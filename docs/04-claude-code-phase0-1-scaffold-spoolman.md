@@ -48,13 +48,13 @@ CLAUDE.md                   (rules above + pointers to docs/)
 - [x] Graceful shutdown on Ctrl+C / SIGTERM.
 
 ### 0.3 Frontend skeleton
-- [ ] Vite + React + TS app, imports `src/design/tokens.css` once; sets `data-fw-theme` / `data-fw-mode` on `<html>`; theme + mode switcher persisted locally.
-- [ ] Empty shell per doc 03 §4: left rail with 8 sections (Fleet, Jobs, Library, Projects, Filament, Service, Tools, Settings), top bar placeholders (search, Scan, Send, Attention), routes with placeholder pages, inspector slot on the right (closed).
-- [ ] API client module + WebSocket client hook that shows heartbeat connection state in the top bar.
-- [ ] Dev: Vite proxies `/api` and `/ws` to foreman-server.
+- [x] Vite + React + TS app, imports `src/design/tokens.css` once; sets `data-fw-theme` / `data-fw-mode` on `<html>`; theme + mode switcher persisted locally.
+- [x] Empty shell per doc 03 §4: left rail with 8 sections (Fleet, Jobs, Library, Projects, Filament, Service, Tools, Settings), top bar placeholders (search, Scan, Send, Attention), routes with placeholder pages, inspector slot on the right (closed).
+- [x] API client module + WebSocket client hook that shows heartbeat connection state in the top bar.
+- [x] Dev: Vite proxies `/api` and `/ws` to foreman-server.
 
 ### 0.4 Rust → TypeScript types
-- [ ] Use **ts-rs** on API DTOs (`#[derive(TS)]`), export to `frontend/src/api/types/` via a `cargo` alias (e.g. `cargo gen-types`). CI fails if generated types are out of date.
+- [x] Use **ts-rs** on API DTOs (`#[derive(TS)]`), export to `frontend/src/api/types/` via a `cargo` alias (e.g. `cargo gen-types`). CI fails if generated types are out of date.
   - Why ts-rs: data travels over HTTP, not Tauri commands; ts-rs has stable releases. Specta/tauri-specta may be used later only for the few Tauri-native commands.
 
 ### 0.5 Tauri desktop shell

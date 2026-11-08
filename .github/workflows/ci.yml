@@ -46,6 +46,14 @@ jobs:
       - name: test
         run: cargo test --all
 
+      # 0.4 — Type-gen drift check (Linux only; Windows has the same Rust output)
+      - name: type-gen drift check
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p frontend/src/api/types
+          cargo test --all -- export_bindings --nocapture
+          git diff --exit-code frontend/src/api/types/
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
