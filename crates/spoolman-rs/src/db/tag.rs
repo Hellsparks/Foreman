@@ -218,6 +218,146 @@ pub async fn find_filament_id_by_uid(pool: &AnyPool, uid: &str) -> Result<Option
     Ok(filament_id)
 }
 
+/// Fetch all tags linked to a specific filament.
+pub async fn get_filament_tags(pool: &AnyPool, filament_id: i64) -> Result<Vec<TagInfo>> {
+    let sql = "SELECT id, uid, format, CAST(added AS TEXT) AS added \
+               FROM tag WHERE filament_id = ? AND target_type = 'filament' ORDER BY id";
+    let rows = sqlx::query(sql).bind(filament_id).fetch_all(pool).await?;
+    let mut result = Vec::with_capacity(rows.len());
+    for row in &rows {
+        result.push(row_to_tag_info(row)?);
+    }
+    Ok(result)
+}
+
+/// Fetch tags for a batch of filament IDs.  Returns `HashMap<filament_id, tags>`.
+pub async fn get_filament_tags_batch(
+    pool: &AnyPool,
+    filament_ids: &[i64],
+) -> Result<HashMap<i64, Vec<TagInfo>>> {
+    if filament_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = filament_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT filament_id, id, uid, format, CAST(added AS TEXT) AS added \
+         FROM tag WHERE filament_id IN ({placeholders}) AND target_type = 'filament' ORDER BY id"
+    );
+    let mut q = sqlx::query(&sql);
+    for id in filament_ids {
+        q = q.bind(*id);
+    }
+    let rows = q.fetch_all(pool).await?;
+
+    let mut result: HashMap<i64, Vec<TagInfo>> = HashMap::new();
+    for row in &rows {
+        use sqlx::Row;
+        let fid: i64 = row.try_get("filament_id")?;
+        let tag = row_to_tag_info(row)?;
+        result.entry(fid).or_default().push(tag);
+    }
+    Ok(result)
+}
+
+/// Link a UID to a filament.
+///
+/// Returns the new/existing `TagInfo`.  Mirrors `link_spool` semantics exactly.
+pub async fn link_filament(
+    pool: &AnyPool,
+    filament_id: i64,
+    uid: &str,
+    format: Option<&str>,
+) -> Result<TagInfo> {
+    let uid_norm = normalize_uid(uid);
+    if uid_norm.is_empty() {
+        return Err(SpoolmanError::BadRequest("Invalid tag UID".into()));
+    }
+
+    // Verify filament exists.
+    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM filament WHERE id = ?")
+        .bind(filament_id)
+        .fetch_optional(pool)
+        .await?;
+    if exists.is_none() {
+        return Err(SpoolmanError::NotFound(format!("filament {filament_id}")));
+    }
+
+    // Check if the UID is already in the tag table.
+    let existing = sqlx::query(
+        "SELECT id, uid, target_type, spool_id, filament_id, format, \
+         CAST(added AS TEXT) AS added FROM tag WHERE uid = ?",
+    )
+    .bind(&uid_norm)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(row) = existing {
+        use sqlx::Row;
+        let existing_spool_id: Option<i64> = row.try_get("spool_id")?;
+        let existing_filament_id: Option<i64> = row.try_get("filament_id")?;
+        let tag_id: i64 = row.try_get("id")?;
+
+        if existing_filament_id == Some(filament_id) {
+            // Re-link to same filament — may update format.
+            if let Some(fmt) = format {
+                sqlx::query("UPDATE tag SET format = ? WHERE id = ?")
+                    .bind(fmt)
+                    .bind(tag_id)
+                    .execute(pool)
+                    .await?;
+            }
+            return get_tag_by_id(pool, tag_id).await;
+        }
+
+        let msg = if let Some(sid) = existing_spool_id {
+            format!("Tag {uid_norm} is already linked to spool {sid}")
+        } else if let Some(fid) = existing_filament_id {
+            format!("Tag {uid_norm} is already linked to filament {fid}")
+        } else {
+            format!("Tag {uid_norm} is already linked to something else")
+        };
+        return Err(SpoolmanError::TagConflict {
+            message: msg,
+            spool_id: existing_spool_id,
+            filament_id: existing_filament_id,
+        });
+    }
+
+    let now = utc_now_str();
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO tag (uid, target_type, filament_id, format, added) \
+         VALUES (?, 'filament', ?, ?, ?) RETURNING id",
+    )
+    .bind(&uid_norm)
+    .bind(filament_id)
+    .bind(format)
+    .bind(&now)
+    .fetch_one(pool)
+    .await?;
+
+    get_tag_by_id(pool, id).await
+}
+
+/// Unlink a UID from a filament.
+/// Returns `NotFound` if no such tag exists for that filament.
+pub async fn unlink_filament(pool: &AnyPool, filament_id: i64, uid: &str) -> Result<()> {
+    let uid_norm = normalize_uid(uid);
+    let result = sqlx::query(
+        "DELETE FROM tag WHERE uid = ? AND filament_id = ? AND target_type = 'filament'",
+    )
+    .bind(&uid_norm)
+    .bind(filament_id)
+    .execute(pool)
+    .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(SpoolmanError::NotFound(format!(
+            "tag '{uid_norm}' on filament {filament_id}"
+        )));
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------

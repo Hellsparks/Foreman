@@ -98,27 +98,27 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - [x] extra fields (`/field/{entity}/{key}`): definitions in `setting`, values JSON-encoded in `*_field` tables. Basic validation (choice field requires choices/multi_choice; type/multi_choice cannot change).
 - [x] settings (`/setting`, `/setting/{key}`), info (`/info`), health (`/health`), find endpoints (`/material`, `/location`, `/lot-number`, `/article-number`), location rename (`PATCH /location/{location}`).
 - [x] search (`GET /search`), externaldb stubs (`/external/filament`, `/external/filament/search`, `/external/material`), tags (NFC link/unlink: `POST /spool/{id}/tag`, `DELETE /spool/{id}/tag/{uid}`) and scan relay (`POST /tag/scan`, `GET /tag/reader`).
-- [ ] archived spool filter + backup endpoint, export.
-- [ ] Error responses match upstream status codes and body shape.
+- [x] archived spool filter + backup endpoint, export.
+- [x] Error responses match upstream status codes and body shape.
 
 ### 1.3 WebSockets
 - [x] Same paths and subscription tree as `ws.py` (all-events root `/api/v1/`, per-collection `/vendor`|`/filament`|`/spool`, per-item `/{id}`), same event JSON (`{type, resource, date, payload}`), same triggers (added/updated/deleted on CRUD; updated on spool use/measure).
 - [x] Scan relay websockets with upstream debounce (3 s) and reader registry semantics (`GET /tag/scan`, `GET /tag/scan/{reader_id}`).
 
 ### 1.4 Packaging
-- [ ] Standalone binary `spoolman-rs` (for people who only want the Spoolman replacement).
-- [ ] Library mount inside foreman-server on **its own listener port** (configurable) so Moonraker can point at `http://host:<port>` exactly like upstream. Foreman's own UI talks to it in-process.
-- [ ] No web UI. `GET /` returns a small page pointing to Foreman's Filament section (or a JSON info doc when Accept is JSON).
+- [x] Standalone binary `spoolman-rs` (for people who only want the Spoolman replacement).
+- [x] Library mount inside foreman-server on **its own listener port** (configurable) so Moonraker can point at `http://host:<port>` exactly like upstream. Foreman's own UI talks to it in-process.
+- [x] No web UI. `GET /` returns a small page pointing to Foreman's Filament section (or a JSON info doc when Accept is JSON).
 
 ### 1.5 Compatibility gate (definition of done)
 - [ ] Upstream `tests_integration/` suite runs against spoolman-rs (it targets `SPOOLMAN_HOST`/`SPOOLMAN_PORT`) via a cargo alias that starts DB containers (Docker is fine **for tests only**). Green on **SQLite, Postgres, MariaDB**; Cockroach run reported, not blocking.
-- [ ] Route-list diff vs committed OpenAPI fixture = empty.
+- [x] Route-list diff vs committed OpenAPI fixture = empty.
 - [ ] Migration test: copy of a real older Spoolman SQLite DB (owner will provide one) → starts, migrates, data intact, opens in upstream Python afterwards.
 - [ ] Moonraker smoke test: real or containerised Moonraker with `[spoolman] server: http://…` shows `spoolman_connected: true`, active spool set/cleared, usage reports decrease `used_weight`.
 - [ ] Load test: 50 concurrent clients with websockets; memory and latency recorded vs upstream (report only).
 
 ### 1.6 Foreman-specific extra fields
-- [ ] On first Foreman start (not in standalone mode), ensure Foreman's extra fields exist exactly as Marathon created them: `url`, `hue_td`, `swatch`, `orcaslicer_config`, `material_modifier` — read `backend/src/routes/setup.js` in the old repo for entity + type of each.
+- [x] On first Foreman start (not in standalone mode), ensure Foreman's extra fields exist exactly as Marathon created them: `url`, `hue_td`, `swatch`, `orcaslicer_config`, `material_modifier` — read `backend/src/routes/setup.js` in the old repo for entity + type of each.
 
 ---
 
@@ -178,9 +178,19 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 
 **`Option<WebSocketUpgrade>` does not satisfy Axum 0.8 `Handler` trait bounds:** Using `Option<WebSocketUpgrade>` as a handler argument fails because Axum 0.8's macro-generated `Handler` impls do not cover this combination. Fix: a custom `OptWs(pub Option<WebSocketUpgrade>)` extractor that explicitly implements `FromRequestParts<S>` by calling `WebSocketUpgrade::from_request_parts` and wrapping errors in `Ok(None)`. This avoids the blanket `Option<T>` impl issue entirely.
 
+**`ApiError` lacked `From<std::io::Error>`:** The backup handler uses `tokio::fs::create_dir_all` and `tokio::fs::copy`, both of which return `std::io::Error`. `SpoolmanError::Io` already wraps it via `#[from]`, but `ApiError` only implemented `From<SpoolmanError>` and `From<serde_json::Error>`. Added `impl From<std::io::Error> for ApiError` to `api/error.rs`.
+
+**`RUSTC` env var required when `cargo` is called via full toolchain path:** Even with `~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo`, the subprocess `rustc` calls fall back to the system PATH where the broken shim lives. Setting `RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc` explicitly prevents this.
+
 **`db::search` takes `&Engine` but only uses it in `attach_filament_spools` (not yet):** The `_engine` parameter is prefixed as unused. Engine-specific SQL for the search path is deferred to session 10 (SQL LIKE filter optimisation).
 
 **External DB (SpoolmanDB) download/cache deferred:** `api/external.rs` returns empty arrays. The external DB download, cache, and proxy logic is deferred to session 10 per the original plan.
+
+### Session 10 — 2026-11-08
+
+**Axum 0.8 `nest()` does not reliably match root route inside nested router:** `Router::new().nest("/api/v1", Router::new().route("/", get(ws_handler)))` returns 404 for `GET /api/v1/` in Axum 0.8. The fix is to register the root WebSocket route directly on the outer router: `.route("/api/v1/", get(ws_handler)).nest("/api/v1", inner_without_root)`. The behavior difference was detected by the route-list integration test.
+
+**Route-list test needed body check to distinguish handler 404 from routing 404:** The in-process route test fires real HTTP requests with dummy entity IDs (e.g. `/filament/1`). Handlers return 404 JSON `{"message":"..."}` when the entity is not found; Axum's routing 404 returns an empty body. Test updated to check `body.contains("\"message\"")` before counting a 404 as a missing route.
 
 ### Session 6 — 2026-11-08
 

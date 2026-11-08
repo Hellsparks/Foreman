@@ -92,6 +92,7 @@ pub struct FilamentResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
     pub extra: Map<String, Value>,
+    pub tags: Vec<TagInfo>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -385,6 +386,46 @@ pub struct SearchResultFilamentSpool {
 }
 
 // ---------------------------------------------------------------------------
+// Spool group
+// ---------------------------------------------------------------------------
+
+/// One aggregated spool group returned by `GET /spool/group`.
+#[derive(Debug, Serialize)]
+pub struct SpoolGroupResponse {
+    /// The axis this group was formed on (e.g. `"filament"`, `"location"`).
+    pub group_by: String,
+    /// The group's key value as a string (null = ungrouped / no-value).
+    pub key: Option<String>,
+    pub spool_count: i64,
+    pub in_use_count: i64,
+    pub total_remaining_weight: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_used: Option<String>,
+    /// Hydrated when `group_by = "filament"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filament: Option<FilamentResponse>,
+    /// Hydrated when `group_by = "vendor"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<VendorResponse>,
+    /// Count of distinct filaments — only present when `group_by = "vendor"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filament_count: Option<i64>,
+}
+
+/// Body for `PATCH /spool/field/{field}`.
+#[derive(Debug, Deserialize)]
+pub struct RenameFieldValueRequest {
+    pub value: String,
+    pub new_value: String,
+}
+
+/// Response for `PATCH /spool/field/{field}`.
+#[derive(Debug, Serialize)]
+pub struct RenameFieldValueResult {
+    pub count: i64,
+}
+
+// ---------------------------------------------------------------------------
 // Spool use / measure
 // ---------------------------------------------------------------------------
 
@@ -464,7 +505,7 @@ pub struct SettingResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Info / health
+// Info / health / backup
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize)]
@@ -476,6 +517,12 @@ pub struct HealthCheck {
 pub struct InfoResponse {
     pub version: &'static str,
     pub db_type: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BackupResponse {
+    pub path: String,
+    pub created: bool,
 }
 
 // ---------------------------------------------------------------------------

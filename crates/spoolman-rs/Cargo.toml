@@ -52,3 +52,7 @@ dirs = { workspace = true }
 [dev-dependencies]
 # Temporary directories for database tests
 tempfile = "3"
+# HTTP client for route-list integration test
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# JSON for route fixture
+serde_json = "1"

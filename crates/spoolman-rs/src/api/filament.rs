@@ -12,8 +12,9 @@ use serde::Deserialize;
 
 use crate::{
     api::error::ApiResult,
-    db::filament as db,
-    models::{CreateFilamentRequest, FilamentResponse, UpdateFilamentRequest},
+    db::{filament as db, tag as db_tag},
+    error::SpoolmanError,
+    models::{CreateFilamentRequest, FilamentResponse, TagInfo, TagLinkRequest, UpdateFilamentRequest},
     state::AppState,
 };
 
@@ -139,5 +140,32 @@ pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiRe
         filament.id,
         &filament,
     );
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
+// Tag link / unlink
+// ---------------------------------------------------------------------------
+
+/// POST {base_path}/api/v1/filament/{id}/tag
+pub async fn link_tag(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<TagLinkRequest>,
+) -> ApiResult<(StatusCode, Json<TagInfo>)> {
+    let tag = db_tag::link_filament(&state.db.pool, id, &req.uid, req.format.as_deref()).await?;
+    Ok((StatusCode::CREATED, Json(tag)))
+}
+
+/// DELETE {base_path}/api/v1/filament/{id}/tag/{uid}
+pub async fn unlink_tag(
+    State(state): State<AppState>,
+    Path((id, uid)): Path<(i64, String)>,
+) -> ApiResult<StatusCode> {
+    // Validate filament exists first (returns 404 if not).
+    if db::find_by_id(&state.db.pool, id).await.is_err() {
+        return Err(SpoolmanError::NotFound(format!("filament {id}")).into());
+    }
+    db_tag::unlink_filament(&state.db.pool, id, &uid).await?;
     Ok(StatusCode::NO_CONTENT)
 }

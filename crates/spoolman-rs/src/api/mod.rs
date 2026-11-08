@@ -1,6 +1,7 @@
 //! Axum router for the spoolman-rs HTTP API.
 
 pub mod error;
+pub mod export;
 pub mod external;
 pub mod extra_field;
 pub mod filament;
@@ -23,9 +24,10 @@ use crate::state::AppState;
 
 /// Build the API router mounted at `{base_path}/api/v1`.
 pub fn router(base_path: &str) -> Router<AppState> {
+    // Note: the root WebSocket route ("/") is NOT placed inside the nest because
+    // Axum 0.8's nest() does not reliably match the stripped root path "/" when
+    // accessed as `{prefix}/`.  It is registered directly on the outer router.
     let api = Router::new()
-        // Root WebSocket — subscribe to all entity events
-        .route("/", get(root_ws))
         // Health / Info
         .route("/health", get(other::health))
         .route("/info", get(other::info))
@@ -47,6 +49,8 @@ pub fn router(base_path: &str) -> Router<AppState> {
         )
         // Spool
         .route("/spool", get(spool::list).post(spool::create))
+        .route("/spool/group", get(spool::find_groups))
+        .route("/spool/field/{field}", patch(spool::rename_field_value))
         .route(
             "/spool/{id}",
             get(spool::get_one)
@@ -55,9 +59,12 @@ pub fn router(base_path: &str) -> Router<AppState> {
         )
         .route("/spool/{id}/use", put(spool::use_spool))
         .route("/spool/{id}/measure", put(spool::measure_spool))
-        // Tag link / unlink
+        // Spool tag link / unlink
         .route("/spool/{id}/tag", post(tag::link_tag))
         .route("/spool/{id}/tag/{uid}", delete(tag::unlink_tag))
+        // Filament tag link / unlink
+        .route("/filament/{id}/tag", post(filament::link_tag))
+        .route("/filament/{id}/tag/{uid}", delete(filament::unlink_tag))
         // Tag scan relay
         .route("/tag/scan", post(tag::scan_post).get(tag::scan_ws_any))
         .route("/tag/scan/{reader_id}", get(tag::scan_ws_reader))
@@ -92,12 +99,23 @@ pub fn router(base_path: &str) -> Router<AppState> {
         .route("/location", get(other::find_locations))
         .route("/lot-number", get(other::find_lot_numbers))
         // Location rename
-        .route("/location/{location}", patch(other::rename_location));
+        .route("/location/{location}", patch(other::rename_location))
+        // Backup
+        .route("/backup", post(other::backup))
+        // Export
+        .route("/export/spools", get(export::export_spools))
+        .route("/export/filaments", get(export::export_filaments))
+        .route("/export/vendors", get(export::export_vendors));
 
+    // Register root WebSocket outside the nest so "/api/v1/" matches reliably.
     if base_path.is_empty() {
-        Router::new().nest("/api/v1", api)
+        Router::new()
+            .route("/api/v1/", get(root_ws))
+            .nest("/api/v1", api)
     } else {
-        Router::new().nest(&format!("{base_path}/api/v1"), api)
+        Router::new()
+            .route(&format!("{base_path}/api/v1/"), get(root_ws))
+            .nest(&format!("{base_path}/api/v1"), api)
     }
 }
 

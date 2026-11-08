@@ -42,6 +42,14 @@ pub struct Db {
     pub engine: Engine,
 }
 
+/// Register all compiled-in sqlx drivers.
+///
+/// Must be called once before any `AnyPool` operation.  `Db::connect` calls it
+/// automatically; call this directly in tests that bypass `Db::connect`.
+pub fn install_drivers() {
+    sqlx::any::install_default_drivers();
+}
+
 impl Db {
     /// Open (or create) the database described by `config`.
     ///

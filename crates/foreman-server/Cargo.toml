@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 foreman-core = { path = "../foreman-core" }
+spoolman-rs = { path = "../spoolman-rs" }
 
 # Async runtime
 tokio = { workspace = true }

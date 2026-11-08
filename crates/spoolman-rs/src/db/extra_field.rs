@@ -236,6 +236,66 @@ pub async fn set_values(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Foreman-specific defaults
+// ---------------------------------------------------------------------------
+
+/// Ensure Foreman's built-in extra fields exist on the `filament` entity.
+///
+/// Called once by `foreman-server` after connecting to the spoolman-rs database.
+/// Each field is created only if it is not already present — existing definitions
+/// are never overwritten so users can rename/reorder without losing their changes.
+///
+/// Fields (from the original Marathon `setup.js`):
+/// | key                | type    | unit |
+/// |--------------------|---------|------|
+/// | url                | text    |      |
+/// | hue_td             | float   | TD   |
+/// | swatch             | boolean |      |
+/// | orcaslicer_config  | text    |      |
+/// | material_modifier  | text    |      |
+pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::error::Result<()> {
+    use crate::models::ExtraFieldType;
+
+    struct DefaultField {
+        key: &'static str,
+        name: &'static str,
+        field_type: ExtraFieldType,
+        unit: Option<&'static str>,
+    }
+
+    let defaults = [
+        DefaultField { key: "url",               name: "Link",                 field_type: ExtraFieldType::Text,    unit: None      },
+        DefaultField { key: "hue_td",             name: "Hueforge TD",          field_type: ExtraFieldType::Float,   unit: Some("TD") },
+        DefaultField { key: "swatch",             name: "Has printed swatch",   field_type: ExtraFieldType::Boolean, unit: None      },
+        DefaultField { key: "orcaslicer_config",  name: "OrcaSlicer Config",    field_type: ExtraFieldType::Text,    unit: None      },
+        DefaultField { key: "material_modifier",  name: "Material Modifier",    field_type: ExtraFieldType::Text,    unit: None      },
+    ];
+
+    let existing = get_definitions(pool, "filament").await?;
+    let existing_keys: std::collections::HashSet<&str> =
+        existing.iter().map(|f| f.key.as_str()).collect();
+
+    for d in &defaults {
+        if existing_keys.contains(d.key) {
+            continue;
+        }
+        let params = ExtraFieldParams {
+            name: d.name.to_owned(),
+            order: 0,
+            field_type: d.field_type.clone(),
+            unit: d.unit.map(str::to_owned),
+            default_value: None,
+            choices: None,
+            multi_choice: None,
+        };
+        upsert_definition(pool, engine, "filament", d.key, &params).await?;
+        tracing::info!(key = d.key, "created Foreman default extra field");
+    }
+
+    Ok(())
+}
+
 /// Get all distinct values stored for a specific extra field key across all entities.
 pub async fn get_distinct_values(pool: &AnyPool, table: &str, key: &str) -> Result<Vec<String>> {
     let sql = format!("SELECT DISTINCT value FROM {table} WHERE key = ?");

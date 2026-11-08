@@ -150,6 +150,7 @@ impl SpoolRow {
             multi_color_direction: self.f_multi_color_direction,
             external_id: self.f_external_id,
             extra: Map::new(),
+            tags: vec![],
         };
 
         SpoolResponse {
@@ -294,6 +295,7 @@ pub async fn find(
     let mut v_extras =
         extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &vendor_ids).await?;
     let mut tags_map = tag::get_spool_tags_batch(pool, &spool_ids).await?;
+    let mut filament_tags_map = tag::get_filament_tags_batch(pool, &filament_ids).await?;
 
     let mut results = Vec::with_capacity(parsed.len());
     for r in parsed {
@@ -313,6 +315,7 @@ pub async fn find(
             }
         }
         resp.tags = tags_map.remove(&sid).unwrap_or_default();
+        resp.filament.tags = filament_tags_map.remove(&fid).unwrap_or_default();
         results.push(resp);
     }
     Ok((results, total))
@@ -336,6 +339,7 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<SpoolResponse> {
         v.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", vid).await?;
     }
     resp.tags = tag::get_spool_tags(pool, id).await?;
+    resp.filament.tags = tag::get_filament_tags(pool, filament_id).await?;
     Ok(resp)
 }
 
@@ -708,4 +712,304 @@ pub async fn rename_location(pool: &AnyPool, old_name: &str, new_name: &str) -> 
         .execute(pool)
         .await?;
     Ok(())
+}
+
+/// Rename a spool field value across all spools that hold it.
+///
+/// `field` is either `"location"` or `"extra.<key>"`.  Any other value returns a `BadRequest`.
+/// Returns the number of spools changed.
+///
+/// Mirrors `spoolman/database/spool.py::rename_field_value`.
+pub async fn rename_field_value(
+    pool: &AnyPool,
+    field: &str,
+    value: &str,
+    new_value: &str,
+) -> Result<i64> {
+    if field == "location" {
+        let result = sqlx::query("UPDATE spool SET location = ? WHERE location = ?")
+            .bind(new_value)
+            .bind(value)
+            .execute(pool)
+            .await?;
+        return Ok(result.rows_affected() as i64);
+    }
+
+    if let Some(key) = field.strip_prefix("extra.") {
+        // Encode the value as a JSON string (the way it's stored in spool_field.value).
+        let encoded_old = serde_json::to_string(value)?;
+        let encoded_new = serde_json::to_string(new_value)?;
+        let result = sqlx::query(
+            "UPDATE spool_field SET value = ? WHERE key = ? AND value = ?",
+        )
+        .bind(encoded_new)
+        .bind(key)
+        .bind(encoded_old)
+        .execute(pool)
+        .await?;
+        return Ok(result.rows_affected() as i64);
+    }
+
+    Err(SpoolmanError::BadRequest(format!(
+        "Cannot rename values of '{field}'. Only fields the spool itself owns can be renamed: \
+         location, or 'extra.<spool extra field key>'."
+    )))
+}
+
+// ---------------------------------------------------------------------------
+// Spool grouping
+// ---------------------------------------------------------------------------
+
+/// Parameters for `GET /spool/group`.
+#[derive(Debug, Default)]
+pub struct SpoolGroupFilter {
+    /// Required: `filament`, `vendor`, `material`, `location`, or `extra.<key>`.
+    pub group_by: String,
+    // Reuse spool filter fields:
+    pub filament_name: Option<String>,
+    pub filament_id: Option<String>,
+    pub filament_material: Option<String>,
+    pub filament_vendor_name: Option<String>,
+    pub filament_vendor_id: Option<String>,
+    pub location: Option<String>,
+    pub allow_archived: bool,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// One row of the aggregation query.
+struct GroupRow {
+    group_key: Option<String>,
+    spool_count: i64,
+    in_use_count: i64,
+    total_remaining_weight: f64,
+    last_used: Option<String>,
+    /// Only for group_by = vendor
+    filament_count: Option<i64>,
+}
+
+/// Find grouped spool aggregates.
+///
+/// Supports `group_by` values: `filament`, `vendor`, `material`, `location`, `extra.<key>`.
+/// Does not support `include_empty` (deferred to session 10).
+/// Does not support the `preview` flag (deferred to session 10).
+pub async fn find_groups(
+    pool: &AnyPool,
+    engine: &Engine,
+    filter: &SpoolGroupFilter,
+) -> Result<(Vec<crate::models::SpoolGroupResponse>, i64, i64, f64)> {
+    use crate::db::{filament as filament_db, vendor as vendor_db};
+
+    let group_by = filter.group_by.trim();
+
+    // Resolve the SQL GROUP BY column.
+    let group_col_sql = if group_by == "filament" {
+        "s.filament_id"
+    } else if group_by == "vendor" {
+        "f.vendor_id"
+    } else if group_by == "material" {
+        "f.material"
+    } else if group_by == "location" {
+        "s.location"
+    } else if let Some(key) = group_by.strip_prefix("extra.") {
+        // For extra fields we join spool_field table once.
+        // We'll handle this via a subquery approach below.
+        // For now, validate and fall through to extra-field path.
+        let _ = key; // used below
+        "sf_group.value"
+    } else {
+        return Err(SpoolmanError::BadRequest(format!(
+            "Invalid group_by field '{group_by}'. \
+             Must be one of: filament, vendor, material, location, or extra.<key>."
+        )));
+    };
+
+    // Build filter WHERE conditions (same as spool find).
+    let mut wb = WhereBuilder::new();
+    wb.add_str_opt("f.name", filter.filament_name.as_deref(), engine);
+    wb.add_int_opt("s.filament_id", filter.filament_id.as_deref());
+    wb.add_str_opt("f.material", filter.filament_material.as_deref(), engine);
+    wb.add_str_opt("v.name", filter.filament_vendor_name.as_deref(), engine);
+    wb.add_int_opt("f.vendor_id", filter.filament_vendor_id.as_deref());
+    wb.add_str_opt("s.location", filter.location.as_deref(), engine);
+    if !filter.allow_archived {
+        wb.add_bool("s.archived", false);
+    }
+
+    let where_sql = wb.sql();
+    let pag = Pagination::new(filter.limit, filter.offset);
+
+    // Build the extra-field join clause if needed.
+    let extra_join = if let Some(key) = group_by.strip_prefix("extra.") {
+        format!(
+            "LEFT JOIN spool_field sf_group \
+             ON sf_group.spool_id = s.id AND sf_group.key = '{}'",
+            key.replace('\'', "''")
+        )
+    } else {
+        String::new()
+    };
+
+    // The GROUP BY column in the SELECT.
+    // For vendor, also count distinct filaments.
+    let extra_agg = if group_by == "vendor" {
+        ", COUNT(DISTINCT f.id) AS filament_count"
+    } else {
+        ""
+    };
+
+    // Remaining weight expression — mirrors upstream's formula:
+    //   max(0, coalesce(initial_weight, filament.weight) - used_weight)
+    let remaining_expr =
+        "CASE WHEN COALESCE(s.initial_weight, f.weight, 0.0) - s.used_weight < 0 \
+         THEN 0.0 \
+         ELSE COALESCE(s.initial_weight, f.weight, 0.0) - s.used_weight END";
+
+    let agg_sql = format!(
+        "SELECT \
+         CAST({group_col_sql} AS TEXT) AS group_key, \
+         COUNT(s.id) AS spool_count, \
+         COUNT(CASE WHEN s.used_weight > 0 THEN s.id END) AS in_use_count, \
+         COALESCE(SUM({remaining_expr}), 0.0) AS total_remaining_weight, \
+         MAX(CAST(s.last_used AS TEXT)) AS last_used \
+         {extra_agg} \
+         FROM spool s \
+         JOIN filament f ON f.id = s.filament_id \
+         LEFT JOIN vendor v ON v.id = f.vendor_id \
+         {extra_join} \
+         {where_sql} \
+         GROUP BY {group_col_sql} \
+         ORDER BY {group_col_sql} ASC \
+         LIMIT ? OFFSET ?"
+    );
+
+    let count_sql = format!(
+        "SELECT COUNT(*) FROM ( \
+         SELECT {group_col_sql} \
+         FROM spool s \
+         JOIN filament f ON f.id = s.filament_id \
+         LEFT JOIN vendor v ON v.id = f.vendor_id \
+         {extra_join} \
+         {where_sql} \
+         GROUP BY {group_col_sql} \
+         ) AS _cnt"
+    );
+
+    // Count query.
+    let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
+    for b in &wb.binds {
+        count_q = count_q.bind(b.clone());
+    }
+    let total_count: i64 = count_q.fetch_one(pool).await?;
+
+    // Data query.
+    let mut q = sqlx::query(&agg_sql);
+    for b in &wb.binds {
+        q = q.bind(b.clone());
+    }
+    q = q.bind(pag.limit).bind(pag.offset);
+    let rows = q.fetch_all(pool).await?;
+
+    // Parse aggregate rows.
+    let mut group_rows: Vec<GroupRow> = Vec::with_capacity(rows.len());
+    for row in &rows {
+        use sqlx::Row as _;
+        let group_key: Option<String> = row.try_get("group_key").ok().flatten();
+        let spool_count: i64 = row.try_get("spool_count").unwrap_or(0);
+        let in_use_count: i64 = row.try_get("in_use_count").unwrap_or(0);
+        let total_remaining_weight: f64 =
+            row.try_get("total_remaining_weight").unwrap_or(0.0);
+        let last_used: Option<String> = row.try_get_unchecked("last_used").ok().flatten();
+        let filament_count: Option<i64> = if group_by == "vendor" {
+            row.try_get("filament_count").ok()
+        } else {
+            None
+        };
+        group_rows.push(GroupRow {
+            group_key,
+            spool_count,
+            in_use_count,
+            total_remaining_weight,
+            last_used,
+            filament_count,
+        });
+    }
+
+    // Totals across all groups (before pagination).
+    let totals_sql = format!(
+        "SELECT \
+         COALESCE(SUM(spool_count), 0) AS total_spools, \
+         COALESCE(SUM(total_remaining_weight), 0.0) AS total_remaining_weight \
+         FROM ( \
+           SELECT COUNT(s.id) AS spool_count, \
+           COALESCE(SUM({remaining_expr}), 0.0) AS total_remaining_weight \
+           FROM spool s \
+           JOIN filament f ON f.id = s.filament_id \
+           LEFT JOIN vendor v ON v.id = f.vendor_id \
+           {extra_join} \
+           {where_sql} \
+           GROUP BY {group_col_sql} \
+         ) AS _t"
+    );
+    let mut totals_q = sqlx::query(&totals_sql);
+    for b in &wb.binds {
+        totals_q = totals_q.bind(b.clone());
+    }
+    let totals_row = totals_q.fetch_one(pool).await?;
+    let total_spools: i64 = {
+        use sqlx::Row as _;
+        totals_row.try_get("total_spools").unwrap_or(0)
+    };
+    let total_remaining_weight: f64 = {
+        use sqlx::Row as _;
+        totals_row.try_get("total_remaining_weight").unwrap_or(0.0)
+    };
+
+    // Hydrate grouped entities (filament or vendor).
+    let mut results: Vec<crate::models::SpoolGroupResponse> =
+        Vec::with_capacity(group_rows.len());
+
+    for gr in group_rows {
+        let filament_obj = if group_by == "filament" {
+            if let Some(ref key) = gr.group_key {
+                if let Ok(fid) = key.parse::<i64>() {
+                    filament_db::find_by_id(pool, fid).await.ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let vendor_obj = if group_by == "vendor" {
+            if let Some(ref key) = gr.group_key {
+                if let Ok(vid) = key.parse::<i64>() {
+                    vendor_db::find_by_id(pool, vid).await.ok()
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        results.push(crate::models::SpoolGroupResponse {
+            group_by: group_by.to_owned(),
+            key: gr.group_key,
+            spool_count: gr.spool_count,
+            in_use_count: gr.in_use_count,
+            total_remaining_weight: gr.total_remaining_weight,
+            last_used: gr.last_used.as_deref().map(normalise_dt),
+            filament: filament_obj,
+            vendor: vendor_obj,
+            filament_count: gr.filament_count,
+        });
+    }
+
+    Ok((results, total_count, total_spools, total_remaining_weight))
 }

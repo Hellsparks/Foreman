@@ -7,6 +7,12 @@ use axum::{
     Router,
 };
 use foreman_core::events::ServerEvent;
+use spoolman_rs::{
+    api as spoolman_api,
+    config::SpoolmanConfig,
+    db::{extra_field, Db as SpoolmanDb},
+    state::AppState as SpoolmanState,
+};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{signal, sync::broadcast};
 use tower_http::{
@@ -102,6 +108,52 @@ async fn main() {
     info!("listening on http://{addr}");
     info!("health: http://{addr}/api/health");
     info!("events: ws://{addr}/ws/events");
+
+    // Spawn the Spoolman-compatible API on its own port (default 7912).
+    if cfg.spoolman_enabled {
+        match SpoolmanConfig::from_env() {
+            Ok(spoolman_cfg) => {
+                let spoolman_addr: SocketAddr =
+                    format!("{}:{}", spoolman_cfg.host, spoolman_cfg.port)
+                        .parse()
+                        .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 7912)));
+                match SpoolmanDb::connect(&spoolman_cfg).await {
+                    Ok(db) => {
+                        // Ensure Foreman's built-in extra fields exist (idempotent).
+                        if let Err(e) =
+                            extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await
+                        {
+                            warn!("could not create Foreman default extra fields: {e}");
+                        }
+                        let state = SpoolmanState::new(db, spoolman_cfg.clone());
+                        let spoolman_router =
+                            spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
+                        match tokio::net::TcpListener::bind(spoolman_addr).await {
+                            Ok(spoolman_listener) => {
+                                info!(%spoolman_addr, "spoolman-rs API listening");
+                                tokio::spawn(async move {
+                                    if let Err(e) =
+                                        axum::serve(spoolman_listener, spoolman_router).await
+                                    {
+                                        tracing::error!("spoolman-rs server error: {e}");
+                                    }
+                                });
+                            }
+                            Err(e) => {
+                                warn!("could not bind spoolman-rs to {spoolman_addr}: {e}");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("spoolman-rs database connect failed: {e}");
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("spoolman-rs config error (spoolman-rs disabled): {e}");
+            }
+        }
+    }
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

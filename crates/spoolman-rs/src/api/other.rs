@@ -1,16 +1,20 @@
 //! Miscellaneous endpoints — mirrors `spoolman/api/v1/other.py` and the
-//! router-level `/info` and `/health` endpoints in `spoolman/api/v1/router.py`.
+//! router-level `/info`, `/health`, and `/backup` endpoints in
+//! `spoolman/api/v1/router.py`.
 
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
 };
+use chrono::Local;
 
 use crate::{
     api::error::ApiResult,
+    config::DbType,
     db::{filament as db_filament, spool as db_spool},
-    models::{HealthCheck, InfoResponse, RenameLocationBody},
+    error::SpoolmanError,
+    models::{BackupResponse, HealthCheck, InfoResponse, RenameLocationBody},
     state::AppState,
 };
 
@@ -66,4 +70,37 @@ pub async fn rename_location(
 ) -> ApiResult<(StatusCode, Json<String>)> {
     db_spool::rename_location(&state.db.pool, &location, &body.name).await?;
     Ok((StatusCode::OK, Json(body.name)))
+}
+
+// ---------------------------------------------------------------------------
+// Backup
+// ---------------------------------------------------------------------------
+
+/// POST {base_path}/api/v1/backup
+///
+/// Copies the SQLite database file to `backups_dir`.  For non-SQLite databases
+/// backup is not supported and a 400 is returned, matching upstream behaviour.
+pub async fn backup(State(state): State<AppState>) -> ApiResult<Json<BackupResponse>> {
+    if state.config.db_type != DbType::Sqlite {
+        return Err(SpoolmanError::BadRequest(
+            "Backup is only supported for SQLite databases.".to_owned(),
+        )
+        .into());
+    }
+
+    let src = state.config.sqlite_path();
+    let backups_dir = &state.config.backups_dir;
+
+    tokio::fs::create_dir_all(backups_dir).await?;
+
+    let ts = Local::now().format("%Y-%m-%d_%H-%M-%S");
+    let filename = format!("spoolman_{ts}.db");
+    let dest = backups_dir.join(&filename);
+
+    tokio::fs::copy(&src, &dest).await?;
+
+    Ok(Json(BackupResponse {
+        path: dest.to_string_lossy().into_owned(),
+        created: true,
+    }))
 }

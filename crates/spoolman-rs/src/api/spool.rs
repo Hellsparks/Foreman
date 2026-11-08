@@ -15,7 +15,8 @@ use crate::{
     db::spool as db,
     error::SpoolmanError,
     models::{
-        CreateSpoolRequest, SpoolMeasureRequest, SpoolResponse, SpoolUseRequest, UpdateSpoolRequest,
+        CreateSpoolRequest, RenameFieldValueRequest, RenameFieldValueResult, SpoolGroupResponse,
+        SpoolMeasureRequest, SpoolResponse, SpoolUseRequest, UpdateSpoolRequest,
     },
     state::AppState,
 };
@@ -178,4 +179,88 @@ pub async fn measure_spool(
     let spool = db::measure(&state.db.pool, id, req.weight).await?;
     crate::ws::broadcast(&state.event_tx, "updated", "spool", spool.id, &spool);
     Ok(Json(spool))
+}
+
+// ---------------------------------------------------------------------------
+// Group aggregation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Default)]
+pub struct SpoolGroupQuery {
+    pub group_by: Option<String>,
+    #[serde(rename = "filament.name")]
+    pub filament_name: Option<String>,
+    #[serde(rename = "filament.id")]
+    pub filament_id: Option<String>,
+    #[serde(rename = "filament.material")]
+    pub filament_material: Option<String>,
+    #[serde(rename = "filament.vendor.name")]
+    pub filament_vendor_name: Option<String>,
+    #[serde(rename = "filament.vendor.id")]
+    pub filament_vendor_id: Option<String>,
+    pub location: Option<String>,
+    pub allow_archived: Option<bool>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// GET {base_path}/api/v1/spool/group
+pub async fn find_groups(
+    State(state): State<AppState>,
+    Query(q): Query<SpoolGroupQuery>,
+) -> ApiResult<(StatusCode, HeaderMap, Json<Vec<SpoolGroupResponse>>)> {
+    let group_by = q.group_by.unwrap_or_default();
+    if group_by.is_empty() {
+        return Err(SpoolmanError::BadRequest(
+            "group_by query parameter is required.".into(),
+        )
+        .into());
+    }
+
+    let filter = db::SpoolGroupFilter {
+        group_by,
+        filament_name: q.filament_name,
+        filament_id: q.filament_id,
+        filament_material: q.filament_material,
+        filament_vendor_name: q.filament_vendor_name,
+        filament_vendor_id: q.filament_vendor_id,
+        location: q.location,
+        allow_archived: q.allow_archived.unwrap_or(false),
+        limit: q.limit,
+        offset: q.offset,
+    };
+
+    let (groups, total_count, total_spools, total_remaining_weight) =
+        db::find_groups(&state.db.pool, &state.db.engine, &filter).await?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "x-total-count",
+        HeaderValue::from_str(&total_count.to_string()).unwrap_or(HeaderValue::from_static("0")),
+    );
+    headers.insert(
+        "x-total-spools",
+        HeaderValue::from_str(&total_spools.to_string()).unwrap_or(HeaderValue::from_static("0")),
+    );
+    headers.insert(
+        "x-total-remaining-weight",
+        HeaderValue::from_str(&format!("{total_remaining_weight:.2}"))
+            .unwrap_or(HeaderValue::from_static("0")),
+    );
+    Ok((StatusCode::OK, headers, Json(groups)))
+}
+
+// ---------------------------------------------------------------------------
+// Rename field value
+// ---------------------------------------------------------------------------
+
+/// PATCH {base_path}/api/v1/spool/field/{field}
+pub async fn rename_field_value(
+    State(state): State<AppState>,
+    Path(field): Path<String>,
+    Json(req): Json<RenameFieldValueRequest>,
+) -> ApiResult<Json<RenameFieldValueResult>> {
+    let count =
+        db::rename_field_value(&state.db.pool, &field, &req.value, &req.new_value).await?;
+    Ok(Json(RenameFieldValueResult { count }))
 }

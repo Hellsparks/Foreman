@@ -7,6 +7,7 @@ use crate::{
     db::{
         extra_field,
         query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
+        tag,
         vendor::{normalise_dt, utc_now_str},
         Engine,
     },
@@ -111,6 +112,7 @@ impl FilamentRow {
             multi_color_direction: self.multi_color_direction,
             external_id: self.external_id,
             extra: Map::new(),
+            tags: vec![],
         }
     }
 }
@@ -201,7 +203,7 @@ pub async fn find(
         parsed_rows.push(FilamentRow::from_row(row)?);
     }
 
-    // Batch extra field lookup.
+    // Batch extra field + tag lookup.
     let f_ids: Vec<i64> = parsed_rows.iter().map(|r| r.id).collect();
     let v_ids: Vec<i64> = parsed_rows.iter().filter_map(|r| r.vendor_id).collect();
 
@@ -209,6 +211,7 @@ pub async fn find(
         extra_field::get_values_batch(pool, "filament_field", "filament_id", &f_ids).await?;
     let mut v_extras =
         extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &v_ids).await?;
+    let mut f_tags = tag::get_filament_tags_batch(pool, &f_ids).await?;
 
     let mut results = Vec::with_capacity(parsed_rows.len());
     for r in parsed_rows {
@@ -223,6 +226,7 @@ pub async fn find(
                 v.extra = e;
             }
         }
+        resp.tags = f_tags.remove(&fid).unwrap_or_default();
         results.push(resp);
     }
     Ok((results, total))
@@ -243,6 +247,7 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<FilamentResponse> {
     if let (Some(vid), Some(ref mut v)) = (vendor_id, resp.vendor.as_mut()) {
         v.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", vid).await?;
     }
+    resp.tags = tag::get_filament_tags(pool, id).await?;
     Ok(resp)
 }
 

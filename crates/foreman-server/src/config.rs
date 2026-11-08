@@ -29,10 +29,19 @@ pub struct ServerConfig {
     /// Default: `sqlite://<data_dir>/foreman.db`.
     /// Overridden at runtime if still `None` after loading.
     pub db_url: Option<String>,
+
+    /// Whether to run the Spoolman-compatible API alongside Foreman.
+    /// Default: `true`. Disable with `FOREMAN__SPOOLMAN_ENABLED=false`.
+    #[serde(default = "default_spoolman_enabled")]
+    pub spoolman_enabled: bool,
 }
 
 fn default_port() -> u16 {
     9090
+}
+
+fn default_spoolman_enabled() -> bool {
+    true
 }
 
 fn default_host() -> String {
@@ -107,6 +116,7 @@ impl Default for ServerConfig {
             host: default_host(),
             db_url: Some(db_url),
             data_dir,
+            spoolman_enabled: default_spoolman_enabled(),
         }
     }
 }
