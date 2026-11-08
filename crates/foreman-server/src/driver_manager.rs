@@ -10,16 +10,19 @@ use std::sync::Arc;
 use foreman_core::{
     domain::{FirmwareKind, Printer},
     driver::{PrinterCapabilities, PrinterDriver},
-    drivers::moonraker::{MoonrakerConfig, MoonrakerDriver},
+    drivers::{
+        bambu::{BambuConfig, BambuDriver},
+        moonraker::{MoonrakerConfig, MoonrakerDriver},
+    },
     events::{PrinterStatus, ServerEvent},
 };
 use sqlx::SqlitePool;
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
-/// A running driver handle.
+/// A running driver handle (type-erased).
 struct DriverHandle {
-    driver: Arc<MoonrakerDriver>,
+    driver: Arc<dyn PrinterDriver>,
 }
 
 /// Manages the lifecycle of printer drivers.
@@ -84,29 +87,46 @@ impl DriverManager {
 
     /// Start a driver for a single printer.
     pub async fn start_driver(&self, printer: &Printer) -> Result<(), String> {
-        let url = match &printer.primary_url {
-            Some(u) if !u.is_empty() => u.clone(),
-            _ => return Err("no primary_url".into()),
+        let driver: Arc<dyn PrinterDriver> = match printer.firmware {
+            FirmwareKind::Moonraker => {
+                let url = match &printer.primary_url {
+                    Some(u) if !u.is_empty() => u.clone(),
+                    _ => return Err("moonraker printer has no primary_url".into()),
+                };
+                let config = MoonrakerConfig {
+                    printer_id: printer.id,
+                    url,
+                    api_key: printer.api_key.clone(),
+                };
+                info!(printer_id = printer.id, name = %printer.name, "starting moonraker driver");
+                Arc::new(MoonrakerDriver::new(config, Arc::clone(&self.bus_tx)))
+            }
+            FirmwareKind::Bambu => {
+                let host = match &printer.primary_url {
+                    Some(u) if !u.is_empty() => u.clone(),
+                    _ => return Err("bambu printer has no host (primary_url)".into()),
+                };
+                let serial = match &printer.serial_number {
+                    Some(s) if !s.is_empty() => s.clone(),
+                    _ => return Err("bambu printer has no serial_number".into()),
+                };
+                let access_code = match &printer.access_code {
+                    Some(c) if !c.is_empty() => c.clone(),
+                    _ => return Err("bambu printer has no access_code".into()),
+                };
+                let config = BambuConfig {
+                    printer_id: printer.id,
+                    host,
+                    serial,
+                    access_code,
+                };
+                info!(printer_id = printer.id, name = %printer.name, "starting bambu driver");
+                Arc::new(BambuDriver::new(config, Arc::clone(&self.bus_tx)))
+            }
+            _ => {
+                return Err(format!("unsupported firmware: {:?}", printer.firmware));
+            }
         };
-
-        // Only Moonraker is supported this session.
-        if printer.firmware != FirmwareKind::Moonraker {
-            return Err(format!("unsupported firmware: {:?}", printer.firmware));
-        }
-
-        let config = MoonrakerConfig {
-            printer_id: printer.id,
-            url,
-            api_key: printer.api_key.clone(),
-        };
-
-        let driver = Arc::new(MoonrakerDriver::new(config, Arc::clone(&self.bus_tx)));
-
-        info!(
-            printer_id = printer.id,
-            name = %printer.name,
-            "starting moonraker driver"
-        );
 
         match driver.connect().await {
             Ok(caps) => {
@@ -114,8 +134,6 @@ impl DriverManager {
                     printer_id = printer.id,
                     bed_size = ?caps.bed_size,
                     extruders = caps.extruder_count,
-                    webcams = caps.webcams.len(),
-                    macros = caps.macros.len(),
                     "driver connected"
                 );
                 self.capabilities_cache

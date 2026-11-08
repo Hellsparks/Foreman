@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
 import type { PrinterWithStatus } from "../api/client";
+import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { StatusMap, ConnectionMap } from "../shell/Shell";
 import "./Fleet.css";
@@ -32,15 +33,15 @@ export default function Fleet() {
     loadPrinters();
   }, [loadPrinters]);
 
-  const handleAdd = async (name: string, url: string) => {
+  const handleAdd = async (data: AddPrinterData) => {
     try {
       await api.createPrinter({
-        name,
-        firmware: "moonraker",
-        primary_url: url,
+        name: data.name,
+        firmware: data.firmware,
+        primary_url: data.url || null,
         api_key: null,
-        serial_number: null,
-        access_code: null,
+        serial_number: data.serial || null,
+        access_code: data.accessCode || null,
         tags: [],
         hardened_nozzle: false,
         sort_order: null,
@@ -176,6 +177,23 @@ function PrinterCard({
         </div>
       )}
 
+      {status?.ams_trays && status.ams_trays.length > 0 && (
+        <div className="fleet-card__ams">
+          {status.ams_trays
+            .filter((t) => t.slot < 254)
+            .map((tray) => (
+              <div
+                key={tray.slot}
+                className="fleet-card__ams-swatch"
+                style={{
+                  backgroundColor: tray.color ? `#${tray.color}` : "var(--fw-muted)",
+                }}
+                title={`Slot ${tray.slot}: ${tray.material ?? "?"} ${tray.remaining != null ? `${tray.remaining}%` : ""}`}
+              />
+            ))}
+        </div>
+      )}
+
       {status?.filename && (
         <div className="fleet-card__filename">{status.filename}</div>
       )}
@@ -191,54 +209,127 @@ function PrinterCard({
 // Add printer form
 // ---------------------------------------------------------------------------
 
+interface AddPrinterData {
+  name: string;
+  firmware: FirmwareKind;
+  url: string;
+  serial: string;
+  accessCode: string;
+}
+
 function AddPrinterForm({
   onSubmit,
 }: {
-  onSubmit: (name: string, url: string) => void;
+  onSubmit: (data: AddPrinterData) => void;
 }) {
   const [name, setName] = useState("");
+  const [firmware, setFirmware] = useState<FirmwareKind>("moonraker");
   const [url, setUrl] = useState("");
+  const [serial, setSerial] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+
+  const isBambu = firmware === "bambu";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim() && url.trim()) {
-      onSubmit(name.trim(), url.trim());
+    if (!name.trim()) return;
+    if (isBambu) {
+      if (!url.trim() || !serial.trim() || !accessCode.trim()) return;
+    } else {
+      if (!url.trim()) return;
     }
+    onSubmit({
+      name: name.trim(),
+      firmware,
+      url: url.trim(),
+      serial: serial.trim(),
+      accessCode: accessCode.trim(),
+    });
   };
 
   return (
-    <form className="fleet__form" onSubmit={handleSubmit}>
-      <div className="fleet__form-field">
-        <label className="fleet__form-label" htmlFor="printer-name">
-          Name
-        </label>
-        <input
-          id="printer-name"
-          className="fleet__form-input"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. HellV0"
-          required
-        />
+    <form className="fleet__form fleet__form--multi" onSubmit={handleSubmit}>
+      <div className="fleet__form-row">
+        <div className="fleet__form-field">
+          <label className="fleet__form-label" htmlFor="printer-name">
+            Name
+          </label>
+          <input
+            id="printer-name"
+            className="fleet__form-input"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. HellV0"
+            required
+          />
+        </div>
+        <div className="fleet__form-field fleet__form-field--short">
+          <label className="fleet__form-label" htmlFor="printer-firmware">
+            Type
+          </label>
+          <select
+            id="printer-firmware"
+            className="fleet__form-input"
+            value={firmware}
+            onChange={(e) => setFirmware(e.target.value as FirmwareKind)}
+          >
+            <option value="moonraker">Moonraker</option>
+            <option value="bambu">Bambu</option>
+          </select>
+        </div>
       </div>
-      <div className="fleet__form-field">
-        <label className="fleet__form-label" htmlFor="printer-url">
-          Moonraker URL
-        </label>
-        <input
-          id="printer-url"
-          className="fleet__form-input"
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="http://10.0.0.177"
-          required
-        />
+      <div className="fleet__form-row">
+        <div className="fleet__form-field">
+          <label className="fleet__form-label" htmlFor="printer-url">
+            {isBambu ? "IP Address" : "Moonraker URL"}
+          </label>
+          <input
+            id="printer-url"
+            className="fleet__form-input"
+            type={isBambu ? "text" : "url"}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={isBambu ? "10.0.0.249" : "http://10.0.0.177"}
+            required
+          />
+        </div>
+        {isBambu && (
+          <>
+            <div className="fleet__form-field">
+              <label className="fleet__form-label" htmlFor="printer-serial">
+                Serial
+              </label>
+              <input
+                id="printer-serial"
+                className="fleet__form-input"
+                type="text"
+                value={serial}
+                onChange={(e) => setSerial(e.target.value)}
+                placeholder="e.g. 00W00A000000000"
+                required
+              />
+            </div>
+            <div className="fleet__form-field">
+              <label className="fleet__form-label" htmlFor="printer-access">
+                Access code
+              </label>
+              <input
+                id="printer-access"
+                className="fleet__form-input"
+                type="password"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                placeholder="8-digit code"
+                required
+              />
+            </div>
+          </>
+        )}
+        <button className="fleet__form-submit" type="submit">
+          Add
+        </button>
       </div>
-      <button className="fleet__form-submit" type="submit">
-        Add
-      </button>
     </form>
   );
 }

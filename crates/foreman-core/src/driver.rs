@@ -28,6 +28,14 @@ pub struct PrinterCapabilities {
     pub firmware_version: Option<String>,
     /// Hostname reported by the firmware.
     pub hostname: Option<String>,
+    /// Nozzle diameter in mm (Bambu).
+    pub nozzle_diameter: Option<f64>,
+    /// Number of AMS tray slots available (4 per AMS unit).
+    pub ams_slot_count: Option<u32>,
+    /// Camera type: "basic", "ai", or None.
+    pub camera_type: Option<String>,
+    /// Printer model string derived from serial prefix (Bambu).
+    pub printer_model: Option<String>,
 }
 
 /// A webcam discovered via the firmware API.

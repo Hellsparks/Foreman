@@ -120,6 +120,12 @@ impl CachedStatus {
             filename: self.filename.clone(),
             print_duration: Some(self.print_duration),
             display_message: self.display_message.clone(),
+            layer: None,
+            total_layers: None,
+            remaining_time: None,
+            fans: None,
+            ams_trays: Vec::new(),
+            hms_codes: Vec::new(),
         }
     }
 

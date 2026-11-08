@@ -68,7 +68,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] Mock printer servers (Moonraker + OctoPrint at least) that replay `test-gcodes/` scenarios; used in integration tests.
 
 ### 2.3b Bambu LAN driver (moved up from Phase 9 — owner has a real Bambu + a real Klipper printer to test on)
-- [ ] MQTT over TLS, port 8883, user `bblp`, password = LAN access code, topics `device/<serial>/report` and `device/<serial>/request`. Send `pushall` on connect; merge partial reports into a full status (state, temps, fans, progress, layer, AMS trays with colour/material/remaining, HMS errors).
+- [x] MQTT over TLS, port 8883, user `bblp`, password = LAN access code, topics `device/<serial>/report` and `device/<serial>/request`. Send `pushall` on connect; merge partial reports into a full status (state, temps, fans, progress, layer, AMS trays with colour/material/remaining, HMS errors).
 - [ ] Commands: pause/resume/stop, set temps, light, fan, G-code line, AMS tray select where supported. Map into the same `PrinterDriver` trait.
 - [ ] FTPS (implicit TLS) on port 990 for file list/upload/delete on the SD card; start a print from an uploaded `.3mf` (project_file command). These feed the Library browser in Phase 3.
 - [ ] Camera: X1 RTSPS stream; P1/A1 JPEG stream (verify ports/framing against a reference lib and the real printer; log what was found).
@@ -184,6 +184,23 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 **HellV0 capabilities probe:** bed 120x120mm, 1 extruder, 0 webcams (none configured in moonraker.conf), 0 public macros (all macros on this printer start with `_`). No MMU detected.
 
 **Tauri CLI not installed** on this dev machine — could not test `tauri dev`. Verified the full data path via headless server + curl: HellV0 added via REST, live temps (nozzle ~26°C, bed ~26°C) returned in `GET /api/printers` and via WebSocket events. Frontend builds clean and renders the Fleet page.
+
+### Session 16 — 2026-11-09 (Bambu LAN driver — MQTT + status)
+
+**Reference sources for Bambu MQTT protocol (read, not copied):**
+- OpenBambuAPI: `github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md` — MQTT topic structure, pushall command format, report field names and types, AMS tray schema, HMS code format.
+- Bambu wiki: `wiki.bambulab.com/en/knowledge-sharing/developer-resources/bambu-mqtt-overview` — official LAN MQTT overview.
+- ha-bambulab: `github.com/greghesp/ha-bambulab` — Home Assistant integration, validated field mappings for A1/P1/X1 series (especially fan speed 0–15 → percent mapping, serial prefix → model mapping, AMS Lite detection).
+
+**Fan speed encoding:** Bambu reports fan speeds as string values "0"–"15" (not percentages). Driver maps `raw / 15 * 100` to get 0–100%. Confirmed against ha-bambulab and real A1 report observations from other users.
+
+**Serial prefix → model mapping:** `00W` = A1, `01S` = A1 Mini, `00M` = X1C, `01P` = P1P, `03P` = P1S, `030` = X1E. These are derived from community observations (OpenBambuAPI, ha-bambulab) — Bambu doesn't publish an official model-to-serial mapping in MQTT. The `dev_model_name` field is only in the cloud API.
+
+**TLS:** Bambu printers use a self-signed certificate. The driver uses rustls with a custom `ServerCertVerifier` that accepts any cert (TOFU approach). Certificate fingerprint pinning (store on first connect, refuse on mismatch) is deferred — requires DB schema for pinned certs.
+
+**MQTT crate:** chose `rumqttc v0.24` with `use-rustls` feature. Initially tried `use-native-tls` but rumqttc's native-tls backend doesn't expose `danger_accept_invalid_certs` on the `TlsConfiguration` enum — only `Native` (default OS certs) and `SimpleNative` (custom CA PEM) are available. Switched to rustls which allows injecting a custom `ClientConfig` with a custom cert verifier.
+
+**Commands:** All `PrinterDriver` trait command methods return `NotImplemented` this session per the read-only constraint. Wiring actual MQTT commands (pause, resume, set temp, etc.) is deferred.
 
 ### Session 13 — 2026-11-08 (migration test)
 

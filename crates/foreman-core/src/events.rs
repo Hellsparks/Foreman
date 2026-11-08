@@ -45,6 +45,38 @@ pub struct TempReading {
     pub target: f64,
 }
 
+/// Fan speed readings (0–100 %).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FanSpeeds {
+    pub part_fan: Option<u8>,
+    pub aux_fan: Option<u8>,
+    pub chamber_fan: Option<u8>,
+    pub heatbreak_fan: Option<u8>,
+}
+
+/// A single AMS / AMS-Lite tray.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AmsTray {
+    /// Global slot index (ams_id * 4 + tray_id), or 254 for external spool.
+    pub slot: u32,
+    /// Hex colour string "RRGGBB" (alpha stripped).
+    pub color: Option<String>,
+    /// Material type, e.g. "PLA", "PETG".
+    pub material: Option<String>,
+    /// Remaining filament 0–100 %.
+    pub remaining: Option<u8>,
+}
+
+/// A raw HMS (Health Management System) code from the printer.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct HmsCode {
+    pub attr: u32,
+    pub code: u32,
+}
+
 /// A printer status snapshot with temps, progress, and job info.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -62,6 +94,20 @@ pub struct PrinterStatus {
     pub print_duration: Option<f64>,
     /// Display message from the printer (M117).
     pub display_message: Option<String>,
+    /// Current layer number (Bambu).
+    pub layer: Option<u32>,
+    /// Total layers in print (Bambu).
+    pub total_layers: Option<u32>,
+    /// Estimated remaining time in seconds (Bambu).
+    pub remaining_time: Option<u32>,
+    /// Fan speeds (Bambu).
+    pub fans: Option<FanSpeeds>,
+    /// AMS / AMS-Lite trays loaded (Bambu).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ams_trays: Vec<AmsTray>,
+    /// Active HMS error codes (Bambu).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hms_codes: Vec<HmsCode>,
 }
 
 /// What triggered a connection event.
@@ -249,6 +295,12 @@ mod tests {
                 filename: None,
                 print_duration: None,
                 display_message: None,
+                layer: None,
+                total_layers: None,
+                remaining_time: None,
+                fans: None,
+                ams_trays: Vec::new(),
+                hms_codes: Vec::new(),
             },
         }
     }

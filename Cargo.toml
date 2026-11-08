@@ -50,6 +50,7 @@ async-trait = "0.1"
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 url = "2"
 futures-util = "0.3"
+rumqttc = { version = "0.24", features = ["use-rustls"] }
 
 [profile.release]
 opt-level = 3

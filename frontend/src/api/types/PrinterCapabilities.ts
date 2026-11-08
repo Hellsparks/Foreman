@@ -28,4 +28,20 @@ firmware_version: string | null,
 /**
  * Hostname reported by the firmware.
  */
-hostname: string | null, };
+hostname: string | null, 
+/**
+ * Nozzle diameter in mm (Bambu).
+ */
+nozzle_diameter: number | null, 
+/**
+ * Number of AMS tray slots available (4 per AMS unit).
+ */
+ams_slot_count: number | null, 
+/**
+ * Camera type: "basic", "ai", or None.
+ */
+camera_type: string | null, 
+/**
+ * Printer model string derived from serial prefix (Bambu).
+ */
+printer_model: string | null, };

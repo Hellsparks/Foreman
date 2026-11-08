@@ -1,0 +1,227 @@
+[
+  {
+    "_comment": "pushall response — full state dump (A1, idle, AMS Lite with 4 trays)",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "1",
+      "gcode_state": "IDLE",
+      "mc_percent": 0,
+      "mc_remaining_time": 0,
+      "layer_num": 0,
+      "total_layer_num": 0,
+      "gcode_file": "",
+      "subtask_name": "",
+      "mc_print_error_code": "0",
+      "nozzle_temper": 25.5,
+      "nozzle_target_temper": 0.0,
+      "bed_temper": 24.2,
+      "bed_target_temper": 0.0,
+      "chamber_temper": 23.0,
+      "cooling_fan_speed": "0",
+      "big_fan1_speed": "0",
+      "big_fan2_speed": "0",
+      "heatbreak_fan_speed": "0",
+      "nozzle_diameter": "0.4",
+      "spd_lvl": 2,
+      "spd_mag": 100,
+      "stg_cur": -1,
+      "ipcam": {
+        "ipcam_dev": "1",
+        "ipcam_record": "enable",
+        "timelapse": "disable",
+        "resolution": "720p"
+      },
+      "ams": {
+        "ams": [
+          {
+            "id": "0",
+            "humidity": "3",
+            "temp": "24.0",
+            "tray": [
+              {
+                "id": "0",
+                "tray_type": "PLA",
+                "tray_color": "FF0000FF",
+                "tray_sub_brands": "PLA Basic",
+                "tray_info_idx": "GFL00",
+                "remain": 85,
+                "nozzle_temp_min": "190",
+                "nozzle_temp_max": "230",
+                "tray_diameter": "1.75",
+                "tray_weight": "1000",
+                "tag_uid": "0000000000000000"
+              },
+              {
+                "id": "1",
+                "tray_type": "PLA",
+                "tray_color": "00FF00FF",
+                "tray_sub_brands": "PLA Matte",
+                "tray_info_idx": "GFL01",
+                "remain": 62,
+                "nozzle_temp_min": "190",
+                "nozzle_temp_max": "230",
+                "tray_diameter": "1.75",
+                "tray_weight": "1000",
+                "tag_uid": "0000000000000000"
+              },
+              {
+                "id": "2",
+                "tray_type": "PETG",
+                "tray_color": "0000FFFF",
+                "tray_sub_brands": "PETG Basic",
+                "tray_info_idx": "GFG00",
+                "remain": 44,
+                "nozzle_temp_min": "230",
+                "nozzle_temp_max": "260",
+                "tray_diameter": "1.75",
+                "tray_weight": "1000",
+                "tag_uid": "0000000000000000"
+              },
+              {
+                "id": "3"
+              }
+            ]
+          }
+        ],
+        "tray_now": "255",
+        "ams_exist_bits": "1",
+        "tray_exist_bits": "7",
+        "tray_is_bbl_bits": "0",
+        "version": 1,
+        "tray_tar": "255",
+        "tray_pre": "255",
+        "insert_flag": true,
+        "power_on_flag": true,
+        "vt_tray": {
+          "id": "254",
+          "tray_type": "",
+          "tray_color": "00000000",
+          "remain": 0
+        }
+      },
+      "hms": [],
+      "lights_report": [
+        {"node": "chamber_light", "mode": "off"},
+        {"node": "work_light", "mode": "on"}
+      ],
+      "wifi_signal": "-42dBm",
+      "sdcard": true,
+      "online": {
+        "rfid": true
+      }
+    }
+  },
+  {
+    "_comment": "partial — bed heating, nozzle heating (print starting)",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "50",
+      "gcode_state": "RUNNING",
+      "nozzle_temper": 42.8,
+      "nozzle_target_temper": 220.0,
+      "bed_temper": 38.5,
+      "bed_target_temper": 60.0,
+      "mc_percent": 0,
+      "mc_remaining_time": 5400,
+      "layer_num": 0,
+      "total_layer_num": 150,
+      "gcode_file": "benchy_pla_0.20mm.gcode.3mf",
+      "subtask_name": "Benchy",
+      "cooling_fan_speed": "0",
+      "heatbreak_fan_speed": "10"
+    }
+  },
+  {
+    "_comment": "partial — mid-print, temps at target, fans running",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "200",
+      "gcode_state": "RUNNING",
+      "nozzle_temper": 219.8,
+      "nozzle_target_temper": 220.0,
+      "bed_temper": 59.9,
+      "bed_target_temper": 60.0,
+      "mc_percent": 33,
+      "mc_remaining_time": 3600,
+      "layer_num": 50,
+      "total_layer_num": 150,
+      "cooling_fan_speed": "15",
+      "big_fan1_speed": "8",
+      "big_fan2_speed": "0",
+      "heatbreak_fan_speed": "12"
+    }
+  },
+  {
+    "_comment": "partial — progress update",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "400",
+      "mc_percent": 66,
+      "mc_remaining_time": 1800,
+      "layer_num": 100,
+      "nozzle_temper": 220.1,
+      "bed_temper": 60.0
+    }
+  },
+  {
+    "_comment": "partial — HMS warning (filament runout AMS tray 2)",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "410",
+      "hms": [
+        {
+          "attr": 50331648,
+          "code": 32772
+        }
+      ]
+    }
+  },
+  {
+    "_comment": "partial — HMS cleared, print nearing completion",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "500",
+      "mc_percent": 95,
+      "mc_remaining_time": 270,
+      "layer_num": 143,
+      "hms": []
+    }
+  },
+  {
+    "_comment": "partial — print finished",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "550",
+      "gcode_state": "FINISH",
+      "mc_percent": 100,
+      "mc_remaining_time": 0,
+      "layer_num": 150,
+      "nozzle_target_temper": 0.0,
+      "bed_target_temper": 0.0,
+      "cooling_fan_speed": "0",
+      "big_fan1_speed": "0",
+      "heatbreak_fan_speed": "0"
+    }
+  },
+  {
+    "_comment": "partial — cooldown, back to idle",
+    "print": {
+      "command": "push_status",
+      "sequence_id": "600",
+      "gcode_state": "IDLE",
+      "nozzle_temper": 45.2,
+      "nozzle_target_temper": 0.0,
+      "bed_temper": 38.1,
+      "bed_target_temper": 0.0,
+      "mc_percent": 0,
+      "mc_remaining_time": 0,
+      "layer_num": 0,
+      "total_layer_num": 0,
+      "gcode_file": "",
+      "cooling_fan_speed": "0",
+      "big_fan1_speed": "0",
+      "big_fan2_speed": "0",
+      "heatbreak_fan_speed": "0"
+    }
+  }
+]

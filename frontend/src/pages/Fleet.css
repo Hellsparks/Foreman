@@ -162,6 +162,21 @@
   text-align: right;
 }
 
+/* AMS colour swatches */
+.fleet-card__ams {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fleet-card__ams-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--fw-border);
+  flex-shrink: 0;
+}
+
 .fleet-card__filename {
   font: var(--fw-type-label) / 1 var(--fw-mono);
   color: var(--fw-muted);
@@ -218,6 +233,21 @@
   border-radius: var(--fw-radius-panel);
 }
 
+.fleet__form--multi {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.fleet__form-row {
+  display: flex;
+  gap: var(--fw-space-3);
+  align-items: flex-end;
+}
+
+.fleet__form-field--short {
+  max-width: 140px;
+}
+
 .fleet__form-field {
   display: flex;
   flex-direction: column;
@@ -240,6 +270,11 @@
   border-radius: var(--fw-radius-control);
   font: var(--fw-type-ui) / 1 var(--fw-sans);
   color: var(--fw-text);
+}
+
+select.fleet__form-input {
+  appearance: none;
+  cursor: pointer;
 }
 
 .fleet__form-input:focus {
@@ -280,6 +315,15 @@
   .fleet__form {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .fleet__form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fleet__form-field--short {
+    max-width: none;
   }
 
   .fleet__grid {

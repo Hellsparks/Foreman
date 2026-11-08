@@ -23,6 +23,9 @@ tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 futures-util = { workspace = true }
 
+# MQTT (Bambu LAN driver)
+rumqttc = { workspace = true }
+
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 
@@ -31,3 +34,5 @@ tempfile = "3"
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
+rumqttc = { workspace = true }
+toml = "0.8"

@@ -28,6 +28,7 @@ Thumbs.db
 # Test fixtures — may contain personal data, never commit
 /fixtures/
 test-printers.local.toml
+**/bambu_a1_captured.json
 
 # Compat harness — Python venv + optional upstream clone (never commit)
 compat-tests/
