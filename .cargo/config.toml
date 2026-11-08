@@ -24,3 +24,7 @@ check-all = ["fmt-check", "lint", "test --all"]
 # against a locally-started spoolman-rs server.
 # Usage: cargo compat [--engine sqlite|postgres|mariadb|cockroach]
 compat = "run -p xtask -- compat"
+
+# Launch the Tauri desktop shell in dev mode (Vite dev server + embedded server).
+# Requires: cargo install tauri-cli --version "^2"
+tauri-dev = "tauri dev -p foreman-desktop"

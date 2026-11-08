@@ -5,8 +5,17 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
-# Tauri 2 integration is added in session 3.
-# This is a placeholder lib crate so the workspace compiles from the start.
+[[bin]]
+name = "foreman-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 foreman-core = { path = "../foreman-core" }
+foreman-server = { path = "../foreman-server" }
+tauri = { version = "2", features = [] }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
