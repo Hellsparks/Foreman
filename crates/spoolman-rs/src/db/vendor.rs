@@ -4,7 +4,10 @@ use serde_json::Map;
 use sqlx::AnyPool;
 
 use crate::{
-    db::query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
+    db::{
+        extra_field,
+        query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
+    },
     error::{Result, SpoolmanError},
     models::{CreateVendorRequest, UpdateVendorRequest, VendorResponse},
 };
@@ -112,8 +115,17 @@ pub async fn find(
     q = q.bind(pag.limit).bind(pag.offset);
     let raw_rows = q.fetch_all(pool).await?;
     let mut rows = Vec::with_capacity(raw_rows.len());
-    for r in raw_rows {
-        rows.push(VendorRow::from_row(&r)?.into_response());
+    for r in &raw_rows {
+        rows.push(VendorRow::from_row(r)?.into_response());
+    }
+
+    // Populate extra fields in one batch query.
+    let ids: Vec<i64> = rows.iter().map(|r| r.id).collect();
+    let mut extras = extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &ids).await?;
+    for r in &mut rows {
+        if let Some(e) = extras.remove(&r.id) {
+            r.extra = e;
+        }
     }
 
     Ok((rows, total))
@@ -129,7 +141,9 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<VendorResponse> {
     .await?
     .ok_or_else(|| SpoolmanError::NotFound(format!("vendor {id}")))?;
 
-    VendorRow::from_row(&raw).map(VendorRow::into_response)
+    let mut resp = VendorRow::from_row(&raw).map(VendorRow::into_response)?;
+    resp.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", id).await?;
+    Ok(resp)
 }
 
 pub async fn create(
@@ -139,9 +153,9 @@ pub async fn create(
 ) -> Result<VendorResponse> {
     let now = utc_now_str();
 
-    if !matches!(engine, Engine::Mysql) {
+    let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres both support RETURNING id.
-        let id: i64 = sqlx::query_scalar(
+        sqlx::query_scalar(
             "INSERT INTO vendor (registered, name, comment, empty_spool_weight, external_id) \
              VALUES (?, ?, ?, ?, ?) RETURNING id",
         )
@@ -151,27 +165,33 @@ pub async fn create(
         .bind(req.empty_spool_weight)
         .bind(&req.external_id)
         .fetch_one(pool)
+        .await?
+    } else {
+        // MySQL: RETURNING is not supported; use LAST_INSERT_ID() inside a transaction.
+        let mut tx = pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO vendor (registered, name, comment, empty_spool_weight, external_id) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&req.name)
+        .bind(&req.comment)
+        .bind(req.empty_spool_weight)
+        .bind(&req.external_id)
+        .execute(&mut *tx)
         .await?;
-        return find_by_id(pool, id).await;
+        let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        id
+    };
+
+    // Store extra fields if any.
+    if !req.extra.is_empty() {
+        extra_field::set_values(pool, "vendor_field", "vendor_id", id, &req.extra).await?;
     }
 
-    // MySQL: RETURNING is not supported; use LAST_INSERT_ID() inside a transaction.
-    let mut tx = pool.begin().await?;
-    sqlx::query(
-        "INSERT INTO vendor (registered, name, comment, empty_spool_weight, external_id) \
-         VALUES (?, ?, ?, ?, ?)",
-    )
-    .bind(&now)
-    .bind(&req.name)
-    .bind(&req.comment)
-    .bind(req.empty_spool_weight)
-    .bind(&req.external_id)
-    .execute(&mut *tx)
-    .await?;
-    let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
-        .fetch_one(&mut *tx)
-        .await?;
-    tx.commit().await?;
     find_by_id(pool, id).await
 }
 
@@ -224,6 +244,12 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateVendorRequest) -> Resul
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("vendor {id}")));
     }
+
+    // Replace extra fields if provided.
+    if let Some(extra) = &req.extra {
+        extra_field::set_values(pool, "vendor_field", "vendor_id", id, extra).await?;
+    }
+
     find_by_id(pool, id).await
 }
 

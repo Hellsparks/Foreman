@@ -10,7 +10,10 @@ use serde::Deserialize;
 use crate::{
     api::error::ApiResult,
     db::spool as db,
-    models::{CreateSpoolRequest, SpoolResponse, UpdateSpoolRequest},
+    error::SpoolmanError,
+    models::{
+        CreateSpoolRequest, SpoolMeasureRequest, SpoolResponse, SpoolUseRequest, UpdateSpoolRequest,
+    },
     state::AppState,
 };
 
@@ -107,4 +110,37 @@ pub async fn update(
 pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiResult<StatusCode> {
     db::delete(&state.db.pool, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT {base_path}/api/v1/spool/{id}/use
+pub async fn use_spool(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<SpoolUseRequest>,
+) -> ApiResult<Json<SpoolResponse>> {
+    if req.use_weight.is_some() && req.use_length.is_some() {
+        return Err(SpoolmanError::BadRequest(
+            "Only specify either use_weight or use_length.".into(),
+        )
+        .into());
+    }
+    if let Some(w) = req.use_weight {
+        return Ok(Json(db::use_weight(&state.db.pool, id, w).await?));
+    }
+    if let Some(l) = req.use_length {
+        return Ok(Json(db::use_length(&state.db.pool, id, l).await?));
+    }
+    Err(
+        SpoolmanError::BadRequest("Either use_weight or use_length must be specified.".into())
+            .into(),
+    )
+}
+
+/// PUT {base_path}/api/v1/spool/{id}/measure
+pub async fn measure_spool(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<SpoolMeasureRequest>,
+) -> ApiResult<Json<SpoolResponse>> {
+    Ok(Json(db::measure(&state.db.pool, id, req.weight).await?))
 }

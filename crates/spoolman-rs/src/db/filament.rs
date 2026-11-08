@@ -5,6 +5,7 @@ use sqlx::AnyPool;
 
 use crate::{
     db::{
+        extra_field,
         query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
         vendor::{normalise_dt, utc_now_str},
         Engine,
@@ -195,9 +196,34 @@ pub async fn find(
     q = q.bind(pag.limit).bind(pag.offset);
     let rows = q.fetch_all(pool).await?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for row in rows {
-        results.push(FilamentRow::from_row(&row)?.into_response());
+    let mut parsed_rows = Vec::with_capacity(rows.len());
+    for row in &rows {
+        parsed_rows.push(FilamentRow::from_row(row)?);
+    }
+
+    // Batch extra field lookup.
+    let f_ids: Vec<i64> = parsed_rows.iter().map(|r| r.id).collect();
+    let v_ids: Vec<i64> = parsed_rows.iter().filter_map(|r| r.vendor_id).collect();
+
+    let mut f_extras =
+        extra_field::get_values_batch(pool, "filament_field", "filament_id", &f_ids).await?;
+    let mut v_extras =
+        extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &v_ids).await?;
+
+    let mut results = Vec::with_capacity(parsed_rows.len());
+    for r in parsed_rows {
+        let vid = r.vendor_id;
+        let fid = r.id;
+        let mut resp = r.into_response();
+        if let Some(e) = f_extras.remove(&fid) {
+            resp.extra = e;
+        }
+        if let (Some(vid), Some(ref mut v)) = (vid, resp.vendor.as_mut()) {
+            if let Some(e) = v_extras.remove(&vid) {
+                v.extra = e;
+            }
+        }
+        results.push(resp);
     }
     Ok((results, total))
 }
@@ -210,7 +236,14 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<FilamentResponse> {
         .await?
         .ok_or_else(|| SpoolmanError::NotFound(format!("filament {id}")))?;
 
-    FilamentRow::from_row(&row).map(FilamentRow::into_response)
+    let parsed = FilamentRow::from_row(&row)?;
+    let vendor_id = parsed.vendor_id;
+    let mut resp = parsed.into_response();
+    resp.extra = extra_field::get_values(pool, "filament_field", "filament_id", id).await?;
+    if let (Some(vid), Some(ref mut v)) = (vendor_id, resp.vendor.as_mut()) {
+        v.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", vid).await?;
+    }
+    Ok(resp)
 }
 
 pub async fn create(
@@ -248,21 +281,26 @@ pub async fn create(
         };
     }
 
-    if !matches!(engine, Engine::Mysql) {
+    let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres support RETURNING id.
-        let id: i64 = bind_all!(sqlx::query_scalar(&format!("{INSERT_SQL} RETURNING id")))
+        bind_all!(sqlx::query_scalar(&format!("{INSERT_SQL} RETURNING id")))
             .fetch_one(pool)
+            .await?
+    } else {
+        // MySQL: use transaction + LAST_INSERT_ID().
+        let mut tx = pool.begin().await?;
+        bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
+        let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
+            .fetch_one(&mut *tx)
             .await?;
-        return find_by_id(pool, id).await;
+        tx.commit().await?;
+        id
+    };
+
+    if !req.extra.is_empty() {
+        extra_field::set_values(pool, "filament_field", "filament_id", id, &req.extra).await?;
     }
 
-    // MySQL: use transaction + LAST_INSERT_ID().
-    let mut tx = pool.begin().await?;
-    bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
-    let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
-        .fetch_one(&mut *tx)
-        .await?;
-    tx.commit().await?;
     find_by_id(pool, id).await
 }
 
@@ -341,6 +379,11 @@ pub async fn update(
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("filament {id}")));
     }
+
+    if let Some(extra) = &req.extra {
+        extra_field::set_values(pool, "filament_field", "filament_id", id, extra).await?;
+    }
+
     find_by_id(pool, id).await
 }
 
@@ -353,4 +396,32 @@ pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
         return Err(SpoolmanError::NotFound(format!("filament {id}")));
     }
     Ok(())
+}
+
+pub async fn find_materials(pool: &AnyPool) -> Result<Vec<String>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT material FROM filament WHERE material IS NOT NULL ORDER BY material",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut result = Vec::with_capacity(rows.len());
+    for row in rows {
+        use sqlx::Row;
+        result.push(row.try_get::<String, _>("material")?);
+    }
+    Ok(result)
+}
+
+pub async fn find_article_numbers(pool: &AnyPool) -> Result<Vec<String>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT article_number FROM filament WHERE article_number IS NOT NULL ORDER BY article_number",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut result = Vec::with_capacity(rows.len());
+    for row in rows {
+        use sqlx::Row;
+        result.push(row.try_get::<String, _>("article_number")?);
+    }
+    Ok(result)
 }

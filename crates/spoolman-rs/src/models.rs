@@ -4,9 +4,7 @@
 //! clients (Moonraker, Mainsail, Fluidd, OctoPrint-Spoolman) are unaffected.
 //!
 //! Datetimes are serialised as ISO 8601 strings (`"2024-01-01T00:00:00"`),
-//! matching upstream Python's `datetime.isoformat()`.  Extra fields are
-//! serialised as a JSON object; they return `{}` until session 7 wires the
-//! DB queries.
+//! matching upstream Python's `datetime.isoformat()`.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -51,6 +49,8 @@ pub struct UpdateVendorRequest {
     pub empty_spool_weight: Option<f64>,
     #[serde(default)]
     pub external_id: Option<String>,
+    #[serde(default)]
+    pub extra: Option<Map<String, Value>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +162,8 @@ pub struct UpdateFilamentRequest {
     pub multi_color_direction: Option<String>,
     #[serde(default)]
     pub external_id: Option<String>,
+    #[serde(default)]
+    pub extra: Option<Map<String, Value>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -256,4 +258,109 @@ pub struct UpdateSpoolRequest {
     pub archived: Option<bool>,
     #[serde(default)]
     pub price: Option<f64>,
+    #[serde(default)]
+    pub extra: Option<Map<String, Value>>,
+}
+
+// ---------------------------------------------------------------------------
+// Spool use / measure
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct SpoolUseRequest {
+    pub use_weight: Option<f64>,
+    pub use_length: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SpoolMeasureRequest {
+    pub weight: f64,
+}
+
+// ---------------------------------------------------------------------------
+// Extra fields
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExtraFieldType {
+    Text,
+    Integer,
+    IntegerRange,
+    Float,
+    FloatRange,
+    Datetime,
+    Boolean,
+    Choice,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtraField {
+    pub key: String,
+    pub entity_type: String,
+    pub name: String,
+    #[serde(default)]
+    pub order: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    pub field_type: ExtraFieldType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub choices: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_choice: Option<bool>,
+}
+
+/// Parameters for POST /field/{entity_type}/{key} — same as ExtraField but without key/entity_type.
+#[derive(Debug, Deserialize)]
+pub struct ExtraFieldParams {
+    pub name: String,
+    #[serde(default)]
+    pub order: i64,
+    pub field_type: ExtraFieldType,
+    #[serde(default)]
+    pub unit: Option<String>,
+    #[serde(default)]
+    pub default_value: Option<String>,
+    #[serde(default)]
+    pub choices: Option<Vec<String>>,
+    #[serde(default)]
+    pub multi_choice: Option<bool>,
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SettingResponse {
+    pub value: Value,
+    pub is_set: bool,
+    #[serde(rename = "type")]
+    pub type_: String,
+}
+
+// ---------------------------------------------------------------------------
+// Info / health
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct HealthCheck {
+    pub status: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InfoResponse {
+    pub version: &'static str,
+    pub db_type: String,
+}
+
+// ---------------------------------------------------------------------------
+// Location rename
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct RenameLocationBody {
+    pub name: String,
 }

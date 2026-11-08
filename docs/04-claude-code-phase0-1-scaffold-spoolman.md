@@ -93,10 +93,11 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - [x] Respect upstream env vars (`SPOOLMAN_DB_TYPE`, `SPOOLMAN_DB_HOST`, `_PORT`, `_NAME`, `_USERNAME`, `_PASSWORD`/`_PASSWORD_FILE`, `SPOOLMAN_DIR_DATA`, `SPOOLMAN_BASE_PATH`, `SPOOLMAN_HOST`, `SPOOLMAN_PORT`, `SPOOLMAN_AUTOMATIC_BACKUP`, `SPOOLMAN_DIR_LOGS`, `SPOOLMAN_DIR_BACKUPS` — full list confirmed from `env.py`). Default SQLite path matches upstream's default location (`~/.local/share/spoolman/spoolman.db` on Linux).
 
 ### 1.2 REST API (`{base_path}/api/v1`)
-- [x] vendor, filament, spool CRUD with upstream filtering (comma lists, empty-value semantics, extra-field filters), sorting, pagination (incl. total-count header — check upstream for exact name). Extra fields return `{}`, tags return `[]` (wired in session 7).
-- [ ] spool `use` (by weight and by length → weight via density/diameter) and `measure`; first/last used timestamps; archived.
-- [ ] extra fields (`/field/{entity}/{key}`): definitions in `setting`, values JSON-encoded in `*_field` tables, validation per field type.
-- [ ] settings, info/health, backup, find endpoints (material, location, lot-number, article-number), location rename, export, search, externaldb (SpoolmanDB cache/proxy), tags (NFC/OpenPrintTag) and scan relay.
+- [x] vendor, filament, spool CRUD with upstream filtering (comma lists, empty-value semantics, extra-field filters), sorting, pagination (incl. total-count header — check upstream for exact name). Extra fields now populated from `*_field` tables in all responses.
+- [x] spool `use` (by weight and by length → weight via density/diameter) and `measure`; first/last used timestamps.
+- [x] extra fields (`/field/{entity}/{key}`): definitions in `setting`, values JSON-encoded in `*_field` tables. Basic validation (choice field requires choices/multi_choice; type/multi_choice cannot change).
+- [x] settings (`/setting`, `/setting/{key}`), info (`/info`), health (`/health`), find endpoints (`/material`, `/location`, `/lot-number`, `/article-number`), location rename (`PATCH /location/{location}`).
+- [ ] archived spool filter + backup endpoint, export, search, externaldb (SpoolmanDB cache/proxy), tags (NFC/OpenPrintTag) and scan relay.
 - [ ] Error responses match upstream status codes and body shape.
 
 ### 1.3 WebSockets
@@ -163,6 +164,14 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **`AnyPool::connect` does not set SQLite `create_if_missing`:** Unlike `SqlitePool::connect_with(opts.create_if_missing(true))`, `AnyPool::connect(url)` opens SQLite in read-write-only mode (no create). `From<SqliteConnectOptions>` is not implemented for `AnyConnectOptions` in sqlx 0.8. Workaround: `std::fs::File::create` the SQLite file explicitly before calling `AnyPool::connect`, then run WAL/FK PRAGMA commands as the first query.
 
 **SQLite error code 1 is generic:** `is_table_not_found` must not short-circuit on a non-nil error code — SQLite code 1 (`SQLITE_ERROR`) is used for many errors including "no such table". Logic changed to check Postgres/MySQL specific codes first, then always fall through to a message-prefix check.
+
+### Session 7 — 2026-11-08
+
+**`setting` table upsert requires engine-specific ON CONFLICT syntax:** SQLite and PostgreSQL support `ON CONFLICT(key) DO UPDATE SET …`; MySQL requires `ON DUPLICATE KEY UPDATE …`. Implemented two paths (`setting::set` / `setting::set_mysql`) and routed based on `Engine`.
+
+**`archived` filter in spool find uses `s.archived = ?` with bind `"0"` string:** Because `WhereBuilder` stores all binds as `String`, the boolean filter passes `"0"` or `"1"` as strings. SQLite accepts this for integer comparisons (implicit cast), and Postgres/MySQL also coerce. No issue found, documented here for clarity.
+
+**extra field `weight_from_length` formula:** Upstream uses `volume_mm3 = length * π * (d/2)²`; existing `length_from_weight` used `radius_cm = d/20`. Both are mathematically equivalent but expressed differently — verified they invert each other correctly.
 
 ### Session 6 — 2026-11-08
 

@@ -17,10 +17,18 @@ impl From<SpoolmanError> for ApiError {
     }
 }
 
+impl From<serde_json::Error> for ApiError {
+    fn from(e: serde_json::Error) -> Self {
+        ApiError(SpoolmanError::Json(e))
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match &self.0 {
             SpoolmanError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
+            SpoolmanError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            SpoolmanError::MeasureError(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             SpoolmanError::Config(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             SpoolmanError::Database(e) => {
                 tracing::error!("database error: {e}");
@@ -37,6 +45,10 @@ impl IntoResponse for ApiError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("unknown alembic revision: {r}"),
             ),
+            SpoolmanError::Json(e) => {
+                tracing::error!("JSON error: {e}");
+                (StatusCode::INTERNAL_SERVER_ERROR, "JSON error".to_owned())
+            }
         };
         (status, Json(json!({ "message": message }))).into_response()
     }

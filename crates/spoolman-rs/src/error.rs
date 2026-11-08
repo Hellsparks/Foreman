@@ -19,6 +19,18 @@ pub enum SpoolmanError {
 
     #[error("not found: {0}")]
     NotFound(String),
+
+    /// 400-class client error (validation failure, bad parameters, etc.)
+    #[error("{0}")]
+    BadRequest(String),
+
+    /// 422-class error for measure operations (initial weight unknown, etc.)
+    #[error("{0}")]
+    MeasureError(String),
+
+    /// JSON serialization/deserialization error.
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, SpoolmanError>;

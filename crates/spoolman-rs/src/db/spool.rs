@@ -5,12 +5,13 @@ use sqlx::AnyPool;
 
 use crate::{
     db::{
+        extra_field,
         query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
         vendor::{normalise_dt, utc_now_str},
         Engine,
     },
     error::{Result, SpoolmanError},
-    math::length_from_weight,
+    math::{length_from_weight, weight_from_length},
     models::{
         CreateSpoolRequest, FilamentResponse, SpoolResponse, UpdateSpoolRequest, VendorResponse,
     },
@@ -275,9 +276,41 @@ pub async fn find(
     q = q.bind(pag.limit).bind(pag.offset);
     let rows = q.fetch_all(pool).await?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for row in rows {
-        results.push(SpoolRow::from_row(&row)?.into_response());
+    let mut parsed = Vec::with_capacity(rows.len());
+    for row in &rows {
+        parsed.push(SpoolRow::from_row(row)?);
+    }
+
+    // Batch extra field lookup for spools, filaments, and vendors.
+    let spool_ids: Vec<i64> = parsed.iter().map(|r| r.id).collect();
+    let filament_ids: Vec<i64> = parsed.iter().map(|r| r.filament_id).collect();
+    let vendor_ids: Vec<i64> = parsed.iter().filter_map(|r| r.v_id).collect();
+
+    let mut s_extras =
+        extra_field::get_values_batch(pool, "spool_field", "spool_id", &spool_ids).await?;
+    let mut f_extras =
+        extra_field::get_values_batch(pool, "filament_field", "filament_id", &filament_ids).await?;
+    let mut v_extras =
+        extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &vendor_ids).await?;
+
+    let mut results = Vec::with_capacity(parsed.len());
+    for r in parsed {
+        let sid = r.id;
+        let fid = r.filament_id;
+        let vid = r.v_id;
+        let mut resp = r.into_response();
+        if let Some(e) = s_extras.remove(&sid) {
+            resp.extra = e;
+        }
+        if let Some(e) = f_extras.remove(&fid) {
+            resp.filament.extra = e;
+        }
+        if let (Some(vid), Some(ref mut v)) = (vid, resp.filament.vendor.as_mut()) {
+            if let Some(e) = v_extras.remove(&vid) {
+                v.extra = e;
+            }
+        }
+        results.push(resp);
     }
     Ok((results, total))
 }
@@ -289,7 +322,17 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<SpoolResponse> {
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| SpoolmanError::NotFound(format!("spool {id}")))?;
-    SpoolRow::from_row(&row).map(SpoolRow::into_response)
+    let parsed = SpoolRow::from_row(&row)?;
+    let filament_id = parsed.filament_id;
+    let vendor_id = parsed.v_id;
+    let mut resp = parsed.into_response();
+    resp.extra = extra_field::get_values(pool, "spool_field", "spool_id", id).await?;
+    resp.filament.extra =
+        extra_field::get_values(pool, "filament_field", "filament_id", filament_id).await?;
+    if let (Some(vid), Some(ref mut v)) = (vendor_id, resp.filament.vendor.as_mut()) {
+        v.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", vid).await?;
+    }
+    Ok(resp)
 }
 
 pub async fn create(
@@ -337,21 +380,26 @@ pub async fn create(
         };
     }
 
-    if !matches!(engine, Engine::Mysql) {
+    let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres support RETURNING id.
-        let id: i64 = bind_all!(sqlx::query_scalar(&format!("{INSERT_SQL} RETURNING id")))
+        bind_all!(sqlx::query_scalar(&format!("{INSERT_SQL} RETURNING id")))
             .fetch_one(pool)
+            .await?
+    } else {
+        // MySQL: use transaction + LAST_INSERT_ID().
+        let mut tx = pool.begin().await?;
+        bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
+        let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
+            .fetch_one(&mut *tx)
             .await?;
-        return find_by_id(pool, id).await;
+        tx.commit().await?;
+        id
+    };
+
+    if !req.extra.is_empty() {
+        extra_field::set_values(pool, "spool_field", "spool_id", id, &req.extra).await?;
     }
 
-    // MySQL: use transaction + LAST_INSERT_ID().
-    let mut tx = pool.begin().await?;
-    bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
-    let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
-        .fetch_one(&mut *tx)
-        .await?;
-    tx.commit().await?;
     find_by_id(pool, id).await
 }
 
@@ -437,6 +485,11 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateSpoolRequest) -> Result
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("spool {id}")));
     }
+
+    if let Some(extra) = &req.extra {
+        extra_field::set_values(pool, "spool_field", "spool_id", id, extra).await?;
+    }
+
     find_by_id(pool, id).await
 }
 
@@ -448,5 +501,207 @@ pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("spool {id}")));
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Use / Measure
+// ---------------------------------------------------------------------------
+
+/// Consume filament by weight (grams) — mirrors upstream `use_weight`.
+///
+/// Increments `used_weight` atomically (clamped to 0), sets `first_used` if
+/// not already set, and updates `last_used` to now.
+pub async fn use_weight(pool: &AnyPool, id: i64, weight: f64) -> Result<SpoolResponse> {
+    let now = utc_now_str();
+
+    // Atomic update: clamp used_weight to >= 0; set timestamps in same statement.
+    // COALESCE(first_used, ?) preserves existing first_used (NULL → now).
+    let n = sqlx::query(
+        "UPDATE spool SET \
+         used_weight = CASE WHEN used_weight + ? >= 0.0 THEN used_weight + ? ELSE 0.0 END, \
+         first_used = COALESCE(first_used, ?), \
+         last_used = ? \
+         WHERE id = ?",
+    )
+    .bind(weight)
+    .bind(weight)
+    .bind(&now)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
+
+    if n.rows_affected() == 0 {
+        return Err(SpoolmanError::NotFound(format!("spool {id}")));
+    }
+
+    find_by_id(pool, id).await
+}
+
+/// Consume filament by length (millimetres) — mirrors upstream `use_length`.
+///
+/// Converts length → weight via the spool's filament density and diameter,
+/// then delegates to [`use_weight`].
+pub async fn use_length(pool: &AnyPool, id: i64, length_mm: f64) -> Result<SpoolResponse> {
+    // Fetch filament density and diameter for the weight calculation.
+    let row = sqlx::query(
+        "SELECT f.density, f.diameter FROM spool s \
+         JOIN filament f ON f.id = s.filament_id \
+         WHERE s.id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| SpoolmanError::NotFound(format!("spool {id}")))?;
+
+    let density: f64 = {
+        use sqlx::Row;
+        row.try_get("density")?
+    };
+    let diameter: f64 = {
+        use sqlx::Row;
+        row.try_get("diameter")?
+    };
+
+    let weight = weight_from_length(length_mm, density, diameter);
+    use_weight(pool, id, weight).await
+}
+
+/// Measure the current gross weight of the spool and derive how much filament
+/// was used — mirrors upstream `measure`.
+///
+/// `weight_g` is the current gross weight of the spool (filament + empty spool).
+pub async fn measure(pool: &AnyPool, id: i64, weight_g: f64) -> Result<SpoolResponse> {
+    // --- Step 1: get spool's own initial_weight, used_weight, spool_weight ---
+    let spool_row =
+        sqlx::query("SELECT initial_weight, used_weight, spool_weight FROM spool WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| SpoolmanError::NotFound(format!("spool {id}")))?;
+
+    let (spool_initial_weight, spool_used_weight, spool_spool_weight): (
+        Option<f64>,
+        f64,
+        Option<f64>,
+    ) = {
+        use sqlx::Row;
+        (
+            spool_row.try_get("initial_weight")?,
+            spool_row.try_get("used_weight")?,
+            spool_row.try_get("spool_weight")?,
+        )
+    };
+
+    let mut initial_weight = spool_initial_weight;
+    let mut spool_weight = spool_spool_weight;
+
+    // --- Step 2: fill in from filament/vendor if needed ---
+    let needs_filament = initial_weight.map(|w| w == 0.0).unwrap_or(true) || spool_weight.is_none();
+    if needs_filament {
+        let fil_row = sqlx::query(
+            "SELECT f.weight, f.spool_weight, v.empty_spool_weight \
+             FROM spool s \
+             JOIN filament f ON f.id = s.filament_id \
+             LEFT JOIN vendor v ON v.id = f.vendor_id \
+             WHERE s.id = ?",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| SpoolmanError::NotFound(format!("filament for spool {id}")))?;
+
+        let (fil_weight, fil_spool_weight, vendor_spool_weight): (
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+        ) = {
+            use sqlx::Row;
+            (
+                fil_row.try_get("weight")?,
+                fil_row.try_get("spool_weight")?,
+                fil_row.try_get("empty_spool_weight")?,
+            )
+        };
+
+        if spool_weight.is_none() {
+            spool_weight = fil_spool_weight.or(vendor_spool_weight);
+        }
+        if initial_weight.map(|w| w == 0.0).unwrap_or(true) {
+            initial_weight = fil_weight.or(Some(0.0));
+        }
+    }
+
+    let initial_weight = initial_weight.unwrap_or(0.0);
+    if initial_weight == 0.0 {
+        return Err(SpoolmanError::MeasureError(
+            "initial weight is not set for this spool".into(),
+        ));
+    }
+    let spool_weight = spool_weight.unwrap_or(0.0);
+
+    let initial_gross = initial_weight + spool_weight;
+
+    // --- Step 3: apply measurement ---
+    if weight_g > initial_gross {
+        // Measured more than expected — reset initial_weight.
+        sqlx::query("UPDATE spool SET initial_weight = ?, used_weight = 0.0 WHERE id = ?")
+            .bind(weight_g - spool_weight)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        return find_by_id(pool, id).await;
+    }
+
+    // current_use = how much we expect to still be on the spool (gross)
+    let current_use = initial_gross - spool_used_weight;
+    // weight_to_consume = difference between expected and measured remaining
+    let mut weight_to_consume = current_use - weight_g;
+    // If the measurement is below the empty spool weight, cap at "use all filament".
+    if initial_gross - weight_to_consume < spool_weight {
+        weight_to_consume = current_use - spool_weight;
+    }
+
+    use_weight(pool, id, weight_to_consume).await
+}
+
+// ---------------------------------------------------------------------------
+// Find helpers
+// ---------------------------------------------------------------------------
+
+pub async fn find_locations(pool: &AnyPool) -> Result<Vec<String>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT location FROM spool WHERE location IS NOT NULL ORDER BY location",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut result = Vec::with_capacity(rows.len());
+    for row in rows {
+        use sqlx::Row;
+        result.push(row.try_get::<String, _>("location")?);
+    }
+    Ok(result)
+}
+
+pub async fn find_lot_numbers(pool: &AnyPool) -> Result<Vec<String>> {
+    let rows =
+        sqlx::query("SELECT DISTINCT lot_nr FROM spool WHERE lot_nr IS NOT NULL ORDER BY lot_nr")
+            .fetch_all(pool)
+            .await?;
+    let mut result = Vec::with_capacity(rows.len());
+    for row in rows {
+        use sqlx::Row;
+        result.push(row.try_get::<String, _>("lot_nr")?);
+    }
+    Ok(result)
+}
+
+pub async fn rename_location(pool: &AnyPool, old_name: &str, new_name: &str) -> Result<()> {
+    sqlx::query("UPDATE spool SET location = ? WHERE location = ?")
+        .bind(new_name)
+        .bind(old_name)
+        .execute(pool)
+        .await?;
     Ok(())
 }

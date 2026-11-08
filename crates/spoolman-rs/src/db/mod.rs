@@ -1,6 +1,8 @@
+pub mod extra_field;
 pub mod filament;
 pub mod migrations;
 pub mod query;
+pub mod setting;
 pub mod spool;
 pub mod vendor;
 
