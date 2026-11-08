@@ -6,7 +6,7 @@ use axum::{
     routing::{get, get_service},
     Router,
 };
-use foreman_core::events::ServerEvent;
+use foreman_core::{db::ForemanDb, events::ServerEvent};
 use spoolman_rs::{
     api as spoolman_api,
     config::SpoolmanConfig,
@@ -41,6 +41,13 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
             "could not create data dir {}: {err}",
             cfg.data_dir.display()
         );
+    }
+
+    // Open (or create) the Foreman-native SQLite database.
+    let foreman_db_path = cfg.data_dir.join("foreman.db");
+    match ForemanDb::connect(&foreman_db_path).await {
+        Ok(_db) => info!(path = %foreman_db_path.display(), "foreman db ready"),
+        Err(e) => warn!("foreman db open failed (continuing without it): {e}"),
     }
 
     // Broadcast bus — 256-slot ring buffer.

@@ -55,11 +55,11 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 ## Phase 2 — Printers + live core (W2, W3, W6)
 
 ### 2.1 Foreman DB + domain
-- [ ] `foreman-core` SQLite DB (sqlx, own migrations, separate file from the Spoolman DB). Tables to start: `printer`, `printer_path` (connection tiers), `printer_ssh`, `webcam`, `macro_favourite`, `temp_preset`, `shell_macro`, `audit_log`, `attention_item`, `setting`.
-- [ ] Domain types with `#[derive(TS)]` for every DTO the frontend uses.
+- [x] `foreman-core` SQLite DB (sqlx, own migrations, separate file from the Spoolman DB). Tables to start: `printer`, `printer_path` (connection tiers), `printer_ssh`, `webcam`, `macro_favourite`, `temp_preset`, `shell_macro`, `audit_log`, `attention_item`, `setting`.
+- [x] Domain types with `#[derive(TS)]` for every DTO the frontend uses.
 
 ### 2.2 Event bus
-- [ ] Typed events on `/ws/events`: `printer.status`, `printer.connection` (path switch, offline), `attention.added/updated/cleared`, `job.*` (stub), `transfer.*` (Phase 3), `device.*` (Phase 4). Client can subscribe by topic and printer id. Keep heartbeat.
+- [x] Typed events on `/ws/events`: `printer.status`, `printer.connection` (path switch, offline), `attention.added/updated/cleared`, `job.*` (stub), `transfer.*` (Phase 3), `device.*` (Phase 4). Client can subscribe by topic and printer id. Keep heartbeat.
 
 ### 2.3 PrinterDriver trait + drivers
 - [ ] Trait: connect, status stream, capabilities probe, commands (start/pause/resume/cancel, set temp, jog/home, macro, raw G-code, light), file ops (list/upload/delete/start) — file ops are used by Phase 3.
@@ -105,6 +105,8 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 
 ### 2.8 Settings → Printers
 - [ ] Same printer settings as the printer page's Config tab, editable from Settings (inline per printer): name, auth (Moonraker key / Bambu access code / API key), tags, connection paths, SSH, hardened nozzle, sort order (drag order = Fleet order).
+
+### 2.9 Connect screen + auth (moved up from Phase 6) — design in UI demo first; build before remote access.
 
 **Phase 2 done =** mock printers + the owner's real Klipper printer + real Bambu live on Fleet (temps, AMS, camera); killing the primary path fails over and back; SSH tab browses and edits `printer.cfg`; a file uploads to the Bambu over FTPS; Attention shows a finished print on both.
 
