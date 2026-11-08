@@ -29,6 +29,9 @@ Thumbs.db
 fixtures/
 test-printers.local.toml
 
+# Compat harness — Python venv + optional upstream clone (never commit)
+compat-tests/
+
 # Generated types are COMMITTED and checked in CI.
 # Do not add frontend/src/api/types/ here.
 # Run `cargo gen-types` after changing API DTOs.

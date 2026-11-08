@@ -139,47 +139,56 @@ fn filament_min_color_distance(query_hex: &str, f: &FilamentResponse) -> f64 {
 // In-memory term matcher + ranker
 // ---------------------------------------------------------------------------
 
-/// Return `(matched_field, rank)` if ALL terms hit at least one field.
-/// Lower rank = better match.
-fn classify(terms: &[String], fields: &[(&str, Option<&str>)]) -> Option<(String, i64)> {
+// Base rank constants — mirror upstream `_BASE_*` values.
+const BASE_NATIVE: i64 = 0; // entity's own text fields
+const BASE_VENDOR: i64 = 2; // vendor name (join)
+const BASE_EXTRA: i64 = 4; // extra-field text
+const WEAK_PENALTY: i64 = 1; // applied when value merely *contains* term (not starts_with)
+const RANK_ID_OR_COLOR: i64 = -1; // exact id / color match
+
+/// Return `(matched_field, worst_rank)` if ALL terms hit at least one field.
+///
+/// Fields are `(label, value, base_rank)` triples, ordered by preference.
+/// rank = base_rank if value starts_with term, else base_rank + WEAK_PENALTY.
+/// `best` = the term_best with the lowest rank across all terms.
+/// `worst_rank` = the highest (worst) rank across all per-term bests.
+fn classify(terms: &[String], fields: &[(&str, Option<&str>, i64)]) -> Option<(String, i64)> {
     if terms.is_empty() {
         return None;
     }
-    let mut best_label = String::new();
-    let mut best_rank = i64::MAX;
-    let mut worst_rank = i64::MIN;
+    let mut best: Option<(String, i64)> = None;
+    let mut worst_rank = RANK_ID_OR_COLOR;
 
     for term in terms {
-        let mut hit: Option<(&str, i64)> = None;
-        for (label, value) in fields {
+        let mut term_best: Option<(&str, i64)> = None;
+        for &(label, value, base) in fields {
             let Some(v) = value else { continue };
+            if v.is_empty() {
+                continue;
+            }
             let v_lower = v.to_lowercase();
-            if v_lower.contains(term.as_str()) {
-                let rank: i64 = if v_lower.starts_with(term.as_str()) {
-                    0
-                } else {
-                    1
-                };
-                if hit.is_none() || rank < hit.unwrap().1 {
-                    hit = Some((label, rank));
-                }
+            if !v_lower.contains(term.as_str()) {
+                continue;
+            }
+            let rank = if v_lower.starts_with(term.as_str()) {
+                base
+            } else {
+                base + WEAK_PENALTY
+            };
+            if term_best.is_none() || rank < term_best.unwrap().1 {
+                term_best = Some((label, rank));
             }
         }
-        let (label, rank) = hit?; // term not found → no match
+        let (label, rank) = term_best?; // term not found → no match for this row
         if rank > worst_rank {
             worst_rank = rank;
         }
-        if rank < best_rank {
-            best_rank = rank;
-            best_label = label.to_owned();
+        if best.is_none() || rank < best.as_ref().unwrap().1 {
+            best = Some((label.to_owned(), rank));
         }
     }
 
-    if best_label.is_empty() {
-        None
-    } else {
-        Some((best_label, worst_rank))
-    }
+    best.map(|(label, _)| (label, worst_rank))
 }
 
 // ---------------------------------------------------------------------------
@@ -194,15 +203,33 @@ fn match_spools(
     let mut hits: Vec<(SpoolResponse, String, i64)> = spools
         .into_iter()
         .filter_map(|s| {
-            classify(
-                terms,
-                &[
-                    ("comment", s.comment.as_deref()),
-                    ("location", s.location.as_deref()),
-                    ("lot_nr", s.lot_nr.as_deref()),
-                ],
-            )
-            .map(|(f, r)| (s, f, r))
+            // Build extra field entries: extra.<key> = decoded string value.
+            let extra_strings: Vec<(String, String)> = s
+                .extra
+                .iter()
+                .filter_map(|(k, v)| {
+                    let decoded = match v {
+                        serde_json::Value::String(sv) => sv.clone(),
+                        other => other.to_string(),
+                    };
+                    if decoded.is_empty() {
+                        None
+                    } else {
+                        Some((format!("extra.{k}"), decoded))
+                    }
+                })
+                .collect();
+
+            let mut fields: Vec<(&str, Option<&str>, i64)> = vec![
+                ("comment", s.comment.as_deref(), BASE_NATIVE),
+                ("location", s.location.as_deref(), BASE_NATIVE),
+                ("lot_nr", s.lot_nr.as_deref(), BASE_NATIVE),
+            ];
+            for (label, value) in &extra_strings {
+                fields.push((label.as_str(), Some(value.as_str()), BASE_EXTRA));
+            }
+
+            classify(terms, &fields).map(|(f, r)| (s, f, r))
         })
         .collect();
 
@@ -242,17 +269,32 @@ fn match_filaments(
         .filter(|f| !color_ids.contains(&f.id))
         .filter_map(|f| {
             let vendor_name = f.vendor.as_ref().map(|v| v.name.as_str());
-            classify(
-                terms,
-                &[
-                    ("name", f.name.as_deref()),
-                    ("material", f.material.as_deref()),
-                    ("article_number", f.article_number.as_deref()),
-                    ("comment", f.comment.as_deref()),
-                    ("vendor.name", vendor_name),
-                ],
-            )
-            .map(|(field, rank)| (f, field, rank))
+            let extra_strings: Vec<(String, String)> = f
+                .extra
+                .iter()
+                .filter_map(|(k, v)| {
+                    let decoded = match v {
+                        serde_json::Value::String(sv) => sv.clone(),
+                        other => other.to_string(),
+                    };
+                    if decoded.is_empty() {
+                        None
+                    } else {
+                        Some((format!("extra.{k}"), decoded))
+                    }
+                })
+                .collect();
+            let mut fields: Vec<(&str, Option<&str>, i64)> = vec![
+                ("name", f.name.as_deref(), BASE_NATIVE),
+                ("material", f.material.as_deref(), BASE_NATIVE),
+                ("article_number", f.article_number.as_deref(), BASE_NATIVE),
+                ("comment", f.comment.as_deref(), BASE_NATIVE),
+                ("vendor.name", vendor_name, BASE_VENDOR),
+            ];
+            for (label, value) in &extra_strings {
+                fields.push((label.as_str(), Some(value.as_str()), BASE_EXTRA));
+            }
+            classify(terms, &fields).map(|(field, rank)| (f, field, rank))
         })
         .collect();
 
@@ -285,8 +327,8 @@ fn match_vendors(
             classify(
                 terms,
                 &[
-                    ("name", Some(v.name.as_str())),
-                    ("comment", v.comment.as_deref()),
+                    ("name", Some(v.name.as_str()), BASE_NATIVE),
+                    ("comment", v.comment.as_deref(), BASE_NATIVE),
                 ],
             )
             .map(|(f, r)| (v, f, r))
@@ -330,7 +372,7 @@ async fn attach_filament_spools(
          CAST(s.archived AS INTEGER) AS archived \
          FROM spool s WHERE s.filament_id IN ({placeholders}) {archived_clause} ORDER BY s.id"
     );
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
     for id in &fids {
         q = q.bind(*id);
     }
@@ -459,11 +501,14 @@ pub async fn search(
     let mut filaments = match_filaments(all_filaments, &terms, lim, color_hits);
     let vendors = match_vendors(all_vendors, &terms, lim);
 
-    // Numeric query: prepend exact spool-id match if not already present.
-    if let Ok(spool_id) = q.parse::<i64>() {
-        if !spools.iter().any(|s| s.spool.id == spool_id) {
+    // Numeric query: surface the spool with that exact id at the very top.
+    // Only trigger for purely-digit queries (mirrors Python's str.isdigit()).
+    if !q.is_empty() && q.chars().all(|c| c.is_ascii_digit()) {
+        if let Ok(spool_id) = q.parse::<i64>() {
             if let Ok(spool) = spool_db::find_by_id(pool, spool_id).await {
                 if allow_archived || !spool.archived {
+                    // Drop any weaker text match for this spool, then prepend the id match.
+                    spools.retain(|s| s.spool.id != spool_id);
                     spools.insert(
                         0,
                         SearchResultSpool {

@@ -41,10 +41,10 @@ pub async fn search_handler(
         &state.db.pool,
         &state.db.engine,
         q.q.as_deref().unwrap_or(""),
-        q.color_similarity_threshold.unwrap_or(10.0),
-        q.limit.unwrap_or(10),
+        q.color_similarity_threshold.unwrap_or(20.0),
+        q.limit.unwrap_or(20),
         q.allow_archived.unwrap_or(false),
-        q.spools_per_filament.unwrap_or(1),
+        q.spools_per_filament.unwrap_or(0),
     )
     .await?;
     Ok(Json(results))

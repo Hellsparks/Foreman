@@ -20,9 +20,13 @@ pub enum SpoolmanError {
     #[error("not found: {0}")]
     NotFound(String),
 
-    /// 400-class client error (validation failure, bad parameters, etc.)
+    /// 400-class client error (bad parameters, etc.)
     #[error("{0}")]
     BadRequest(String),
+
+    /// 422-class error: entity validation failure (unknown extra field keys, etc.)
+    #[error("{0}")]
+    ValidationError(String),
 
     /// 422-class error for measure operations (initial weight unknown, etc.)
     #[error("{0}")]
@@ -31,6 +35,10 @@ pub enum SpoolmanError {
     /// JSON serialization/deserialization error.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// 403 — entity cannot be deleted because it is referenced by another entity.
+    #[error("{0}")]
+    DeleteConflict(String),
 
     /// 409 conflict — tag UID already linked to a different entity.
     #[error("{message}")]

@@ -20,13 +20,43 @@ use crate::{
 // UID normalisation
 // ---------------------------------------------------------------------------
 
-/// Strip separators (`:`, `-`, `_`, space) and uppercase — matches upstream
-/// `spoolman/tags.py::normalize_uid`.
-pub fn normalize_uid(uid: &str) -> String {
-    uid.chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .map(|c| c.to_ascii_uppercase())
-        .collect()
+const UID_MAX_LENGTH: usize = 64;
+
+/// Normalize a tag UID to uppercase hex, stripping separators.
+///
+/// Mirrors upstream `spoolman/tags/__init__.py::normalize_uid`.
+/// Returns `Err(BadRequest)` if the UID is invalid.
+pub fn normalize_uid(uid: &str) -> Result<String> {
+    // Strip separators (space, colon, underscore, dot, hyphen) and optional 0x prefix.
+    let stripped: String = uid
+        .chars()
+        .filter(|c| !matches!(c, ' ' | ':' | '_' | '.' | '-' | '\t' | '\n' | '\r'))
+        .collect::<String>()
+        .to_ascii_uppercase();
+    let normalized = stripped.strip_prefix("0X").unwrap_or(&stripped).to_owned();
+
+    if normalized.is_empty() {
+        return Err(SpoolmanError::BadRequest(
+            "A tag UID must not be empty.".into(),
+        ));
+    }
+    if !normalized.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(SpoolmanError::BadRequest(format!(
+            "\"{uid}\" is not a valid tag UID. A UID must be hexadecimal."
+        )));
+    }
+    if normalized.len() > UID_MAX_LENGTH {
+        return Err(SpoolmanError::BadRequest(format!(
+            "A tag UID can be at most {UID_MAX_LENGTH} hex characters."
+        )));
+    }
+    if !normalized.len().is_multiple_of(2) {
+        return Err(SpoolmanError::BadRequest(
+            "A tag UID must contain a whole number of bytes (an even number of hex characters)."
+                .into(),
+        ));
+    }
+    Ok(normalized)
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +102,7 @@ pub async fn get_spool_tags_batch(
         "SELECT spool_id, id, uid, format, CAST(added AS TEXT) AS added \
          FROM tag WHERE spool_id IN ({placeholders}) AND target_type = 'spool' ORDER BY id"
     );
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
     for id in spool_ids {
         q = q.bind(*id);
     }
@@ -103,10 +133,7 @@ pub async fn link_spool(
     uid: &str,
     format: Option<&str>,
 ) -> Result<TagInfo> {
-    let uid_norm = normalize_uid(uid);
-    if uid_norm.is_empty() {
-        return Err(SpoolmanError::BadRequest("Invalid tag UID".into()));
-    }
+    let uid_norm = normalize_uid(uid)?;
 
     // Verify spool exists.
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM spool WHERE id = ?")
@@ -114,7 +141,7 @@ pub async fn link_spool(
         .fetch_optional(pool)
         .await?;
     if exists.is_none() {
-        return Err(SpoolmanError::NotFound(format!("spool {spool_id}")));
+        return Err(SpoolmanError::NotFound(format!("spool with id {spool_id}")));
     }
 
     // Check if the UID is already in the tag table.
@@ -178,7 +205,7 @@ pub async fn link_spool(
 /// Unlink a UID from a spool.
 /// Returns `NotFound` if no such tag exists for that spool.
 pub async fn unlink_spool(pool: &AnyPool, spool_id: i64, uid: &str) -> Result<()> {
-    let uid_norm = normalize_uid(uid);
+    let uid_norm = normalize_uid(uid)?;
     let result =
         sqlx::query("DELETE FROM tag WHERE uid = ? AND spool_id = ? AND target_type = 'spool'")
             .bind(&uid_norm)
@@ -196,7 +223,7 @@ pub async fn unlink_spool(pool: &AnyPool, spool_id: i64, uid: &str) -> Result<()
 
 /// Look up a spool_id by tag UID. Returns `None` if not linked to a spool.
 pub async fn find_spool_id_by_uid(pool: &AnyPool, uid: &str) -> Result<Option<i64>> {
-    let uid_norm = normalize_uid(uid);
+    let uid_norm = normalize_uid(uid)?;
     let spool_id: Option<i64> = sqlx::query_scalar(
         "SELECT spool_id FROM tag WHERE uid = ? AND target_type = 'spool' AND spool_id IS NOT NULL",
     )
@@ -208,7 +235,7 @@ pub async fn find_spool_id_by_uid(pool: &AnyPool, uid: &str) -> Result<Option<i6
 
 /// Look up a filament_id by tag UID. Returns `None` if not linked to a filament.
 pub async fn find_filament_id_by_uid(pool: &AnyPool, uid: &str) -> Result<Option<i64>> {
-    let uid_norm = normalize_uid(uid);
+    let uid_norm = normalize_uid(uid)?;
     let filament_id: Option<i64> = sqlx::query_scalar(
         "SELECT filament_id FROM tag WHERE uid = ? AND target_type = 'filament' AND filament_id IS NOT NULL",
     )
@@ -247,7 +274,7 @@ pub async fn get_filament_tags_batch(
         "SELECT filament_id, id, uid, format, CAST(added AS TEXT) AS added \
          FROM tag WHERE filament_id IN ({placeholders}) AND target_type = 'filament' ORDER BY id"
     );
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
     for id in filament_ids {
         q = q.bind(*id);
     }
@@ -272,10 +299,7 @@ pub async fn link_filament(
     uid: &str,
     format: Option<&str>,
 ) -> Result<TagInfo> {
-    let uid_norm = normalize_uid(uid);
-    if uid_norm.is_empty() {
-        return Err(SpoolmanError::BadRequest("Invalid tag UID".into()));
-    }
+    let uid_norm = normalize_uid(uid)?;
 
     // Verify filament exists.
     let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM filament WHERE id = ?")
@@ -283,7 +307,9 @@ pub async fn link_filament(
         .fetch_optional(pool)
         .await?;
     if exists.is_none() {
-        return Err(SpoolmanError::NotFound(format!("filament {filament_id}")));
+        return Err(SpoolmanError::NotFound(format!(
+            "filament with id {filament_id}"
+        )));
     }
 
     // Check if the UID is already in the tag table.
@@ -345,7 +371,7 @@ pub async fn link_filament(
 /// Unlink a UID from a filament.
 /// Returns `NotFound` if no such tag exists for that filament.
 pub async fn unlink_filament(pool: &AnyPool, filament_id: i64, uid: &str) -> Result<()> {
-    let uid_norm = normalize_uid(uid);
+    let uid_norm = normalize_uid(uid)?;
     let result = sqlx::query(
         "DELETE FROM tag WHERE uid = ? AND filament_id = ? AND target_type = 'filament'",
     )

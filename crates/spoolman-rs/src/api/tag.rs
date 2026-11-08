@@ -50,7 +50,7 @@ pub async fn scan_post(
     State(state): State<AppState>,
     Json(req): Json<ScanTagRequest>,
 ) -> ApiResult<Json<ScanTagResponse>> {
-    let uid_norm = db::normalize_uid(&req.uid);
+    let uid_norm = db::normalize_uid(&req.uid)?;
     let reader_id = req.reader_id.as_deref().unwrap_or("unknown").to_owned();
 
     let matched_spool_id = db::find_spool_id_by_uid(&state.db.pool, &uid_norm).await?;

@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, Uri},
     response::{IntoResponse, Response},
     Json,
 };
@@ -27,14 +27,17 @@ use crate::{
 #[derive(Debug, Deserialize, Default)]
 pub struct FilamentQuery {
     pub name: Option<String>,
-    #[serde(rename = "vendor_id")]
+    #[serde(rename = "vendor_id", alias = "vendor.id")]
     pub vendor_id: Option<String>,
-    #[serde(rename = "vendor.name")]
+    #[serde(rename = "vendor.name", alias = "vendor_name")]
     pub vendor_name: Option<String>,
     pub material: Option<String>,
     pub article_number: Option<String>,
     pub external_id: Option<String>,
     pub color_hex: Option<String>,
+    pub color_similarity_threshold: Option<f64>,
+    /// NFC/RFID tag UID — returns the single filament linked to this tag (or empty).
+    pub tag: Option<String>,
     pub sort: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -48,6 +51,7 @@ pub struct FilamentQuery {
 pub async fn list(
     OptWs(ws): OptWs,
     State(state): State<AppState>,
+    uri: Uri,
     Query(q): Query<FilamentQuery>,
 ) -> Response {
     if let Some(ws) = ws {
@@ -56,13 +60,45 @@ pub async fn list(
             crate::api::ws::handle_entity_ws(socket, rx, "filament", None)
         });
     }
-    list_inner(state, q).await.into_response()
+    list_inner(state, uri, q).await.into_response()
 }
 
 async fn list_inner(
     state: AppState,
+    uri: Uri,
     q: FilamentQuery,
 ) -> ApiResult<(StatusCode, HeaderMap, Json<Vec<FilamentResponse>>)> {
+    let extra_filters = crate::api::parse_extra_params(&uri);
+
+    // Tag UID filter: find the single filament linked to this tag.
+    if let Some(ref tag_uid) = q.tag {
+        let fid = crate::db::tag::find_filament_id_by_uid(&state.db.pool, tag_uid).await?;
+        // Restrict to exactly that filament ID (or nothing if unlinked).
+        let ids = fid.map(|id| vec![id]).unwrap_or_default();
+        let filter = db::FilamentFilter {
+            ids: Some(ids),
+            sort: q.sort,
+            limit: q.limit,
+            offset: q.offset,
+            ..Default::default()
+        };
+        let (items, total) = db::find(&state.db.pool, &state.db.engine, &filter).await?;
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-total-count",
+            HeaderValue::from_str(&total.to_string()).unwrap_or(HeaderValue::from_static("0")),
+        );
+        return Ok((StatusCode::OK, headers, Json(items)));
+    }
+
+    // Colour-similarity pre-filter: resolve matching IDs before the main query.
+    let ids = if let Some(ref hex) = q.color_hex {
+        let threshold = q.color_similarity_threshold.unwrap_or(20.0);
+        Some(db::find_by_color(&state.db.pool, hex, threshold).await?)
+    } else {
+        None
+    };
+
     let filter = db::FilamentFilter {
         name: q.name,
         vendor_id: q.vendor_id,
@@ -70,10 +106,11 @@ async fn list_inner(
         material: q.material,
         article_number: q.article_number,
         external_id: q.external_id,
-        color_hex: q.color_hex,
+        ids,
         sort: q.sort,
         limit: q.limit,
         offset: q.offset,
+        extra_filters,
     };
     let (items, total) = db::find(&state.db.pool, &state.db.engine, &filter).await?;
     let mut headers = HeaderMap::new();
@@ -166,7 +203,7 @@ pub async fn unlink_tag(
 ) -> ApiResult<StatusCode> {
     // Validate filament exists first (returns 404 if not).
     if db::find_by_id(&state.db.pool, id).await.is_err() {
-        return Err(SpoolmanError::NotFound(format!("filament {id}")).into());
+        return Err(SpoolmanError::NotFound(format!("filament with id {id}")).into());
     }
     db_tag::unlink_filament(&state.db.pool, id, &uid).await?;
     Ok(StatusCode::NO_CONTENT)

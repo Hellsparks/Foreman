@@ -19,3 +19,8 @@ gen-types = "test --all -- export_bindings --nocapture"
 fmt-check = "fmt --all -- --check"
 lint = "clippy --all-targets -- -D warnings"
 check-all = ["fmt-check", "lint", "test --all"]
+
+# Compatibility gate: runs upstream Spoolman v0.27.1 tests_integration/ suite
+# against a locally-started spoolman-rs server.
+# Usage: cargo compat [--engine sqlite|postgres|mariadb|cockroach]
+compat = "run -p xtask -- compat"

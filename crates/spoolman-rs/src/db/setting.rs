@@ -85,6 +85,28 @@ pub fn find_def(key: &str) -> Option<&'static SettingDef> {
     SETTINGS.iter().find(|s| s.key == key)
 }
 
+/// Check that `raw_value` is valid for `def`'s type.
+/// Returns `Some(error_message)` on failure, `None` on success.
+pub fn validate_type(def: &SettingDef, raw_value: &str) -> Option<String> {
+    let parsed: serde_json::Value = match serde_json::from_str(raw_value) {
+        Ok(v) => v,
+        Err(e) => return Some(e.to_string()),
+    };
+    let ok = match def.type_name {
+        "string" => parsed.is_string(),
+        "boolean" => parsed.is_boolean(),
+        "number" => parsed.is_number(),
+        "array" => parsed.is_array(),
+        "object" => parsed.is_object(),
+        _ => true,
+    };
+    if ok {
+        None
+    } else {
+        Some(format!("Setting {} must be a {}.", def.key, def.type_name))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------

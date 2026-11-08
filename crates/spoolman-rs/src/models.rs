@@ -9,6 +9,40 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+/// Deserializer that rejects explicit JSON `null` for a field that is
+/// otherwise optional (may be absent, but must not be `null` when present).
+///
+/// Used with `#[serde(default, deserialize_with = "deny_null")]` so that:
+/// - absent field → `None` (via `default`)
+/// - `null` in JSON → 422 deserialization error
+/// - any value     → `Some(value)`
+pub fn deny_null<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    struct Visitor<T>(std::marker::PhantomData<T>);
+    impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for Visitor<T> {
+        type Value = Option<T>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "a non-null value")
+        }
+        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Err(E::custom("Value must not be None."))
+        }
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Err(E::custom("Value must not be None."))
+        }
+        fn visit_some<D2: serde::Deserializer<'de>>(
+            self,
+            de: D2,
+        ) -> Result<Self::Value, D2::Error> {
+            Ok(Some(T::deserialize(de)?))
+        }
+    }
+    de.deserialize_option(Visitor::<T>(std::marker::PhantomData))
+}
+
 // ---------------------------------------------------------------------------
 // Vendor
 // ---------------------------------------------------------------------------
@@ -139,9 +173,9 @@ pub struct UpdateFilamentRequest {
     pub material: Option<String>,
     #[serde(default)]
     pub price: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deny_null")]
     pub density: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deny_null")]
     pub diameter: Option<f64>,
     #[serde(default)]
     pub weight: Option<f64>,
@@ -175,30 +209,19 @@ pub struct UpdateFilamentRequest {
 pub struct SpoolResponse {
     pub id: i64,
     pub registered: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_used: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_used: Option<String>,
     pub filament: FilamentResponse,
     pub used_weight: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_weight: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_length: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub used_length: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub lot_nr: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     pub archived: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub price: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_weight: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub spool_weight: Option<f64>,
     pub tags: Vec<TagInfo>,
     pub extra: Map<String, Value>,
@@ -498,7 +521,8 @@ pub struct ExtraFieldParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingResponse {
-    pub value: Value,
+    /// Raw JSON-encoded value string (not a parsed JSON value).
+    pub value: String,
     pub is_set: bool,
     #[serde(rename = "type")]
     pub type_: String,
