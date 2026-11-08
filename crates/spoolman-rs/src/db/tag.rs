@@ -238,7 +238,11 @@ pub async fn get_filament_tags_batch(
     if filament_ids.is_empty() {
         return Ok(HashMap::new());
     }
-    let placeholders = filament_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let placeholders = filament_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
     let sql = format!(
         "SELECT filament_id, id, uid, format, CAST(added AS TEXT) AS added \
          FROM tag WHERE filament_id IN ({placeholders}) AND target_type = 'filament' ORDER BY id"

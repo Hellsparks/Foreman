@@ -4,10 +4,10 @@
 //! Responses include a `Content-Disposition: attachment` header.
 
 use axum::{
+    body::Body,
     extract::{Query, State},
     http::{header, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    body::Body,
 };
 use serde::Deserialize;
 
@@ -54,9 +54,8 @@ fn build_response(body: Vec<u8>, content_type: &'static str, filename: &str) -> 
         .header(header::CONTENT_TYPE, HeaderValue::from_static(content_type))
         .header(
             header::CONTENT_DISPOSITION,
-            HeaderValue::from_str(&disposition).unwrap_or_else(|_| {
-                HeaderValue::from_static("attachment")
-            }),
+            HeaderValue::from_str(&disposition)
+                .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
         )
         .body(Body::from(body))
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
@@ -87,9 +86,7 @@ fn opt_i64(v: Option<i64>) -> String {
 }
 
 fn vendors_to_csv(rows: &[VendorResponse]) -> Vec<u8> {
-    let mut out = String::from(
-        "id,registered,name,comment,empty_spool_weight,external_id\n",
-    );
+    let mut out = String::from("id,registered,name,comment,empty_spool_weight,external_id\n");
     for v in rows {
         out.push_str(&format!(
             "{},{},{},{},{},{}\n",
@@ -111,8 +108,16 @@ fn filaments_to_csv(rows: &[FilamentResponse]) -> Vec<u8> {
          settings_bed_temp,color_hex,multi_color_hexes,multi_color_direction,external_id\n",
     );
     for f in rows {
-        let vendor_id = f.vendor.as_ref().map(|v| v.id.to_string()).unwrap_or_default();
-        let vendor_name = f.vendor.as_ref().map(|v| escape_csv(&v.name)).unwrap_or_default();
+        let vendor_id = f
+            .vendor
+            .as_ref()
+            .map(|v| v.id.to_string())
+            .unwrap_or_default();
+        let vendor_name = f
+            .vendor
+            .as_ref()
+            .map(|v| escape_csv(&v.name))
+            .unwrap_or_default();
         out.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
             f.id,
@@ -146,8 +151,18 @@ fn spools_to_csv(rows: &[SpoolResponse]) -> Vec<u8> {
          initial_weight,spool_weight\n",
     );
     for s in rows {
-        let fil_name = s.filament.name.as_deref().map(escape_csv).unwrap_or_default();
-        let fil_material = s.filament.material.as_deref().map(escape_csv).unwrap_or_default();
+        let fil_name = s
+            .filament
+            .name
+            .as_deref()
+            .map(escape_csv)
+            .unwrap_or_default();
+        let fil_material = s
+            .filament
+            .material
+            .as_deref()
+            .map(escape_csv)
+            .unwrap_or_default();
         out.push_str(&format!(
             "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
             s.id,
@@ -195,7 +210,11 @@ pub async fn export_spools(
 
     let fmt = fmt_or_default(&q.fmt);
     if fmt == "csv" {
-        Ok(build_response(spools_to_csv(&rows), "text/csv; charset=utf-8", "spools.csv"))
+        Ok(build_response(
+            spools_to_csv(&rows),
+            "text/csv; charset=utf-8",
+            "spools.csv",
+        ))
     } else {
         let body = serde_json::to_vec(&rows).map_err(|e| map_err(SpoolmanError::Json(e)))?;
         Ok(build_response(body, "application/json", "spools.json"))
@@ -220,7 +239,11 @@ pub async fn export_filaments(
 
     let fmt = fmt_or_default(&q.fmt);
     if fmt == "csv" {
-        Ok(build_response(filaments_to_csv(&rows), "text/csv; charset=utf-8", "filaments.csv"))
+        Ok(build_response(
+            filaments_to_csv(&rows),
+            "text/csv; charset=utf-8",
+            "filaments.csv",
+        ))
     } else {
         let body = serde_json::to_vec(&rows).map_err(|e| map_err(SpoolmanError::Json(e)))?;
         Ok(build_response(body, "application/json", "filaments.json"))
@@ -245,7 +268,11 @@ pub async fn export_vendors(
 
     let fmt = fmt_or_default(&q.fmt);
     if fmt == "csv" {
-        Ok(build_response(vendors_to_csv(&rows), "text/csv; charset=utf-8", "vendors.csv"))
+        Ok(build_response(
+            vendors_to_csv(&rows),
+            "text/csv; charset=utf-8",
+            "vendors.csv",
+        ))
     } else {
         let body = serde_json::to_vec(&rows).map_err(|e| map_err(SpoolmanError::Json(e)))?;
         Ok(build_response(body, "application/json", "vendors.json"))

@@ -33,8 +33,8 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 ## Phase 1 close-out
 
 ### C.1 CI (was 0.6)
-- [ ] GitHub Actions: fmt, clippy `-D warnings`, test (Linux + Windows), frontend build, `cargo gen-types` diff check.
-- [ ] Weekly scheduled job: compare latest `Donkie/Spoolman` tag and the file list of `migrations/versions/` against v0.27.1; open an issue (or fail a non-blocking job) when they differ.
+- [x] GitHub Actions: fmt, clippy `-D warnings`, test (Linux + Windows), frontend build, `cargo gen-types` diff check.
+- [x] Weekly scheduled job: compare latest `Donkie/Spoolman` tag and the file list of `migrations/versions/` against v0.27.1; open an issue (or fail a non-blocking job) when they differ.
 
 ### C.2 Compatibility gate (was 1.5)
 - [ ] `cargo compat` alias: starts DB containers (Docker **for tests only**), starts spoolman-rs, runs upstream `tests_integration/` with `SPOOLMAN_HOST`/`SPOOLMAN_PORT`. Green on SQLite, Postgres, MariaDB; Cockroach reported.
@@ -184,3 +184,13 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 **Upstream Python v0.27.1 opens the migrated DB successfully:** Installed via `uv` into `/tmp/spoolman-pyenv` (Python 3.12). Needed: add venv `bin/` to `PATH` (alembic is called as a subprocess), set `PYTHONPATH` to vendor source + site-packages explicitly (uv venv uses symlinks so Python's venv auto-detection doesn't add site-packages). Create stub `vendor/spoolman-upstream/client_v2/build/index.html` to pass the client-build check. Upstream reports 1 filament, 12 vendors — all correct.
 
 **Bug found and fixed: extra field values double-encoded on write, decoded on read (wrong per upstream contract).** Upstream contract (`spoolman/api/v1/models.py` line 57): *"Every value in the extra map is a JSON-encoded string regardless of the field's type. Consumers must JSON-decode each value."* spoolman-rs was calling `val.to_string()` on a `Value::String` in `set_values()`, which re-encoded an already-JSON-encoded string. On read, `get_values()` was JSON-decoding the stored value, returning native types instead of raw strings. Fix: `set_values()` stores `s.clone()` for `Value::String(s)`; `get_values()` / `get_values_batch()` / `get_distinct_values()` return `Value::String(raw_val)` without decoding. Two regression tests added (`extra_field_values_round_trip_as_raw_json_strings`, `extra_field_float_stored_by_upstream_survives_read`). All 13 tests pass.
+
+### Session 11 — 2026-11-08 (C.1 CI)
+
+**ci.yml already existed from session 1** with fmt, clippy, test (Linux + Windows), frontend build, and type-gen drift check — all correct. No changes needed to that file, only reformatting of previously committed Rust files that failed `cargo fmt --check` (`export.rs`, `main.rs`, `spool.rs`, `tag.rs`, `extra_field.rs`, `route_list.rs`). The fmt failures were pre-existing from sessions 9–10 but not caught before commit.
+
+**Upstream-watch workflow** (`upstream-spoolman.yml`): uses `actions/github-script` to avoid shell JSON-escaping issues. Creates the `upstream-watch` label automatically if it doesn't exist. Opens or updates one issue when tag or migration file list diverges from `upstream-pin.json`. Non-blocking — warnings via `core.notice`, never fails CI.
+
+**`upstream-pin.json`** pinned at `v0.27.1` with the 15 migration `.py` filenames. Excludes `__init__.py` and `__pycache__`.
+
+**`.gitignore`**: added `fixtures/` and `test-printers.local.toml` (not present on `main`; had been added only on `migration-test` branch).

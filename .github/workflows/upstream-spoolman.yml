@@ -1,0 +1,169 @@
+name: Spoolman upstream watch
+
+# Checks weekly whether Donkie/Spoolman has released a new tag or added
+# migrations since the pinned version in crates/spoolman-rs/upstream-pin.json.
+# When it has, opens (or updates) a single labelled issue so it doesn't get lost.
+# This job is intentionally non-blocking: it never causes a CI failure.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:        # Allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Check for upstream Spoolman changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare upstream with pin and open/update issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // ----------------------------------------------------------------
+            // 1. Read the pinned version from the repo.
+            // ----------------------------------------------------------------
+            const pin = JSON.parse(
+              fs.readFileSync('crates/spoolman-rs/upstream-pin.json', 'utf8')
+            );
+            const pinMigrations = [...pin.migrations].sort();
+
+            // ----------------------------------------------------------------
+            // 2. Fetch the latest Spoolman release tag.
+            // ----------------------------------------------------------------
+            let latestTag;
+            try {
+              const rel = await github.rest.repos.getLatestRelease({
+                owner: 'Donkie',
+                repo: 'Spoolman',
+              });
+              latestTag = rel.data.tag_name;
+            } catch (e) {
+              core.warning(`Could not fetch latest Spoolman release: ${e.message}`);
+              return;
+            }
+
+            // ----------------------------------------------------------------
+            // 3. Fetch the migration file list at that tag.
+            // ----------------------------------------------------------------
+            let latestMigrations;
+            try {
+              const contents = await github.rest.repos.getContent({
+                owner: 'Donkie',
+                repo: 'Spoolman',
+                path: 'migrations/versions',
+                ref: latestTag,
+              });
+              latestMigrations = contents.data
+                .filter(f => f.type === 'file' && f.name.endsWith('.py') && f.name !== '__init__.py')
+                .map(f => f.name)
+                .sort();
+            } catch (e) {
+              core.warning(`Could not fetch Spoolman migration list at ${latestTag}: ${e.message}`);
+              return;
+            }
+
+            // ----------------------------------------------------------------
+            // 4. Compare.
+            // ----------------------------------------------------------------
+            const tagChanged     = latestTag !== pin.tag;
+            const migsChanged    = JSON.stringify(latestMigrations) !== JSON.stringify(pinMigrations);
+
+            if (!tagChanged && !migsChanged) {
+              core.notice(`Upstream is still at pinned ${pin.tag} with no migration changes — nothing to do.`);
+              return;
+            }
+
+            const addedMigs   = latestMigrations.filter(f => !pinMigrations.includes(f));
+            const removedMigs = pinMigrations.filter(f => !latestMigrations.includes(f));
+
+            // ----------------------------------------------------------------
+            // 5. Build the issue body.
+            // ----------------------------------------------------------------
+            const lines = [
+              '## Spoolman upstream has changed',
+              '',
+              '| | Pinned | Latest |',
+              '|---|---|---|',
+              `| Tag | \`${pin.tag}\` | \`${latestTag}\` |`,
+              '',
+            ];
+
+            if (addedMigs.length > 0) {
+              lines.push(`**New migrations added since \`${pin.tag}\`:**`);
+              addedMigs.forEach(f => lines.push(`- \`${f}\``));
+              lines.push('');
+            }
+            if (removedMigs.length > 0) {
+              lines.push(`**Migrations removed since \`${pin.tag}\`:**`);
+              removedMigs.forEach(f => lines.push(`- \`${f}\``));
+              lines.push('');
+            }
+
+            lines.push(
+              'Review the upstream diff, implement any new schema migrations or API changes in',
+              '`crates/spoolman-rs`, then bump `crates/spoolman-rs/upstream-pin.json` to the new tag.',
+              '',
+              `_Automatically updated by the upstream-watch workflow on ${new Date().toISOString().split('T')[0]}_`,
+            );
+
+            const title = 'Spoolman upstream changed — review for compatibility';
+            const body  = lines.join('\n');
+
+            // ----------------------------------------------------------------
+            // 6. Ensure the label exists.
+            // ----------------------------------------------------------------
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'upstream-watch',
+              });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'upstream-watch',
+                color: 'e4e669',
+                description: 'Upstream dependency has changed and needs review',
+              });
+            }
+
+            // ----------------------------------------------------------------
+            // 7. Find an existing open issue with this exact title.
+            // ----------------------------------------------------------------
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-watch',
+              per_page: 50,
+            });
+            const existing = openIssues.find(i => i.title === title);
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              core.notice(`Updated issue #${existing.number}: ${title}`);
+            } else {
+              const { data: created } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['upstream-watch'],
+              });
+              core.notice(`Created issue #${created.number}: ${title}`);
+            }

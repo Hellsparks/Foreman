@@ -1,0 +1,20 @@
+{
+  "tag": "v0.27.1",
+  "migrations": [
+    "2023_05_27_2146-684d32cf7e4d_initial.py",
+    "2023_05_28_2136-b47376d60c6d_add_extruder_and_bed_temperature_.py",
+    "2023_06_01_1953-db385b808a20_add_filament_color_code.py",
+    "2023_07_14_1217-92186a5f7b0f_add_spool_archived_field.py",
+    "2023_08_12_2121-92793c8a937c_color_hex_alpha.py",
+    "2023_12_30_0839-b82cd9e2aa6f_added_spool_prices.py",
+    "2024_01_03_1346-ccbb17aeda7c_added_settings_table.py",
+    "2024_01_04_2209-b8881bdb716c_added_extra_fields.py",
+    "2024_03_26_0948-aafcd7fb0e84_spool_weights.py",
+    "2024_03_26_1349-304a32906234_spool_weight_population.py",
+    "2024_03_26_1507-5f069e51bd89_vendor_empty_spool_weight.py",
+    "2024_05_12_1930-395d560284b3_added_external_id.py",
+    "2024_05_28_1846-415a8f855e14_multi_colors.py",
+    "2026_08_02_0900-9c1d5f2a7b31_strip_color_hex_hash.py",
+    "2026_08_13_1000-fe4970567bb3_tags.py"
+  ]
+}

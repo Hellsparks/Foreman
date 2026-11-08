@@ -201,7 +201,10 @@ pub async fn get_values_batch(
         let key: String = row.try_get("key")?;
         let raw_val: String = row.try_get("value")?;
         // Same as get_values: return the raw stored JSON-encoded string.
-        result.entry(entity_id).or_default().insert(key, Value::String(raw_val));
+        result
+            .entry(entity_id)
+            .or_default()
+            .insert(key, Value::String(raw_val));
     }
     Ok(result)
 }
@@ -272,11 +275,36 @@ pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::
     }
 
     let defaults = [
-        DefaultField { key: "url",               name: "Link",                 field_type: ExtraFieldType::Text,    unit: None      },
-        DefaultField { key: "hue_td",             name: "Hueforge TD",          field_type: ExtraFieldType::Float,   unit: Some("TD") },
-        DefaultField { key: "swatch",             name: "Has printed swatch",   field_type: ExtraFieldType::Boolean, unit: None      },
-        DefaultField { key: "orcaslicer_config",  name: "OrcaSlicer Config",    field_type: ExtraFieldType::Text,    unit: None      },
-        DefaultField { key: "material_modifier",  name: "Material Modifier",    field_type: ExtraFieldType::Text,    unit: None      },
+        DefaultField {
+            key: "url",
+            name: "Link",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
+        DefaultField {
+            key: "hue_td",
+            name: "Hueforge TD",
+            field_type: ExtraFieldType::Float,
+            unit: Some("TD"),
+        },
+        DefaultField {
+            key: "swatch",
+            name: "Has printed swatch",
+            field_type: ExtraFieldType::Boolean,
+            unit: None,
+        },
+        DefaultField {
+            key: "orcaslicer_config",
+            name: "OrcaSlicer Config",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
+        DefaultField {
+            key: "material_modifier",
+            name: "Material Modifier",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
     ];
 
     let existing = get_definitions(pool, "filament").await?;
@@ -425,8 +453,7 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(
-            stored,
-            r#""https://example.com""#,
+            stored, r#""https://example.com""#,
             "stored value must be the JSON string literal, not double-encoded"
         );
     }
