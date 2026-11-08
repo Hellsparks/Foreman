@@ -166,10 +166,10 @@ pub async fn get_values(
         use sqlx::Row;
         let key: String = row.try_get("key")?;
         let raw_val: String = row.try_get("value")?;
-        // Values are stored as JSON: parse them back so the API returns the
-        // native JSON type (string, number, bool, array, etc.), not a JSON string.
-        let json_val: Value = serde_json::from_str(&raw_val).unwrap_or(Value::String(raw_val));
-        map.insert(key, json_val);
+        // Upstream contract: every value in the `extra` map is a JSON-encoded string.
+        // We return the raw stored string so consumers can JSON-decode it themselves,
+        // exactly as the upstream Python Spoolman does.
+        map.insert(key, Value::String(raw_val));
     }
     Ok(map)
 }
@@ -200,8 +200,8 @@ pub async fn get_values_batch(
         let entity_id: i64 = row.try_get(id_col)?;
         let key: String = row.try_get("key")?;
         let raw_val: String = row.try_get("value")?;
-        let json_val: Value = serde_json::from_str(&raw_val).unwrap_or(Value::String(raw_val));
-        result.entry(entity_id).or_default().insert(key, json_val);
+        // Same as get_values: return the raw stored JSON-encoded string.
+        result.entry(entity_id).or_default().insert(key, Value::String(raw_val));
     }
     Ok(result)
 }
@@ -225,7 +225,14 @@ pub async fn set_values(
         if val.is_null() {
             continue;
         }
-        let raw = val.to_string(); // JSON encoding
+        // Upstream contract: clients send JSON-encoded strings for all values.
+        // Store the string content directly — do NOT re-encode with to_string(),
+        // which would double-encode (e.g. "\"hello\"" → "\"\\\"hello\\\"\"").
+        // Fall back to to_string() for bare numbers/bools sent by non-compliant clients.
+        let raw = match val {
+            Value::String(s) => s.clone(),
+            other => other.to_string(),
+        };
         sqlx::query(&ins_sql)
             .bind(id)
             .bind(key.as_str())
@@ -304,12 +311,150 @@ pub async fn get_distinct_values(pool: &AnyPool, table: &str, key: &str) -> Resu
     for row in rows {
         use sqlx::Row;
         let raw: String = row.try_get("value")?;
-        // Values are JSON-encoded; decode to get the plain string for text fields.
-        let decoded = serde_json::from_str::<Value>(&raw)
-            .ok()
-            .and_then(|v| v.as_str().map(str::to_owned))
-            .unwrap_or(raw);
-        result.push(decoded);
+        // Return the raw stored JSON-encoded string, consistent with the extra map.
+        result.push(raw);
     }
     Ok(result)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{install_drivers, Engine};
+    use sqlx::AnyPool;
+    use tempfile::TempDir;
+
+    async fn open_fresh_db(dir: &std::path::Path) -> AnyPool {
+        install_drivers();
+        let path = dir.join("test.db");
+        std::fs::File::create(&path).unwrap();
+        let url = format!("sqlite://{}", path.display());
+        let pool = AnyPool::connect(&url).await.unwrap();
+        // Create the tables needed by extra_field helpers.
+        sqlx::query(
+            "CREATE TABLE setting (
+                key TEXT PRIMARY KEY NOT NULL,
+                value TEXT NOT NULL,
+                first_created DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
+                last_updated DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now'))
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "CREATE TABLE filament_field (
+                filament_id INTEGER NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool
+    }
+
+    /// Round-trip a text extra field: set it with a JSON-encoded string value
+    /// (as the upstream Spoolman client does), then read it back.
+    ///
+    /// Regression for the double-encoding bug: before the fix, `set_values`
+    /// called `val.to_string()` on a `Value::String`, which re-encoded the
+    /// already-JSON-encoded string — producing `"\"\\\"url\\\"\""` instead of
+    /// the correct `"\"url\""`.
+    #[tokio::test]
+    async fn extra_field_values_round_trip_as_raw_json_strings() {
+        let dir = TempDir::new().unwrap();
+        let pool = open_fresh_db(dir.path()).await;
+        let engine = Engine::Sqlite;
+
+        // Create a text extra field definition.
+        let params = crate::models::ExtraFieldParams {
+            name: "Link".to_owned(),
+            order: 1,
+            field_type: crate::models::ExtraFieldType::Text,
+            unit: None,
+            default_value: None,
+            choices: None,
+            multi_choice: None,
+        };
+        upsert_definition(&pool, &engine, "filament", "url", &params)
+            .await
+            .unwrap();
+
+        // Simulate what the Spoolman web client sends: a JSON-encoded string
+        // value for a text field.  Over the wire the PATCH body contains
+        // `"extra": {"url": "\"https://example.com\""}`.  serde_json parses
+        // `"\"https://example.com\""` as Value::String whose Rust content is
+        // `"https://example.com"` — a string that includes the outer double-
+        // quote characters, because those are the JSON encoding of the actual
+        // text field value.  We construct it directly here to avoid confusion
+        // with the from_str string-delimiter stripping.
+        let val = Value::String(r#""https://example.com""#.to_owned());
+        assert!(val.is_string(), "pre-condition: val must be Value::String");
+
+        let mut values = Map::new();
+        values.insert("url".to_owned(), val);
+        set_values(&pool, "filament_field", "filament_id", 1, &values)
+            .await
+            .unwrap();
+
+        // Read back via get_values.
+        let got = get_values(&pool, "filament_field", "filament_id", 1)
+            .await
+            .unwrap();
+
+        // The returned value MUST be the raw stored string, not a decoded URL.
+        // Upstream Spoolman returns `"\"https://example.com\""` in the JSON
+        // response body — a JSON string whose content is `"https://example.com"`
+        // (with the outer double-quote characters preserved).
+        assert_eq!(
+            got.get("url"),
+            Some(&Value::String(r#""https://example.com""#.to_owned())),
+            "get_values must return the raw JSON-encoded string, not a decoded URL"
+        );
+
+        // Verify the DB column stores the raw JSON-encoded string (single encoding).
+        let stored: String =
+            sqlx::query_scalar("SELECT value FROM filament_field WHERE key = 'url'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            stored,
+            r#""https://example.com""#,
+            "stored value must be the JSON string literal, not double-encoded"
+        );
+    }
+
+    /// A float extra field stored by upstream Python as a bare number (`4.3`, not `"4.3"`)
+    /// must round-trip correctly through spoolman-rs.
+    #[tokio::test]
+    async fn extra_field_float_stored_by_upstream_survives_read() {
+        let dir = TempDir::new().unwrap();
+        let pool = open_fresh_db(dir.path()).await;
+
+        // Insert exactly the value the upstream Python app stored.
+        sqlx::query(
+            "INSERT INTO filament_field (filament_id, key, value) VALUES (1, 'hue_td', '4.3')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let got = get_values(&pool, "filament_field", "filament_id", 1)
+            .await
+            .unwrap();
+
+        // Returned as the raw stored string "4.3".
+        assert_eq!(
+            got.get("hue_td"),
+            Some(&Value::String("4.3".to_owned())),
+            "float stored as bare number must come back as the raw stored string"
+        );
+    }
 }
