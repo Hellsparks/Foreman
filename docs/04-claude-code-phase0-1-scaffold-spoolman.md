@@ -93,7 +93,7 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - [x] Respect upstream env vars (`SPOOLMAN_DB_TYPE`, `SPOOLMAN_DB_HOST`, `_PORT`, `_NAME`, `_USERNAME`, `_PASSWORD`/`_PASSWORD_FILE`, `SPOOLMAN_DIR_DATA`, `SPOOLMAN_BASE_PATH`, `SPOOLMAN_HOST`, `SPOOLMAN_PORT`, `SPOOLMAN_AUTOMATIC_BACKUP`, `SPOOLMAN_DIR_LOGS`, `SPOOLMAN_DIR_BACKUPS` — full list confirmed from `env.py`). Default SQLite path matches upstream's default location (`~/.local/share/spoolman/spoolman.db` on Linux).
 
 ### 1.2 REST API (`{base_path}/api/v1`)
-- [ ] vendor, filament, spool CRUD with upstream filtering (comma lists, empty-value semantics, extra-field filters), sorting, pagination (incl. total-count header — check upstream for exact name).
+- [x] vendor, filament, spool CRUD with upstream filtering (comma lists, empty-value semantics, extra-field filters), sorting, pagination (incl. total-count header — check upstream for exact name). Extra fields return `{}`, tags return `[]` (wired in session 7).
 - [ ] spool `use` (by weight and by length → weight via density/diameter) and `measure`; first/last used timestamps; archived.
 - [ ] extra fields (`/field/{entity}/{key}`): definitions in `setting`, values JSON-encoded in `*_field` tables, validation per field type.
 - [ ] settings, info/health, backup, find endpoints (material, location, lot-number, article-number), location rename, export, search, externaldb (SpoolmanDB cache/proxy), tags (NFC/OpenPrintTag) and scan relay.
@@ -163,3 +163,15 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **`AnyPool::connect` does not set SQLite `create_if_missing`:** Unlike `SqlitePool::connect_with(opts.create_if_missing(true))`, `AnyPool::connect(url)` opens SQLite in read-write-only mode (no create). `From<SqliteConnectOptions>` is not implemented for `AnyConnectOptions` in sqlx 0.8. Workaround: `std::fs::File::create` the SQLite file explicitly before calling `AnyPool::connect`, then run WAL/FK PRAGMA commands as the first query.
 
 **SQLite error code 1 is generic:** `is_table_not_found` must not short-circuit on a non-nil error code — SQLite code 1 (`SQLITE_ERROR`) is used for many errors including "no such table". Logic changed to check Postgres/MySQL specific codes first, then always fall through to a message-prefix check.
+
+### Session 6 — 2026-11-08
+
+**`AnyPool` cannot decode SQLite DATETIME or BOOLEAN columns:** When reading rows via `AnyPool`, sqlx's Any driver fails with "Any driver does not support the SQLite type SqliteTypeInfo(Datetime/Bool)" even when `String`/`i64` are used in the struct and even with `try_get_unchecked`. Fix: `CAST(col AS TEXT)` for all datetime columns and `CAST(col AS INTEGER)` for boolean columns in every SELECT query that goes through AnyPool. The stored values are correct TEXT/INTEGER — only the type-affinity metadata confuses the Any driver.
+
+**`AnyQueryResult::last_insert_id()` returns `None` for SQLite:** The Any driver's `last_insert_id()` does not populate for SQLite. Fix: use `INSERT ... RETURNING id` for SQLite (supported since SQLite 3.35.0, 2021-03-12) and Postgres; use a transaction + `SELECT LAST_INSERT_ID()` for MySQL only.
+
+**Axum 0.8 uses `{id}` path syntax:** Axum 0.8 changed path parameters from `:id` to `{id}`. All route definitions updated.
+
+**Ambiguous column in ORDER BY across JOINs:** Unqualified sort columns (e.g. `id`) in multi-table JOINs trigger "ambiguous column name". Fix: `qualify_sort()` helper maps bare column names to qualified names (e.g. `id` → `s.id`) before `order_by_sql()`.
+
+**SQLite BOOLEAN NULL default for spool:** The `archived` column has no DEFAULT in the schema, so new spools without an explicit `archived` value are stored as NULL. The `archived = 0` filter then excludes them. Fix: default `archived` to `0` in the spool create function (matching upstream Spoolman's Python model default of `False`).

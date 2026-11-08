@@ -1,4 +1,8 @@
+pub mod filament;
 pub mod migrations;
+pub mod query;
+pub mod spool;
+pub mod vendor;
 
 use sqlx::AnyPool;
 

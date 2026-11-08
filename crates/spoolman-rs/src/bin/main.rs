@@ -1,16 +1,15 @@
 //! Standalone `spoolman-rs` binary.
 //!
-//! Reads SPOOLMAN_* environment variables, opens (or creates) the SQLite
-//! database, runs the alembic-compatible startup check, then prints the
-//! connection info and exits cleanly.  The full HTTP API is added in
-//! sessions 6–10.
+//! Reads SPOOLMAN_* environment variables, opens (or creates) the database,
+//! runs the alembic-compatible startup check, then serves the REST API.
 
-use spoolman_rs::{config::SpoolmanConfig, db::Db};
+use std::net::SocketAddr;
+
+use spoolman_rs::{api, config::SpoolmanConfig, db::Db, state::AppState};
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[tokio::main]
 async fn main() {
-    // Initialise tracing; RUST_LOG controls verbosity.
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
     let cfg = match SpoolmanConfig::from_env() {
@@ -22,24 +21,40 @@ async fn main() {
     };
 
     tracing::info!(
-        db = %cfg.sqlite_path().display(),
         host = %cfg.host,
         port = cfg.port,
         "spoolman-rs starting"
     );
 
-    match Db::connect(&cfg).await {
-        Ok(_db) => {
-            tracing::info!("database ready");
-            println!(
-                "spoolman-rs v{} — database open at {}",
-                env!("CARGO_PKG_VERSION"),
-                cfg.sqlite_path().display()
-            );
-        }
+    let db = match Db::connect(&cfg).await {
+        Ok(d) => d,
         Err(e) => {
             tracing::error!("failed to open database: {e}");
             std::process::exit(1);
         }
+    };
+
+    tracing::info!("database ready");
+
+    let addr: SocketAddr = format!("{}:{}", cfg.host, cfg.port)
+        .parse()
+        .expect("invalid listen address");
+
+    let state = AppState::new(db, cfg.clone());
+    let app = api::router(&cfg.base_path).with_state(state);
+
+    tracing::info!(%addr, "listening");
+
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!("failed to bind {addr}: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("server error: {e}");
+        std::process::exit(1);
     }
 }
