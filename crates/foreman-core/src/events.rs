@@ -25,10 +25,11 @@ use ts_rs::TS;
 // ---------------------------------------------------------------------------
 
 /// Printer state (stub — will grow in Phase 2.3).
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum PrinterState {
+    #[default]
     Idle,
     Printing,
     Paused,
@@ -36,15 +37,35 @@ pub enum PrinterState {
     Offline,
 }
 
-/// A minimal printer status snapshot (stub — extended in Phase 2.3).
+/// Temperature reading for one heater.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TempReading {
+    pub actual: f64,
+    pub target: f64,
+}
+
+/// A printer status snapshot with temps, progress, and job info.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct PrinterStatus {
     pub state: PrinterState,
+    /// Nozzle temperature (extruder 0).
+    pub nozzle: Option<TempReading>,
+    /// Heated bed temperature.
+    pub bed: Option<TempReading>,
+    /// Print progress 0.0–1.0.
+    pub progress: Option<f64>,
+    /// Currently printing filename (if any).
+    pub filename: Option<String>,
+    /// Print duration in seconds so far.
+    pub print_duration: Option<f64>,
+    /// Display message from the printer (M117).
+    pub display_message: Option<String>,
 }
 
 /// What triggered a connection event.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionEventKind {
@@ -222,6 +243,12 @@ mod tests {
             printer_id,
             status: PrinterStatus {
                 state: PrinterState::Idle,
+                nozzle: None,
+                bed: None,
+                progress: None,
+                filename: None,
+                print_duration: None,
+                display_message: None,
             },
         }
     }

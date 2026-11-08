@@ -1,0 +1,819 @@
+//! Moonraker WebSocket JSON-RPC driver.
+//!
+//! Connects via WebSocket, subscribes to Klipper object updates, merges
+//! partial status updates into a full `PrinterStatus`, and publishes events
+//! on the Foreman event bus.
+//!
+//! Key Moonraker JSON-RPC methods used:
+//! - `server.info` — server state, klipper version
+//! - `printer.objects.list` — available Klipper objects
+//! - `printer.objects.subscribe` — subscribe to object changes
+//! - `printer.objects.query` — one-shot query for config data
+//! - `server.webcams.list` — webcam list
+//!
+//! Subscribed objects: print_stats, extruder, heater_bed, virtual_sdcard,
+//! display_status, toolhead, webhooks.
+//!
+//! Partial updates arrive as `notify_status_update` notifications and are
+//! merged into the cached status. Events are throttled to max 2/s per printer.
+
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use async_trait::async_trait;
+use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tokio::sync::{broadcast, watch, Mutex, RwLock};
+use tracing::{debug, error, info, warn};
+
+use crate::driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile, WebcamInfo};
+use crate::error::AppError;
+use crate::events::{
+    ConnectionEvent, ConnectionEventKind, PrinterState, PrinterStatus, ServerEvent, TempReading,
+};
+
+// ---------------------------------------------------------------------------
+// JSON-RPC types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+struct JsonRpcRequest {
+    jsonrpc: &'static str,
+    method: String,
+    params: Option<Value>,
+    id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct JsonRpcResponse {
+    id: Option<u64>,
+    result: Option<Value>,
+    error: Option<JsonRpcError>,
+    method: Option<String>,
+    params: Option<Vec<Value>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct JsonRpcError {
+    code: i64,
+    message: String,
+}
+
+// ---------------------------------------------------------------------------
+// Subscribed objects
+// ---------------------------------------------------------------------------
+
+/// The Klipper objects we subscribe to.
+const SUBSCRIBED_OBJECTS: &[(&str, Option<&[&str]>)] = &[
+    ("print_stats", None),
+    ("extruder", Some(&["temperature", "target"])),
+    ("heater_bed", Some(&["temperature", "target"])),
+    ("virtual_sdcard", Some(&["progress", "file_path"])),
+    ("display_status", Some(&["message", "progress"])),
+    ("toolhead", Some(&["position", "homed_axes"])),
+    ("webhooks", Some(&["state", "state_message"])),
+];
+
+fn subscription_objects() -> Value {
+    let mut map = serde_json::Map::new();
+    for (name, fields) in SUBSCRIBED_OBJECTS {
+        let val = match fields {
+            Some(fs) => Value::Array(fs.iter().map(|f| Value::String(f.to_string())).collect()),
+            None => Value::Null,
+        };
+        map.insert(name.to_string(), val);
+    }
+    Value::Object(map)
+}
+
+// ---------------------------------------------------------------------------
+// Internal cached state
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default)]
+struct CachedStatus {
+    state: PrinterState,
+    nozzle_actual: f64,
+    nozzle_target: f64,
+    bed_actual: f64,
+    bed_target: f64,
+    progress: f64,
+    filename: Option<String>,
+    print_duration: f64,
+    display_message: Option<String>,
+}
+
+impl CachedStatus {
+    fn to_printer_status(&self) -> PrinterStatus {
+        PrinterStatus {
+            state: self.state.clone(),
+            nozzle: Some(TempReading {
+                actual: self.nozzle_actual,
+                target: self.nozzle_target,
+            }),
+            bed: Some(TempReading {
+                actual: self.bed_actual,
+                target: self.bed_target,
+            }),
+            progress: Some(self.progress),
+            filename: self.filename.clone(),
+            print_duration: Some(self.print_duration),
+            display_message: self.display_message.clone(),
+        }
+    }
+
+    /// Merge a partial `notify_status_update` payload into this status.
+    fn merge_update(&mut self, objects: &Value) {
+        if let Some(obj) = objects.as_object() {
+            for (key, val) in obj {
+                match key.as_str() {
+                    "extruder" => {
+                        if let Some(t) = val.get("temperature").and_then(|v| v.as_f64()) {
+                            self.nozzle_actual = t;
+                        }
+                        if let Some(t) = val.get("target").and_then(|v| v.as_f64()) {
+                            self.nozzle_target = t;
+                        }
+                    }
+                    "heater_bed" => {
+                        if let Some(t) = val.get("temperature").and_then(|v| v.as_f64()) {
+                            self.bed_actual = t;
+                        }
+                        if let Some(t) = val.get("target").and_then(|v| v.as_f64()) {
+                            self.bed_target = t;
+                        }
+                    }
+                    "virtual_sdcard" => {
+                        if let Some(p) = val.get("progress").and_then(|v| v.as_f64()) {
+                            self.progress = p;
+                        }
+                        if let Some(f) = val.get("file_path").and_then(|v| v.as_str()) {
+                            self.filename = if f.is_empty() {
+                                None
+                            } else {
+                                Some(f.to_owned())
+                            };
+                        }
+                    }
+                    "print_stats" => {
+                        if let Some(s) = val.get("state").and_then(|v| v.as_str()) {
+                            self.state = match s {
+                                "printing" => PrinterState::Printing,
+                                "paused" => PrinterState::Paused,
+                                "error" => PrinterState::Error,
+                                "complete" | "cancelled" | "standby" => PrinterState::Idle,
+                                _ => PrinterState::Idle,
+                            };
+                        }
+                        if let Some(d) = val.get("print_duration").and_then(|v| v.as_f64()) {
+                            self.print_duration = d;
+                        }
+                        if let Some(f) = val.get("filename").and_then(|v| v.as_str()) {
+                            self.filename = if f.is_empty() {
+                                None
+                            } else {
+                                Some(f.to_owned())
+                            };
+                        }
+                    }
+                    "display_status" => {
+                        if let Some(m) = val.get("message").and_then(|v| v.as_str()) {
+                            self.display_message = if m.is_empty() {
+                                None
+                            } else {
+                                Some(m.to_owned())
+                            };
+                        }
+                    }
+                    "webhooks" => {
+                        if let Some(s) = val.get("state").and_then(|v| v.as_str()) {
+                            if s == "shutdown" || s == "error" {
+                                self.state = PrinterState::Error;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket send helper
+// ---------------------------------------------------------------------------
+
+type WsSink = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    tokio_tungstenite::tungstenite::Message,
+>;
+
+async fn ws_send_rpc(
+    tx: &mut WsSink,
+    id: u64,
+    method: &str,
+    params: Option<Value>,
+) -> Result<(), AppError> {
+    use tokio_tungstenite::tungstenite;
+    let req = JsonRpcRequest {
+        jsonrpc: "2.0",
+        method: method.to_owned(),
+        params,
+        id,
+    };
+    let json = serde_json::to_string(&req).unwrap_or_else(|_| "{}".to_owned());
+    tx.send(tungstenite::Message::Text(json.into()))
+        .await
+        .map_err(|e| AppError::Driver(format!("ws send: {e}")))
+}
+
+// ---------------------------------------------------------------------------
+// MoonrakerDriver
+// ---------------------------------------------------------------------------
+
+/// Configuration for a Moonraker driver instance.
+#[derive(Debug, Clone)]
+pub struct MoonrakerConfig {
+    /// Printer database ID.
+    pub printer_id: i64,
+    /// Full Moonraker URL, e.g. `http://10.0.0.177` (ws:// will be derived).
+    pub url: String,
+    /// Optional API key.
+    pub api_key: Option<String>,
+}
+
+/// A Moonraker printer driver.
+///
+/// Internally spawns a background task that maintains the WebSocket connection,
+/// subscribes to objects, and publishes events on the bus.
+pub struct MoonrakerDriver {
+    config: MoonrakerConfig,
+    bus_tx: Arc<broadcast::Sender<ServerEvent>>,
+    status: Arc<RwLock<CachedStatus>>,
+    capabilities: Arc<RwLock<Option<PrinterCapabilities>>>,
+    /// Signals the background loop to stop.
+    shutdown_tx: watch::Sender<bool>,
+    /// Handle to the background task.
+    task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+}
+
+impl MoonrakerDriver {
+    pub fn new(config: MoonrakerConfig, bus_tx: Arc<broadcast::Sender<ServerEvent>>) -> Self {
+        let (shutdown_tx, _) = watch::channel(false);
+        Self {
+            config,
+            bus_tx,
+            status: Arc::new(RwLock::new(CachedStatus::default())),
+            capabilities: Arc::new(RwLock::new(None)),
+            shutdown_tx,
+            task: Mutex::new(None),
+        }
+    }
+
+    /// Derive the WebSocket URL from the configured HTTP URL.
+    fn ws_url(&self) -> Result<String, AppError> {
+        let parsed = url::Url::parse(&self.config.url)
+            .map_err(|e| AppError::Driver(format!("invalid URL: {e}")))?;
+        let scheme = match parsed.scheme() {
+            "http" | "ws" => "ws",
+            "https" | "wss" => "wss",
+            s => return Err(AppError::Driver(format!("unsupported scheme: {s}"))),
+        };
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| AppError::Driver("URL has no host".into()))?;
+        let port = parsed.port().map(|p| format!(":{p}")).unwrap_or_default();
+        Ok(format!("{scheme}://{host}{port}/websocket"))
+    }
+
+    /// Spawn the background connection loop.
+    fn spawn_loop(&self) -> tokio::task::JoinHandle<()> {
+        let ws_url = match self.ws_url() {
+            Ok(u) => u,
+            Err(e) => {
+                error!(printer_id = self.config.printer_id, "bad ws url: {e}");
+                return tokio::spawn(async {});
+            }
+        };
+        let printer_id = self.config.printer_id;
+        let api_key = self.config.api_key.clone();
+        let bus_tx = Arc::clone(&self.bus_tx);
+        let status = Arc::clone(&self.status);
+        let capabilities = Arc::clone(&self.capabilities);
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
+
+        tokio::spawn(async move {
+            let mut backoff = Duration::from_secs(1);
+            let max_backoff = Duration::from_secs(30);
+
+            loop {
+                // Check shutdown before attempting connect.
+                if *shutdown_rx.borrow() {
+                    break;
+                }
+
+                info!(printer_id, url = %ws_url, "moonraker: connecting");
+
+                match Self::run_connection(
+                    printer_id,
+                    &ws_url,
+                    api_key.as_deref(),
+                    &bus_tx,
+                    &status,
+                    &capabilities,
+                    &mut shutdown_rx,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        info!(printer_id, "moonraker: disconnected cleanly");
+                        break;
+                    }
+                    Err(e) => {
+                        warn!(printer_id, "moonraker: connection lost: {e}");
+                        // Publish offline event.
+                        let _ = bus_tx.send(ServerEvent::PrinterConnection {
+                            printer_id,
+                            event: ConnectionEvent {
+                                kind: ConnectionEventKind::Offline,
+                                active_path: None,
+                            },
+                        });
+                        // Set status to offline.
+                        {
+                            let mut s = status.write().await;
+                            s.state = PrinterState::Offline;
+                        }
+                        let _ = bus_tx.send(ServerEvent::PrinterStatus {
+                            printer_id,
+                            status: status.read().await.to_printer_status(),
+                        });
+                    }
+                }
+
+                // Check shutdown before sleeping.
+                if *shutdown_rx.borrow() {
+                    break;
+                }
+
+                info!(
+                    printer_id,
+                    backoff_secs = backoff.as_secs(),
+                    "moonraker: reconnecting after backoff"
+                );
+                tokio::select! {
+                    _ = tokio::time::sleep(backoff) => {},
+                    _ = shutdown_rx.changed() => { break; }
+                }
+                backoff = (backoff * 2).min(max_backoff);
+            }
+        })
+    }
+
+    /// Run a single WebSocket connection session. Returns Ok(()) on clean
+    /// shutdown, Err on connection loss.
+    async fn run_connection(
+        printer_id: i64,
+        ws_url: &str,
+        api_key: Option<&str>,
+        bus_tx: &broadcast::Sender<ServerEvent>,
+        status: &RwLock<CachedStatus>,
+        capabilities: &RwLock<Option<PrinterCapabilities>>,
+        shutdown_rx: &mut watch::Receiver<bool>,
+    ) -> Result<(), AppError> {
+        use tokio_tungstenite::tungstenite;
+
+        // Connect — API key, if present, is passed as a query parameter.
+        // Moonraker accepts `?token=<key>` on the WebSocket URL.
+        let connect_url = match api_key {
+            Some(key) => format!("{ws_url}?token={key}"),
+            None => ws_url.to_owned(),
+        };
+
+        let (ws, _) = tokio_tungstenite::connect_async(&connect_url)
+            .await
+            .map_err(|e| AppError::Driver(format!("ws connect: {e}")))?;
+
+        let (mut ws_tx, mut ws_rx) = ws.split();
+        let mut rpc_id: u64 = 1;
+
+        // Publish online event.
+        let _ = bus_tx.send(ServerEvent::PrinterConnection {
+            printer_id,
+            event: ConnectionEvent {
+                kind: ConnectionEventKind::Online,
+                active_path: None,
+            },
+        });
+
+        // 1) server.info
+        let server_info_id = rpc_id;
+        rpc_id += 1;
+        ws_send_rpc(&mut ws_tx, server_info_id, "server.info", None).await?;
+
+        // 2) printer.objects.subscribe
+        let subscribe_id = rpc_id;
+        rpc_id += 1;
+        ws_send_rpc(
+            &mut ws_tx,
+            subscribe_id,
+            "printer.objects.subscribe",
+            Some(json!({ "objects": subscription_objects() })),
+        )
+        .await?;
+
+        // 3) Query config for capabilities.
+        let config_query_id = rpc_id;
+        rpc_id += 1;
+        ws_send_rpc(
+            &mut ws_tx,
+            config_query_id,
+            "printer.objects.query",
+            Some(json!({
+                "objects": {
+                    "configfile": ["settings"],
+                    "toolhead": ["axis_maximum", "axis_minimum"]
+                }
+            })),
+        )
+        .await?;
+
+        // 4) webcams
+        let webcams_id = rpc_id;
+        rpc_id += 1;
+        ws_send_rpc(&mut ws_tx, webcams_id, "server.webcams.list", None).await?;
+
+        // 5) macros
+        let macros_id = rpc_id;
+        // rpc_id += 1; // not used after this
+        ws_send_rpc(&mut ws_tx, macros_id, "printer.objects.list", None).await?;
+
+        // Throttle: max 2 status events per second.
+        let min_interval = Duration::from_millis(500);
+        let mut last_publish = Instant::now() - min_interval;
+
+        // Message loop.
+        loop {
+            tokio::select! {
+                msg = ws_rx.next() => {
+                    let msg = match msg {
+                        Some(Ok(m)) => m,
+                        Some(Err(e)) => return Err(AppError::Driver(format!("ws read: {e}"))),
+                        None => return Err(AppError::Driver("ws closed".into())),
+                    };
+
+                    let text = match msg {
+                        tungstenite::Message::Text(t) => t,
+                        tungstenite::Message::Ping(d) => {
+                            let _ = ws_tx.send(tungstenite::Message::Pong(d)).await;
+                            continue;
+                        }
+                        tungstenite::Message::Close(_) => {
+                            return Err(AppError::Driver("ws server closed".into()));
+                        }
+                        _ => continue,
+                    };
+
+                    let resp: JsonRpcResponse = match serde_json::from_str(&text) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            debug!(printer_id, "moonraker: unparseable msg: {e}");
+                            continue;
+                        }
+                    };
+
+                    // Handle notifications (no id, has method).
+                    if resp.id.is_none() {
+                        if let Some(method) = &resp.method {
+                            if method == "notify_status_update" {
+                                if let Some(params) = &resp.params {
+                                    if let Some(objects) = params.first() {
+                                        let mut s = status.write().await;
+                                        s.merge_update(objects);
+                                        drop(s);
+
+                                        // Throttled publish.
+                                        let now = Instant::now();
+                                        if now.duration_since(last_publish) >= min_interval {
+                                            last_publish = now;
+                                            let ps = status.read().await.to_printer_status();
+                                            let _ = bus_tx.send(ServerEvent::PrinterStatus {
+                                                printer_id,
+                                                status: ps,
+                                            });
+                                        }
+                                    }
+                                }
+                            } else if method == "notify_klippy_disconnected" {
+                                let mut s = status.write().await;
+                                s.state = PrinterState::Error;
+                                drop(s);
+                                let ps = status.read().await.to_printer_status();
+                                let _ = bus_tx.send(ServerEvent::PrinterStatus {
+                                    printer_id,
+                                    status: ps,
+                                });
+                            } else if method == "notify_klippy_ready" {
+                                // Klippy came back — re-subscribe.
+                                let mut s = status.write().await;
+                                s.state = PrinterState::Idle;
+                                drop(s);
+                            }
+                        }
+                        continue;
+                    }
+
+                    // Handle RPC responses.
+                    let id = resp.id.unwrap_or(0);
+
+                    if let Some(err) = resp.error {
+                        warn!(printer_id, id, code = err.code, msg = %err.message, "moonraker rpc error");
+                        continue;
+                    }
+
+                    let result = match resp.result {
+                        Some(r) => r,
+                        None => continue,
+                    };
+
+                    if id == server_info_id {
+                        // Extract klipper version, hostname.
+                        let version = result.get("klippy_state")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_owned());
+                        let hostname = result.get("hostname")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_owned());
+                        let mut caps = capabilities.write().await;
+                        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+                        c.hostname = hostname;
+                        if let Some(v) = version {
+                            debug!(printer_id, klippy_state = %v, "server.info");
+                        }
+                    } else if id == subscribe_id {
+                        // Initial status snapshot from subscribe response.
+                        if let Some(status_obj) = result.get("status") {
+                            let mut s = status.write().await;
+                            s.merge_update(status_obj);
+                            drop(s);
+                            let ps = status.read().await.to_printer_status();
+                            let _ = bus_tx.send(ServerEvent::PrinterStatus {
+                                printer_id,
+                                status: ps,
+                            });
+                        }
+                    } else if id == config_query_id {
+                        // Parse bed size + extruder count from config.
+                        Self::parse_config_capabilities(&result, capabilities).await;
+                    } else if id == webcams_id {
+                        // Parse webcam list.
+                        Self::parse_webcams(&result, capabilities).await;
+                    } else if id == macros_id {
+                        // Parse macro names from printer.objects.list.
+                        Self::parse_macros(&result, capabilities).await;
+                    }
+                }
+
+                _ = shutdown_rx.changed() => {
+                    info!(printer_id, "moonraker: shutdown signal received");
+                    let _ = ws_tx.close().await;
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    async fn parse_config_capabilities(
+        result: &Value,
+        capabilities: &RwLock<Option<PrinterCapabilities>>,
+    ) {
+        let status = match result.get("status") {
+            Some(s) => s,
+            None => return,
+        };
+
+        let mut caps = capabilities.write().await;
+        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+
+        // Bed size from toolhead axis limits.
+        if let Some(toolhead) = status.get("toolhead") {
+            if let Some(max) = toolhead.get("axis_maximum").and_then(|v| v.as_array()) {
+                if max.len() >= 2 {
+                    let x = max[0].as_f64().unwrap_or(0.0);
+                    let y = max[1].as_f64().unwrap_or(0.0);
+                    if x > 0.0 && y > 0.0 {
+                        c.bed_size = Some((x, y));
+                    }
+                }
+            }
+        }
+
+        // Extruder count from configfile.
+        if let Some(configfile) = status.get("configfile") {
+            if let Some(settings) = configfile.get("settings").and_then(|v| v.as_object()) {
+                let mut ext_count: u32 = 0;
+                for key in settings.keys() {
+                    if key == "extruder" || key.starts_with("extruder") {
+                        // Count keys like "extruder", "extruder1", etc.
+                        let suffix = &key["extruder".len()..];
+                        if suffix.is_empty() || suffix.chars().all(|c| c.is_ascii_digit()) {
+                            ext_count += 1;
+                        }
+                    }
+                }
+                if ext_count > 0 {
+                    c.extruder_count = ext_count;
+                }
+            }
+        }
+    }
+
+    async fn parse_webcams(result: &Value, capabilities: &RwLock<Option<PrinterCapabilities>>) {
+        let webcams_arr = match result.get("webcams").and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+
+        let mut caps = capabilities.write().await;
+        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+        c.webcams.clear();
+
+        for wc in webcams_arr {
+            let name = wc
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default")
+                .to_owned();
+            let stream_url = wc
+                .get("stream_url")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_owned());
+            let snapshot_url = wc
+                .get("snapshot_url")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_owned());
+            c.webcams.push(WebcamInfo {
+                name,
+                stream_url,
+                snapshot_url,
+            });
+        }
+    }
+
+    async fn parse_macros(result: &Value, capabilities: &RwLock<Option<PrinterCapabilities>>) {
+        let objects = match result.get("objects").and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+
+        let mut caps = capabilities.write().await;
+        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+        c.macros.clear();
+
+        for obj in objects {
+            if let Some(name) = obj.as_str() {
+                if let Some(macro_name) = name.strip_prefix("gcode_macro ") {
+                    // Skip internal macros starting with underscore.
+                    if !macro_name.starts_with('_') {
+                        c.macros.push(macro_name.to_owned());
+                    }
+                }
+            }
+        }
+        c.macros.sort();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PrinterDriver impl
+// ---------------------------------------------------------------------------
+
+#[async_trait]
+impl PrinterDriver for MoonrakerDriver {
+    async fn connect(&self) -> Result<PrinterCapabilities, AppError> {
+        let handle = self.spawn_loop();
+        let mut task = self.task.lock().await;
+        *task = Some(handle);
+
+        // Wait briefly for initial data to arrive.
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let caps = self.capabilities.read().await;
+        Ok(caps.clone().unwrap_or_default())
+    }
+
+    async fn disconnect(&self) -> Result<(), AppError> {
+        let _ = self.shutdown_tx.send(true);
+        let mut task = self.task.lock().await;
+        if let Some(handle) = task.take() {
+            let _ = handle.await;
+        }
+        Ok(())
+    }
+
+    async fn probe_capabilities(&self) -> Result<PrinterCapabilities, AppError> {
+        let caps = self.capabilities.read().await;
+        Ok(caps.clone().unwrap_or_default())
+    }
+
+    async fn send_command(&self, cmd: PrinterCommand) -> Result<(), AppError> {
+        let gcode = match cmd {
+            PrinterCommand::Pause => "PAUSE".to_owned(),
+            PrinterCommand::Resume => "RESUME".to_owned(),
+            PrinterCommand::Cancel => "CANCEL_PRINT".to_owned(),
+            PrinterCommand::SetNozzleTemp { target } => format!("M104 S{target:.0}"),
+            PrinterCommand::SetBedTemp { target } => format!("M140 S{target:.0}"),
+            PrinterCommand::Home { axes } => {
+                if axes.is_empty() {
+                    "G28".to_owned()
+                } else {
+                    format!("G28 {}", axes.join(" ").to_uppercase())
+                }
+            }
+            PrinterCommand::Jog { x, y, z, speed } => {
+                let mut parts = vec!["G91".to_owned(), "G1".to_owned()];
+                if let Some(v) = x {
+                    parts.push(format!("X{v:.3}"));
+                }
+                if let Some(v) = y {
+                    parts.push(format!("Y{v:.3}"));
+                }
+                if let Some(v) = z {
+                    parts.push(format!("Z{v:.3}"));
+                }
+                if let Some(s) = speed {
+                    parts.push(format!("F{s:.0}"));
+                }
+                parts.push("\nG90".to_owned());
+                parts.join(" ")
+            }
+            PrinterCommand::Macro { name } => name,
+            PrinterCommand::Gcode { command } => command,
+            PrinterCommand::EmergencyStop => "M112".to_owned(),
+        };
+
+        // We send via the Moonraker HTTP API for commands, since the WS connection
+        // is used for subscriptions. This is simpler and matches Moonraker's recommended usage.
+        let url = format!(
+            "{}/printer/gcode/script?script={}",
+            self.config.url,
+            urlencoding::encode(&gcode)
+        );
+
+        // We don't have an HTTP client here — commands will be wired up via the
+        // driver manager's HTTP client in a future session. For now, return
+        // NotImplemented to stay read-only safe.
+        Err(AppError::NotImplemented(format!(
+            "command dispatch not wired (would POST to {url})"
+        )))
+    }
+
+    async fn list_files(&self, _path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
+        Err(AppError::NotImplemented(
+            "file ops deferred to Phase 3".into(),
+        ))
+    }
+
+    async fn upload_file(&self, _path: &str, _data: Vec<u8>) -> Result<(), AppError> {
+        Err(AppError::NotImplemented(
+            "file ops deferred to Phase 3".into(),
+        ))
+    }
+
+    async fn delete_file(&self, _path: &str) -> Result<(), AppError> {
+        Err(AppError::NotImplemented(
+            "file ops deferred to Phase 3".into(),
+        ))
+    }
+
+    async fn start_print(&self, _path: &str) -> Result<(), AppError> {
+        Err(AppError::NotImplemented(
+            "file ops deferred to Phase 3".into(),
+        ))
+    }
+
+    async fn current_status(&self) -> Result<PrinterStatus, AppError> {
+        Ok(self.status.read().await.to_printer_status())
+    }
+}
+
+// We need urlencoding for the gcode script endpoint.
+// Since we're not actually using commands this session (read-only), this is a placeholder.
+mod urlencoding {
+    pub fn encode(input: &str) -> String {
+        let mut result = String::with_capacity(input.len() * 3);
+        for byte in input.bytes() {
+            match byte {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    result.push(byte as char);
+                }
+                _ => {
+                    result.push('%');
+                    result.push_str(&format!("{byte:02X}"));
+                }
+            }
+        }
+        result
+    }
+}

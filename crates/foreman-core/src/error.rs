@@ -17,4 +17,10 @@ pub enum AppError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("driver error: {0}")]
+    Driver(String),
+
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }

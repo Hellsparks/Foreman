@@ -23,19 +23,15 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing::{debug, info, warn};
 
-/// Shared state injected into the WebSocket handler.
-#[derive(Clone)]
-pub struct WsState {
-    pub tx: Arc<broadcast::Sender<ServerEvent>>,
-}
+use crate::state::AppState;
 
 /// `GET /ws/events`
-pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<WsState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_socket(socket, state.bus_tx))
 }
 
-async fn handle_socket(socket: WebSocket, state: WsState) {
-    let mut rx = state.tx.subscribe();
+async fn handle_socket(socket: WebSocket, bus_tx: Arc<broadcast::Sender<ServerEvent>>) {
+    let mut rx = bus_tx.subscribe();
     let (mut sender, mut receiver) = socket.split();
 
     // Channel to pass subscribe messages from the reader task to the main loop.

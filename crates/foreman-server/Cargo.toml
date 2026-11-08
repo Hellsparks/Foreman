@@ -45,3 +45,6 @@ dirs = { workspace = true }
 
 # WebSocket futures helper
 futures-util = "0.3"
+
+# Database (for SqlitePool type in shared state)
+sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio"] }

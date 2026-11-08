@@ -1,0 +1,288 @@
+/* Fleet page — printer grid + add form. Uses Fieldwork tokens only. */
+
+.fleet__actions {
+  margin-bottom: var(--fw-space-4);
+}
+
+.fleet__add-btn {
+  display: inline-flex;
+  align-items: center;
+  height: var(--fw-control-height);
+  padding: 0 var(--fw-space-4);
+  background: var(--fw-accent);
+  color: var(--fw-on-accent);
+  border: none;
+  border-radius: var(--fw-radius-control);
+  font: 600 var(--fw-type-ui) / 1 var(--fw-sans);
+  cursor: pointer;
+  transition: background var(--fw-duration-fast);
+}
+
+.fleet__add-btn:hover {
+  background: var(--fw-accent-hover);
+}
+
+.fleet__add-btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+.fleet__loading,
+.fleet__empty {
+  color: var(--fw-muted);
+  font: var(--fw-type-body) / var(--fw-line-body) var(--fw-sans);
+  padding: var(--fw-space-8) 0;
+}
+
+/* ── Grid ────────────────────────────────────────────────────────────────── */
+
+.fleet__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--fw-space-4);
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+.fleet-card {
+  position: relative;
+  background: var(--fw-raised);
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius-panel);
+  padding: var(--fw-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+}
+
+.fleet-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fw-space-2);
+}
+
+.fleet-card__name {
+  font: 600 var(--fw-type-body) / 1 var(--fw-sans);
+  color: var(--fw-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-card__conn {
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.fleet-card__conn--online {
+  color: var(--fw-success);
+}
+
+.fleet-card__conn--offline {
+  color: var(--fw-danger);
+}
+
+.fleet-card__state {
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+
+.fleet-card--printing .fleet-card__state {
+  color: var(--fw-info);
+}
+
+.fleet-card--paused .fleet-card__state {
+  color: var(--fw-warning);
+}
+
+.fleet-card--error .fleet-card__state {
+  color: var(--fw-danger);
+}
+
+/* Temps */
+.fleet-card__temps {
+  display: flex;
+  gap: var(--fw-space-6);
+}
+
+.fleet-card__temp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fleet-card__temp-label {
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+
+.fleet-card__temp-value {
+  font: 600 var(--fw-type-subheading) / 1 var(--fw-mono);
+  color: var(--fw-text);
+}
+
+.fleet-card__temp-target {
+  font: var(--fw-type-ui) / 1 var(--fw-mono);
+  color: var(--fw-muted);
+}
+
+/* Progress */
+.fleet-card__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--fw-space-2);
+}
+
+.fleet-card__progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--fw-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fleet-card__progress-fill {
+  height: 100%;
+  background: var(--fw-accent);
+  border-radius: 2px;
+  transition: width var(--fw-duration-normal);
+}
+
+.fleet-card__progress-text {
+  font: 600 var(--fw-type-label) / 1 var(--fw-mono);
+  color: var(--fw-text);
+  min-width: 36px;
+  text-align: right;
+}
+
+.fleet-card__filename {
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  color: var(--fw-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Delete button */
+.fleet-card__delete {
+  position: absolute;
+  top: var(--fw-space-2);
+  right: var(--fw-space-2);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--fw-radius-control);
+  color: var(--fw-muted);
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--fw-duration-fast), background var(--fw-duration-fast), color var(--fw-duration-fast);
+}
+
+.fleet-card:hover .fleet-card__delete {
+  opacity: 1;
+}
+
+.fleet-card__delete:hover {
+  background: var(--fw-danger);
+  color: var(--fw-on-accent);
+}
+
+.fleet-card__delete:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+/* ── Add printer form ────────────────────────────────────────────────────── */
+
+.fleet__form {
+  display: flex;
+  gap: var(--fw-space-3);
+  align-items: flex-end;
+  margin-bottom: var(--fw-space-6);
+  padding: var(--fw-space-4);
+  background: var(--fw-surface);
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius-panel);
+}
+
+.fleet__form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-1);
+  flex: 1;
+}
+
+.fleet__form-label {
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+
+.fleet__form-input {
+  height: var(--fw-control-height);
+  padding: 0 var(--fw-space-3);
+  background: var(--fw-background);
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius-control);
+  font: var(--fw-type-ui) / 1 var(--fw-sans);
+  color: var(--fw-text);
+}
+
+.fleet__form-input:focus {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: -1px;
+  border-color: var(--fw-focus);
+}
+
+.fleet__form-input::placeholder {
+  color: var(--fw-muted);
+}
+
+.fleet__form-submit {
+  height: var(--fw-control-height);
+  padding: 0 var(--fw-space-6);
+  background: var(--fw-accent);
+  color: var(--fw-on-accent);
+  border: none;
+  border-radius: var(--fw-radius-control);
+  font: 600 var(--fw-type-ui) / 1 var(--fw-sans);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--fw-duration-fast);
+}
+
+.fleet__form-submit:hover {
+  background: var(--fw-accent-hover);
+}
+
+.fleet__form-submit:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+/* ── Phone ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 430px) {
+  .fleet__form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fleet__grid {
+    grid-template-columns: 1fr;
+  }
+}

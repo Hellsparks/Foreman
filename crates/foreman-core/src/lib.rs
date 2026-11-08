@@ -2,6 +2,8 @@
 
 pub mod db;
 pub mod domain;
+pub mod driver;
+pub mod drivers;
 pub mod error;
 pub mod events;
 pub mod repo;

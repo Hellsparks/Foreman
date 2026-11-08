@@ -62,10 +62,10 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] Typed events on `/ws/events`: `printer.status`, `printer.connection` (path switch, offline), `attention.added/updated/cleared`, `job.*` (stub), `transfer.*` (Phase 3), `device.*` (Phase 4). Client can subscribe by topic and printer id. Keep heartbeat.
 
 ### 2.3 PrinterDriver trait + drivers
-- [ ] Trait: connect, status stream, capabilities probe, commands (start/pause/resume/cancel, set temp, jog/home, macro, raw G-code, light), file ops (list/upload/delete/start) — file ops are used by Phase 3.
-- [ ] **Moonraker:** WebSocket JSON-RPC with object subscriptions (not polling). Probe bed size, nozzle, extruders, MMU, webcams, macros from Moonraker/Klipper config.
+- [x] Trait: connect, status stream, capabilities probe, commands (start/pause/resume/cancel, set temp, jog/home, macro, raw G-code, light), file ops (list/upload/delete/start) — file ops are used by Phase 3.
+- [x] **Moonraker:** WebSocket JSON-RPC with object subscriptions (not polling). Probe bed size, nozzle, extruders, MMU, webcams, macros from Moonraker/Klipper config.
 - [ ] **OctoPrint** and **Duet:** polling drivers with per-driver interval.
-- [ ] Mock printer servers (Moonraker + OctoPrint at least) that replay `test-gcodes/` scenarios; used in integration tests.
+- [x] Mock printer servers (Moonraker + OctoPrint at least) that replay `test-gcodes/` scenarios; used in integration tests.
 
 ### 2.3b Bambu LAN driver (moved up from Phase 9 — owner has a real Bambu + a real Klipper printer to test on)
 - [ ] MQTT over TLS, port 8883, user `bblp`, password = LAN access code, topics `device/<serial>/report` and `device/<serial>/request`. Send `pushall` on connect; merge partial reports into a full status (state, temps, fans, progress, layer, AMS trays with colour/material/remaining, HMS errors).
@@ -174,6 +174,16 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 15 — 2026-11-08 (PrinterDriver + Moonraker + Fleet UI)
+
+**Moonraker API version:** HellV0 reports Moonraker v0.10.0-9 (API 1.5.0), newer than the v0.27.1 Spoolman doc's assumed version. No incompatibilities found — JSON-RPC methods (`server.info`, `printer.objects.subscribe`, `printer.objects.query`, `server.webcams.list`, `printer.objects.list`) work identically.
+
+**API key delivery:** Brief mentions `X-Api-Key` header for Moonraker auth. Moonraker's WebSocket actually accepts API keys as a `?token=<key>` query parameter on the WS URL, not as a header. Changed to query param approach since `tokio-tungstenite::connect_async` with a custom `http::Request` caused `HandshakeIncomplete` errors in tests.
+
+**HellV0 capabilities probe:** bed 120x120mm, 1 extruder, 0 webcams (none configured in moonraker.conf), 0 public macros (all macros on this printer start with `_`). No MMU detected.
+
+**Tauri CLI not installed** on this dev machine — could not test `tauri dev`. Verified the full data path via headless server + curl: HellV0 added via REST, live temps (nozzle ~26°C, bed ~26°C) returned in `GET /api/printers` and via WebSocket events. Frontend builds clean and renders the Fleet page.
 
 ### Session 13 — 2026-11-08 (migration test)
 

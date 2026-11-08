@@ -46,6 +46,10 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio-util = { version = "0.7", features = ["io"] }
 dirs = "5"
+async-trait = "0.1"
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+url = "2"
+futures-util = "0.3"
 
 [profile.release]
 opt-level = 3

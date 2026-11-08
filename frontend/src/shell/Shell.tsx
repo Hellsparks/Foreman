@@ -1,21 +1,46 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import Rail from "./Rail";
 import TopBar from "./TopBar";
 import Inspector from "./Inspector";
 import { useAppearance } from "../hooks/useAppearance";
 import { useEventStream } from "../hooks/useEventStream";
+import type { PrinterStatus } from "../api/types/PrinterStatus";
 import "./Shell.css";
+
+/** Live printer statuses keyed by printer_id. */
+export type StatusMap = Record<number, PrinterStatus>;
+/** Connection state per printer_id. */
+export type ConnectionMap = Record<number, string>;
 
 export default function Shell() {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const { theme, mode, setTheme, setMode } = useAppearance();
-  const { connectionState } = useEventStream();
+
+  // Live printer data from the event bus.
+  const [statuses, setStatuses] = useState<StatusMap>({});
+  const [connections, setConnections] = useState<ConnectionMap>({});
+
+  const handleEvent = useCallback(
+    (event: { type: string; [key: string]: unknown }) => {
+      if (event.type === "printer_status") {
+        const pid = event.printer_id as number;
+        const status = event.status as PrinterStatus;
+        setStatuses((prev) => ({ ...prev, [pid]: status }));
+      } else if (event.type === "printer_connection") {
+        const pid = event.printer_id as number;
+        const conn = event.event as { kind: string };
+        setConnections((prev) => ({ ...prev, [pid]: conn.kind }));
+      }
+    },
+    []
+  );
+
+  const { connectionState } = useEventStream(handleEvent);
 
   return (
     <div className="shell">
-      {/* Desktop nav rail */}
       <Rail
         collapsed={railCollapsed}
         onToggle={() => setRailCollapsed((c) => !c)}
@@ -33,7 +58,13 @@ export default function Shell() {
 
         <div className="shell__content">
           <main className="shell__work" id="main-content">
-            <Outlet context={{ openInspector: () => setInspectorOpen(true) }} />
+            <Outlet
+              context={{
+                openInspector: () => setInspectorOpen(true),
+                statuses,
+                connections,
+              }}
+            />
           </main>
 
           <Inspector
@@ -42,7 +73,6 @@ export default function Shell() {
           />
         </div>
 
-        {/* Phone bottom nav — hidden on desktop via CSS */}
         <PhoneNav />
       </div>
     </div>
