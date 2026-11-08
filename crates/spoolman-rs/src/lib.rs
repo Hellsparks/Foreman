@@ -9,4 +9,5 @@ pub mod error;
 pub mod math;
 pub mod models;
 pub mod state;
+pub mod tags;
 pub mod ws;

@@ -343,5 +343,7 @@ pub async fn rename_field_value(
         .into());
     }
     let count = db::rename_field_value(&state.db.pool, &field, &req.value, &req.new_value).await?;
-    Ok(Json(RenameFieldValueResult { spools_updated: count }))
+    Ok(Json(RenameFieldValueResult {
+        spools_updated: count,
+    }))
 }

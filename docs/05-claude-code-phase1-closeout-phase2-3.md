@@ -16,7 +16,7 @@ Same working rules as doc 04 (fish + Windows-safe commands, fmt/clippy/test befo
 | Bambu Lab A1 | Bambu (LAN Only + Developer Mode) | 10.0.0.249 | 24:EC:4A:0C:07:90 | 2.3b Bambu LAN driver, FTPS, camera |
 
 - Both IPs come from DHCP. Ask the owner to reserve them in the router, or the tests break. Put addresses in a gitignored `test-printers.local.toml`, never hard-coded.
-- **HellV0 SSH (temporary, owner will change it):** user `biqu`, password `biqu`. Copy these into `test-printers.local.toml`. Don't put them in code, tests or commits. Once 2.5 works, install the Foreman ed25519 key on HellV0 and switch to key auth.
+- **HellV0 SSH:** see `test-printers.local.toml` for credentials. Don't put them in code, tests or commits. Once 2.5 works, install the Foreman ed25519 key on HellV0 and switch to key auth.
 - Other secrets (A1 access code + serial, Moonraker API key if set) go only in that local file or env vars. Never commit them or write them to logs.
 - A1 notes: it has no RTSPS camera (that's X1). Expect the P1/A1-style JPEG stream; verify the port and framing on this printer. AMS lite may be fitted; check what `report` shows.
 - Never start a real print, move axes or heat anything without asking the owner first. Read-only checks (status, file list) are fine.

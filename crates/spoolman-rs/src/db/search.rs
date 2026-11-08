@@ -19,6 +19,7 @@ use sqlx::AnyPool;
 use crate::{
     db::{
         filament::{self as filament_db, FilamentFilter},
+        query::tp,
         spool::{self as spool_db, SpoolFilter},
         vendor::{self as vendor_db, VendorFilter},
         Engine,
@@ -367,11 +368,11 @@ async fn attach_filament_spools(
     } else {
         "AND (s.archived IS NULL OR CAST(s.archived AS INTEGER) = 0)"
     };
-    let sql = format!(
+    let sql = tp(&format!(
         "SELECT s.filament_id, s.id, s.initial_weight, s.used_weight, s.location, \
          CAST(s.archived AS INTEGER) AS archived \
          FROM spool s WHERE s.filament_id IN ({placeholders}) {archived_clause} ORDER BY s.id"
-    );
+    ));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
     for id in &fids {
         q = q.bind(*id);

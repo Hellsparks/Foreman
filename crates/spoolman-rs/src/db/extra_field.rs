@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 use sqlx::AnyPool;
 
 use crate::{
-    db::{setting, Engine},
+    db::{query::tp, setting, Engine},
     error::{Result, SpoolmanError},
     models::{ExtraField, ExtraFieldParams},
 };
@@ -237,7 +237,7 @@ pub async fn delete_definition(
 
     // Clear all stored values for this field across all entities.
     let field_table = format!("{entity_type}_field");
-    let del_sql = format!("DELETE FROM {field_table} WHERE key = ?");
+    let del_sql = tp(&format!("DELETE FROM {field_table} WHERE key = ?"));
     sqlx::query(sqlx::AssertSqlSafe(&*del_sql))
         .bind(field_key)
         .execute(pool)
@@ -257,7 +257,9 @@ pub async fn get_values(
     id_col: &str,
     id: i64,
 ) -> Result<Map<String, Value>> {
-    let sql = format!("SELECT key, value FROM {table} WHERE {id_col} = ?");
+    let sql = tp(&format!(
+        "SELECT key, value FROM {table} WHERE {id_col} = ?"
+    ));
     let rows = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(id)
         .fetch_all(pool)
@@ -287,8 +289,9 @@ pub async fn get_values_batch(
         return Ok(HashMap::new());
     }
     let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-    let sql =
-        format!("SELECT {id_col}, key, value FROM {table} WHERE {id_col} IN ({placeholders})");
+    let sql = tp(&format!(
+        "SELECT {id_col}, key, value FROM {table} WHERE {id_col} IN ({placeholders})"
+    ));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
     for id in ids {
         q = q.bind(*id);
@@ -366,8 +369,12 @@ pub async fn set_values(
     id: i64,
     values: &Map<String, Value>,
 ) -> Result<()> {
-    let del_sql = format!("DELETE FROM {table} WHERE {id_col} = ? AND key = ?");
-    let ins_sql = format!("INSERT INTO {table} ({id_col}, key, value) VALUES (?,?,?)");
+    let del_sql = tp(&format!(
+        "DELETE FROM {table} WHERE {id_col} = ? AND key = ?"
+    ));
+    let ins_sql = tp(&format!(
+        "INSERT INTO {table} ({id_col}, key, value) VALUES (?,?,?)"
+    ));
 
     for (key, val) in values {
         // Always remove the current row for this key (if it exists).
@@ -926,7 +933,9 @@ pub async fn build_extra_sql(
 
 /// Get all distinct values stored for a specific extra field key across all entities.
 pub async fn get_distinct_values(pool: &AnyPool, table: &str, key: &str) -> Result<Vec<String>> {
-    let sql = format!("SELECT DISTINCT value FROM {table} WHERE key = ? AND value IS NOT NULL");
+    let sql = tp(&format!(
+        "SELECT DISTINCT value FROM {table} WHERE key = ? AND value IS NOT NULL"
+    ));
     let rows = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(key)
         .fetch_all(pool)

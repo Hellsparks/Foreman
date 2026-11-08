@@ -6,7 +6,7 @@ use sqlx::AnyPool;
 use crate::{
     db::{
         extra_field,
-        query::{parse_sort, Pagination, WhereBuilder},
+        query::{dtp, parse_sort, tp, Pagination, WhereBuilder},
         tag,
         vendor::{normalise_dt, utc_now_str},
         Engine,
@@ -381,7 +381,7 @@ pub async fn find(
 
     let joins = "FROM spool s JOIN filament f ON f.id = s.filament_id LEFT JOIN vendor v ON v.id = f.vendor_id";
 
-    let count_sql = format!("SELECT COUNT(*) {joins} {final_where}");
+    let count_sql = tp(&format!("SELECT COUNT(*) {joins} {final_where}"));
     let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
@@ -396,7 +396,9 @@ pub async fn find(
     }
     let total: i64 = count_q.fetch_one(pool).await?;
 
-    let data_sql = format!("{SPOOL_SELECT} {final_where} {order_sql} LIMIT ? OFFSET ?");
+    let data_sql = tp(&format!(
+        "{SPOOL_SELECT} {final_where} {order_sql} LIMIT ? OFFSET ?"
+    ));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*data_sql));
     for b in &wb.binds {
         q = q.bind(b.clone());
@@ -459,7 +461,7 @@ pub async fn find(
 }
 
 pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<SpoolResponse> {
-    let sql = format!("{SPOOL_SELECT} WHERE s.id = ?");
+    let sql = tp(&format!("{SPOOL_SELECT} WHERE s.id = ?"));
     let row = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(id)
         .fetch_optional(pool)
@@ -493,10 +495,12 @@ pub async fn create(
     // 3. If used_weight is given explicitly, use it.
     // 4. Otherwise used_weight = 0.
     let (filament_weight, filament_spool_weight): (Option<f64>, Option<f64>) = {
-        let row = sqlx::query("SELECT weight, spool_weight FROM filament WHERE id = ?")
-            .bind(req.filament_id)
-            .fetch_optional(pool)
-            .await?;
+        let row = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+            "SELECT weight, spool_weight FROM filament WHERE id = ?",
+        )))
+        .bind(req.filament_id)
+        .fetch_optional(pool)
+        .await?;
         match row {
             Some(r) => {
                 use sqlx::Row as _;
@@ -518,10 +522,13 @@ pub async fn create(
     // Default archived to false (0) — upstream Spoolman also defaults to false.
     let archived_val: i64 = if req.archived.unwrap_or(false) { 1 } else { 0 };
 
-    const INSERT_SQL: &str = "INSERT INTO spool \
+    let dt = dtp();
+    let insert_sql = format!(
+        "INSERT INTO spool \
          (registered, first_used, last_used, filament_id, used_weight, location, lot_nr, \
           comment, archived, price, initial_weight, spool_weight) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+         VALUES ({dt},{dt},{dt},?,?,?,?,?,?,?,?,?)"
+    );
 
     macro_rules! bind_all {
         ($q:expr) => {
@@ -542,15 +549,17 @@ pub async fn create(
 
     let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres support RETURNING id.
-        bind_all!(sqlx::query_scalar(sqlx::AssertSqlSafe(&*format!(
-            "{INSERT_SQL} RETURNING id"
-        ))))
+        bind_all!(sqlx::query_scalar(sqlx::AssertSqlSafe(&*tp(&format!(
+            "{insert_sql} RETURNING id"
+        )))))
         .fetch_one(pool)
         .await?
     } else {
         // MySQL: use transaction + LAST_INSERT_ID().
         let mut tx = pool.begin().await?;
-        bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
+        bind_all!(sqlx::query(sqlx::AssertSqlSafe(&*tp(&insert_sql))))
+            .execute(&mut *tx)
+            .await?;
         let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
             .fetch_one(&mut *tx)
             .await?;
@@ -607,11 +616,13 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateSpoolRequest) -> Result
         let effective_iw: Option<f64> = if let Some(iw) = req.initial_weight {
             Some(iw)
         } else {
-            sqlx::query_scalar::<_, Option<f64>>("SELECT initial_weight FROM spool WHERE id = ?")
-                .bind(id)
-                .fetch_optional(pool)
-                .await?
-                .flatten()
+            sqlx::query_scalar::<_, Option<f64>>(sqlx::AssertSqlSafe(&*tp(
+                "SELECT initial_weight FROM spool WHERE id = ?",
+            )))
+            .bind(id)
+            .fetch_optional(pool)
+            .await?
+            .flatten()
         };
         if let Some(iw) = effective_iw {
             sets.push("used_weight = ?");
@@ -627,8 +638,6 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateSpoolRequest) -> Result
     maybe_i64!(req.filament_id, "filament_id");
     maybe_f64!(req.initial_weight, "initial_weight");
     maybe_f64!(req.spool_weight, "spool_weight");
-    maybe_str!(req.first_used, "first_used");
-    maybe_str!(req.last_used, "last_used");
     maybe_str!(req.location, "location");
     maybe_str!(req.lot_nr, "lot_nr");
     maybe_str!(req.comment, "comment");
@@ -643,7 +652,10 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateSpoolRequest) -> Result
     }
 
     if !sets.is_empty() {
-        let sql = format!("UPDATE spool SET {} WHERE id = ?", sets.join(", "));
+        let sql = tp(&format!(
+            "UPDATE spool SET {} WHERE id = ?",
+            sets.join(", ")
+        ));
         let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
         for b in binds {
             q = match b {
@@ -670,15 +682,19 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateSpoolRequest) -> Result
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
     // Delete dependent records first (neither spool_field nor tag.spool_id have ON DELETE CASCADE).
-    sqlx::query("DELETE FROM spool_field WHERE spool_id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    sqlx::query("DELETE FROM tag WHERE spool_id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    let result = sqlx::query("DELETE FROM spool WHERE id = ?")
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM spool_field WHERE spool_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM tag WHERE spool_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*tp("DELETE FROM spool WHERE id = ?")))
         .bind(id)
         .execute(pool)
         .await?;
@@ -701,13 +717,11 @@ pub async fn use_weight(pool: &AnyPool, id: i64, weight: f64) -> Result<SpoolRes
 
     // Atomic update: clamp used_weight to >= 0; set timestamps in same statement.
     // COALESCE(first_used, ?) preserves existing first_used (NULL → now).
-    let n = sqlx::query(
-        "UPDATE spool SET \
+    let n = sqlx::query(sqlx::AssertSqlSafe(&*tp("UPDATE spool SET \
          used_weight = CASE WHEN used_weight + ? >= 0.0 THEN used_weight + ? ELSE 0.0 END, \
          first_used = COALESCE(first_used, ?), \
          last_used = ? \
-         WHERE id = ?",
-    )
+         WHERE id = ?")))
     .bind(weight)
     .bind(weight)
     .bind(&now)
@@ -729,11 +743,11 @@ pub async fn use_weight(pool: &AnyPool, id: i64, weight: f64) -> Result<SpoolRes
 /// then delegates to [`use_weight`].
 pub async fn use_length(pool: &AnyPool, id: i64, length_mm: f64) -> Result<SpoolResponse> {
     // Fetch filament density and diameter for the weight calculation.
-    let row = sqlx::query(
+    let row = sqlx::query(sqlx::AssertSqlSafe(&*tp(
         "SELECT f.density, f.diameter FROM spool s \
          JOIN filament f ON f.id = s.filament_id \
          WHERE s.id = ?",
-    )
+    )))
     .bind(id)
     .fetch_optional(pool)
     .await?
@@ -758,12 +772,13 @@ pub async fn use_length(pool: &AnyPool, id: i64, length_mm: f64) -> Result<Spool
 /// `weight_g` is the current gross weight of the spool (filament + empty spool).
 pub async fn measure(pool: &AnyPool, id: i64, weight_g: f64) -> Result<SpoolResponse> {
     // --- Step 1: get spool's own initial_weight, used_weight, spool_weight ---
-    let spool_row =
-        sqlx::query("SELECT initial_weight, used_weight, spool_weight FROM spool WHERE id = ?")
-            .bind(id)
-            .fetch_optional(pool)
-            .await?
-            .ok_or_else(|| SpoolmanError::NotFound(format!("spool with id {id}")))?;
+    let spool_row = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "SELECT initial_weight, used_weight, spool_weight FROM spool WHERE id = ?",
+    )))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| SpoolmanError::NotFound(format!("spool with id {id}")))?;
 
     let (spool_initial_weight, spool_used_weight, spool_spool_weight): (
         Option<f64>,
@@ -784,13 +799,13 @@ pub async fn measure(pool: &AnyPool, id: i64, weight_g: f64) -> Result<SpoolResp
     // --- Step 2: fill in from filament/vendor if needed ---
     let needs_filament = initial_weight.map(|w| w == 0.0).unwrap_or(true) || spool_weight.is_none();
     if needs_filament {
-        let fil_row = sqlx::query(
+        let fil_row = sqlx::query(sqlx::AssertSqlSafe(&*tp(
             "SELECT f.weight, f.spool_weight, v.empty_spool_weight \
              FROM spool s \
              JOIN filament f ON f.id = s.filament_id \
              LEFT JOIN vendor v ON v.id = f.vendor_id \
              WHERE s.id = ?",
-        )
+        )))
         .bind(id)
         .fetch_optional(pool)
         .await?
@@ -830,11 +845,13 @@ pub async fn measure(pool: &AnyPool, id: i64, weight_g: f64) -> Result<SpoolResp
     // --- Step 3: apply measurement ---
     if weight_g > initial_gross {
         // Measured more than expected — reset initial_weight.
-        sqlx::query("UPDATE spool SET initial_weight = ?, used_weight = 0.0 WHERE id = ?")
-            .bind(weight_g - spool_weight)
-            .bind(id)
-            .execute(pool)
-            .await?;
+        sqlx::query(sqlx::AssertSqlSafe(&*tp(
+            "UPDATE spool SET initial_weight = ?, used_weight = 0.0 WHERE id = ?",
+        )))
+        .bind(weight_g - spool_weight)
+        .bind(id)
+        .execute(pool)
+        .await?;
         return find_by_id(pool, id).await;
     }
 
@@ -882,11 +899,13 @@ pub async fn find_lot_numbers(pool: &AnyPool) -> Result<Vec<String>> {
 }
 
 pub async fn rename_location(pool: &AnyPool, old_name: &str, new_name: &str) -> Result<()> {
-    sqlx::query("UPDATE spool SET location = ? WHERE location = ?")
-        .bind(new_name)
-        .bind(old_name)
-        .execute(pool)
-        .await?;
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "UPDATE spool SET location = ? WHERE location = ?",
+    )))
+    .bind(new_name)
+    .bind(old_name)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -911,11 +930,13 @@ pub async fn rename_field_value(
                 "Location value is too long (max {LOCATION_MAX_LEN} characters)."
             )));
         }
-        let result = sqlx::query("UPDATE spool SET location = ? WHERE location = ?")
-            .bind(new_value)
-            .bind(value)
-            .execute(pool)
-            .await?;
+        let result = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+            "UPDATE spool SET location = ? WHERE location = ?",
+        )))
+        .bind(new_value)
+        .bind(value)
+        .execute(pool)
+        .await?;
         return Ok(result.rows_affected() as i64);
     }
 
@@ -946,12 +967,14 @@ pub async fn rename_field_value(
         // Encode the value as a JSON string (the way it's stored in spool_field.value).
         let encoded_old = serde_json::to_string(value)?;
         let encoded_new = serde_json::to_string(new_value)?;
-        let result = sqlx::query("UPDATE spool_field SET value = ? WHERE key = ? AND value = ?")
-            .bind(encoded_new)
-            .bind(key)
-            .bind(encoded_old)
-            .execute(pool)
-            .await?;
+        let result = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+            "UPDATE spool_field SET value = ? WHERE key = ? AND value = ?",
+        )))
+        .bind(encoded_new)
+        .bind(key)
+        .bind(encoded_old)
+        .execute(pool)
+        .await?;
         return Ok(result.rows_affected() as i64);
     }
 
@@ -1386,21 +1409,31 @@ pub async fn find_groups(
     );
 
     // Count query.
+    let count_sql = tp(&count_sql);
     let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
     }
-    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+    for b in extra_sql
+        .where_binds
+        .iter()
+        .chain(filament_extra_sql.where_binds.iter())
+    {
         count_q = count_q.bind(b.clone());
     }
     let total_count: i64 = count_q.fetch_one(pool).await?;
 
     // Data query.
+    let agg_sql = tp(&agg_sql);
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*agg_sql));
     for b in &wb.binds {
         q = q.bind(b.clone());
     }
-    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+    for b in extra_sql
+        .where_binds
+        .iter()
+        .chain(filament_extra_sql.where_binds.iter())
+    {
         q = q.bind(b.clone());
     }
     for b in &sort_binds {
@@ -1462,11 +1495,16 @@ pub async fn find_groups(
            GROUP BY {group_col_sql} \
          ) AS _t"
     );
+    let totals_sql = tp(&totals_sql);
     let mut totals_q = sqlx::query(sqlx::AssertSqlSafe(&*totals_sql));
     for b in &wb.binds {
         totals_q = totals_q.bind(b.clone());
     }
-    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+    for b in extra_sql
+        .where_binds
+        .iter()
+        .chain(filament_extra_sql.where_binds.iter())
+    {
         totals_q = totals_q.bind(b.clone());
     }
     let totals_row = totals_q.fetch_one(pool).await?;
@@ -1536,14 +1574,14 @@ pub async fn find_groups(
         } else {
             format!("{where_sql} AND s.filament_id = ?")
         };
-        let preview_sql = format!(
+        let preview_sql = tp(&format!(
             "SELECT s.id, s.initial_weight, s.used_weight \
              FROM spool s \
              JOIN filament f ON f.id = s.filament_id \
              LEFT JOIN vendor v ON v.id = f.vendor_id \
              {preview_where_prefix} \
              ORDER BY s.id ASC LIMIT 5"
-        );
+        ));
         for group in &mut results {
             let fid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
             group.spools = Some(if let Some(fid) = fid {
@@ -1551,7 +1589,11 @@ pub async fn find_groups(
                 for b in &wb.binds {
                     q = q.bind(b.clone());
                 }
-                for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+                for b in extra_sql
+                    .where_binds
+                    .iter()
+                    .chain(filament_extra_sql.where_binds.iter())
+                {
                     q = q.bind(b.clone());
                 }
                 q = q.bind(fid);
@@ -1562,8 +1604,7 @@ pub async fn find_groups(
                     let id: i64 = row.try_get("id")?;
                     let initial_weight: Option<f64> = row.try_get("initial_weight")?;
                     let used_weight: f64 = row.try_get("used_weight")?;
-                    let remaining_weight =
-                        initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
+                    let remaining_weight = initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
                     prev.push(crate::models::SpoolPreview {
                         id,
                         remaining_weight,
@@ -1579,10 +1620,10 @@ pub async fn find_groups(
         for group in &mut results {
             let vid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
             group.filaments = Some(if let Some(vid) = vid {
-                let rows = sqlx::query(
+                let rows = sqlx::query(sqlx::AssertSqlSafe(&*tp(
                     "SELECT id, color_hex, multi_color_hexes, multi_color_direction \
                      FROM filament WHERE vendor_id = ? ORDER BY name, id LIMIT 4",
-                )
+                )))
                 .bind(vid)
                 .fetch_all(pool)
                 .await?;
@@ -1721,6 +1762,7 @@ async fn find_groups_include_empty(
     );
 
     // Count query.
+    let count_sql = tp(&count_sql);
     let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
@@ -1731,6 +1773,7 @@ async fn find_groups_include_empty(
     let total_count: i64 = count_q.fetch_one(pool).await?;
 
     // Data query.
+    let agg_sql = tp(&agg_sql);
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*agg_sql));
     for b in &wb.binds {
         q = q.bind(b.clone());
@@ -1781,6 +1824,7 @@ async fn find_groups_include_empty(
            GROUP BY {group_col} \
          ) AS _t"
     );
+    let totals_sql = tp(&totals_sql);
     let mut totals_q = sqlx::query(sqlx::AssertSqlSafe(&*totals_sql));
     for b in &wb.binds {
         totals_q = totals_q.bind(b.clone());
@@ -1851,12 +1895,12 @@ async fn find_groups_include_empty(
         } else {
             ""
         };
-        let preview_sql = format!(
+        let preview_sql = tp(&format!(
             "SELECT s.id, s.initial_weight, s.used_weight \
              FROM spool s \
              WHERE s.filament_id = ?{archived_cond} \
              ORDER BY s.id ASC LIMIT 5"
-        );
+        ));
         for group in &mut results {
             let fid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
             group.spools = Some(if let Some(fid) = fid {
@@ -1870,8 +1914,7 @@ async fn find_groups_include_empty(
                     let id: i64 = row.try_get("id")?;
                     let initial_weight: Option<f64> = row.try_get("initial_weight")?;
                     let used_weight: f64 = row.try_get("used_weight")?;
-                    let remaining_weight =
-                        initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
+                    let remaining_weight = initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
                     prev.push(crate::models::SpoolPreview {
                         id,
                         remaining_weight,
@@ -1887,10 +1930,10 @@ async fn find_groups_include_empty(
         for group in &mut results {
             let vid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
             group.filaments = Some(if let Some(vid) = vid {
-                let rows = sqlx::query(
+                let rows = sqlx::query(sqlx::AssertSqlSafe(&*tp(
                     "SELECT id, color_hex, multi_color_hexes, multi_color_direction \
                      FROM filament WHERE vendor_id = ? ORDER BY name, id LIMIT 4",
-                )
+                )))
                 .bind(vid)
                 .fetch_all(pool)
                 .await?;

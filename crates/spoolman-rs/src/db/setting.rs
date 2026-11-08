@@ -6,7 +6,10 @@
 
 use sqlx::AnyPool;
 
-use crate::{db::vendor::utc_now_str, error::Result};
+use crate::{
+    db::{query::tp, vendor::utc_now_str},
+    error::Result,
+};
 
 // ---------------------------------------------------------------------------
 // Settings registry (mirrors spoolman/settings.py)
@@ -113,10 +116,12 @@ pub fn validate_type(def: &SettingDef, raw_value: &str) -> Option<String> {
 
 /// Get a setting's JSON value from the DB, or `None` if not set.
 pub async fn get(pool: &AnyPool, key: &str) -> Result<Option<String>> {
-    let row: Option<String> = sqlx::query_scalar("SELECT value FROM setting WHERE key = ?")
-        .bind(key)
-        .fetch_optional(pool)
-        .await?;
+    let row: Option<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(&*tp(
+        "SELECT value FROM setting WHERE key = ?",
+    )))
+    .bind(key)
+    .fetch_optional(pool)
+    .await?;
     Ok(row)
 }
 
@@ -126,10 +131,10 @@ pub async fn set(pool: &AnyPool, key: &str, value: &str) -> Result<()> {
     // SQLite and PostgreSQL: INSERT OR REPLACE / ON CONFLICT DO UPDATE.
     // MySQL: INSERT ... ON DUPLICATE KEY UPDATE.
     // Use separate branches detected at runtime.
-    sqlx::query(
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
         "INSERT INTO setting (key, value, last_updated) VALUES (?,?,?) \
          ON CONFLICT(key) DO UPDATE SET value=excluded.value, last_updated=excluded.last_updated",
-    )
+    )))
     .bind(key)
     .bind(value)
     .bind(&now)
@@ -141,10 +146,10 @@ pub async fn set(pool: &AnyPool, key: &str, value: &str) -> Result<()> {
 /// Set a setting using MySQL's ON DUPLICATE KEY UPDATE syntax.
 pub async fn set_mysql(pool: &AnyPool, key: &str, value: &str) -> Result<()> {
     let now = utc_now_str();
-    sqlx::query(
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
         "INSERT INTO setting (key, value, last_updated) VALUES (?,?,?) \
          ON DUPLICATE KEY UPDATE value=VALUES(value), last_updated=VALUES(last_updated)",
-    )
+    )))
     .bind(key)
     .bind(value)
     .bind(&now)
@@ -155,10 +160,12 @@ pub async fn set_mysql(pool: &AnyPool, key: &str, value: &str) -> Result<()> {
 
 /// Delete a setting (reset to default).
 pub async fn delete(pool: &AnyPool, key: &str) -> Result<()> {
-    sqlx::query("DELETE FROM setting WHERE key = ?")
-        .bind(key)
-        .execute(pool)
-        .await?;
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM setting WHERE key = ?",
+    )))
+    .bind(key)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

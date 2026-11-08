@@ -6,7 +6,7 @@ use sqlx::AnyPool;
 use crate::{
     db::{
         extra_field,
-        query::{parse_sort, Pagination, WhereBuilder},
+        query::{dtp, parse_sort, tp, Pagination, WhereBuilder},
         tag,
         vendor::{normalise_dt, utc_now_str},
         Engine,
@@ -243,9 +243,9 @@ pub async fn find(
 
     let pag = Pagination::new(filter.limit, filter.offset);
 
-    let count_sql = format!(
+    let count_sql = tp(&format!(
         "SELECT COUNT(*) FROM filament f LEFT JOIN vendor v ON v.id = f.vendor_id {final_where}"
-    );
+    ));
     let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
@@ -255,7 +255,9 @@ pub async fn find(
     }
     let total: i64 = count_q.fetch_one(pool).await?;
 
-    let data_sql = format!("{FILAMENT_SELECT} {final_where} {order_sql} LIMIT ? OFFSET ?");
+    let data_sql = tp(&format!(
+        "{FILAMENT_SELECT} {final_where} {order_sql} LIMIT ? OFFSET ?"
+    ));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*data_sql));
     for b in &wb.binds {
         q = q.bind(b.clone());
@@ -348,7 +350,7 @@ pub async fn find_by_color(
 }
 
 pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<FilamentResponse> {
-    let sql = format!("{FILAMENT_SELECT} WHERE f.id = ?");
+    let sql = tp(&format!("{FILAMENT_SELECT} WHERE f.id = ?"));
     let row = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(id)
         .fetch_optional(pool)
@@ -429,12 +431,15 @@ pub async fn create(
         req.multi_color_direction.as_deref(),
     )?;
     let now = utc_now_str();
+    let dt = dtp();
 
-    const INSERT_SQL: &str = "INSERT INTO filament \
+    let insert_sql = format!(
+        "INSERT INTO filament \
          (registered, name, vendor_id, material, price, density, diameter, weight, \
           spool_weight, article_number, comment, settings_extruder_temp, \
           settings_bed_temp, color_hex, multi_color_hexes, multi_color_direction, external_id) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+         VALUES ({dt},?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    );
 
     macro_rules! bind_all {
         ($q:expr) => {
@@ -460,15 +465,17 @@ pub async fn create(
 
     let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres support RETURNING id.
-        bind_all!(sqlx::query_scalar(sqlx::AssertSqlSafe(&*format!(
-            "{INSERT_SQL} RETURNING id"
-        ))))
+        bind_all!(sqlx::query_scalar(sqlx::AssertSqlSafe(&*tp(&format!(
+            "{insert_sql} RETURNING id"
+        )))))
         .fetch_one(pool)
         .await?
     } else {
         // MySQL: use transaction + LAST_INSERT_ID().
         let mut tx = pool.begin().await?;
-        bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
+        bind_all!(sqlx::query(sqlx::AssertSqlSafe(&*tp(&insert_sql))))
+            .execute(&mut *tx)
+            .await?;
         let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
             .fetch_one(&mut *tx)
             .await?;
@@ -545,7 +552,10 @@ pub async fn update(
     }
 
     if !sets.is_empty() {
-        let sql = format!("UPDATE filament SET {} WHERE id = ?", sets.join(", "));
+        let sql = tp(&format!(
+            "UPDATE filament SET {} WHERE id = ?",
+            sets.join(", ")
+        ));
         let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
         for b in binds {
             q = match b {
@@ -572,25 +582,28 @@ pub async fn update(
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
     // Remove extra field values first; filament_field.filament_id has no ON DELETE CASCADE.
-    sqlx::query("DELETE FROM filament_field WHERE filament_id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    let result = sqlx::query("DELETE FROM filament WHERE id = ?")
-        .bind(id)
-        .execute(pool)
-        .await
-        .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.kind() == sqlx::error::ErrorKind::ForeignKeyViolation {
-                    return SpoolmanError::DeleteConflict(
-                        "Failed to delete filament, see server logs for more information."
-                            .to_owned(),
-                    );
-                }
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM filament_field WHERE filament_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM filament WHERE id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(ref db_err) = e {
+            if db_err.kind() == sqlx::error::ErrorKind::ForeignKeyViolation {
+                return SpoolmanError::DeleteConflict(
+                    "Failed to delete filament, see server logs for more information.".to_owned(),
+                );
             }
-            SpoolmanError::Database(e)
-        })?;
+        }
+        SpoolmanError::Database(e)
+    })?;
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("filament with id {id}")));
     }

@@ -26,7 +26,7 @@ Thumbs.db
 *.env.local
 
 # Test fixtures — may contain personal data, never commit
-fixtures/
+/fixtures/
 test-printers.local.toml
 
 # Compat harness — Python venv + optional upstream clone (never commit)

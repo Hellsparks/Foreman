@@ -11,7 +11,9 @@ use std::net::SocketAddr;
 use crate::{
     api::error::ApiResult,
     db::{filament as filament_db, tag as db},
-    models::{ScanTagRequest, ScanTagResponse, TagInfo, TagLinkRequest, TagReaderInfo},
+    models::{
+        ScanTagRequest, ScanTagResponse, TagDecodedInfo, TagInfo, TagLinkRequest, TagReaderInfo,
+    },
     state::AppState,
     ws::ScanBroadcastEvent,
 };
@@ -51,10 +53,63 @@ pub async fn unlink_tag(
 // Scan relay — REST
 // ---------------------------------------------------------------------------
 
+/// Decode a scan's payload, if both a format and a payload were given.
+///
+/// Soft-fails on everything: a missing field, invalid base64, an unknown format
+/// or an unparseable payload all return `None`.
+fn decode_payload(
+    tag_format: Option<&str>,
+    payload_b64: Option<&str>,
+    uid: &str,
+) -> Option<crate::tags::DecodedTag> {
+    let fmt = tag_format?;
+    let b64 = payload_b64?;
+
+    use base64::Engine as _;
+    let raw = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+
+    let uid_bytes: Option<Vec<u8>> = hex::decode(uid).ok();
+    crate::tags::decode(Some(fmt), &raw, uid_bytes.as_deref())
+}
+
+/// Decode hex string to bytes (minimal, avoids adding the `hex` crate).
+mod hex {
+    pub fn decode(s: &str) -> Result<Vec<u8>, ()> {
+        if !s.len().is_multiple_of(2) {
+            return Err(());
+        }
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| ()))
+            .collect()
+    }
+}
+
+fn decoded_to_info(d: &crate::tags::DecodedTag) -> TagDecodedInfo {
+    TagDecodedInfo {
+        material_class: d.material_class.clone(),
+        material: d.material.clone(),
+        name: d.name.clone(),
+        vendor_name: d.vendor_name.clone(),
+        article_number: d.article_number.clone(),
+        color_hex: d.color_hex.clone(),
+        diameter: d.diameter,
+        density: d.density,
+        weight: d.weight,
+        initial_weight: d.initial_weight,
+        spool_weight: d.spool_weight,
+        used_weight: d.used_weight,
+        extruder_temp: d.extruder_temp,
+        bed_temp: d.bed_temp,
+        instance_uuid: d.instance_uuid.clone(),
+    }
+}
+
 /// POST {base_path}/api/v1/tag/scan — relay a tag scan event.
 ///
 /// Looks up the UID, registers with the dedup relay, and broadcasts if
-/// the dedup window allows.
+/// the dedup window allows. When `create: true` and the tag is decodable
+/// as an FFF material, auto-creates vendor + filament + spool + tag link.
 pub async fn scan_post(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     State(state): State<AppState>,
@@ -77,8 +132,47 @@ pub async fn scan_post(
         None => format!("ip-{}", peer.ip()),
     };
 
-    let matched_spool_id = db::find_spool_id_by_uid(&state.db.pool, &uid_norm).await?;
+    let mut matched_spool_id = db::find_spool_id_by_uid(&state.db.pool, &uid_norm).await?;
     let matched_filament_id = db::find_filament_id_by_uid(&state.db.pool, &uid_norm).await?;
+
+    // Decode payload (best-effort).
+    let mut decoded = decode_payload(req.format.as_deref(), req.payload_b64.as_deref(), &uid_norm);
+
+    // Auto-create path: only for FFF tags on unmatched UIDs when `create: true`.
+    let mut created = false;
+    let creatable = decoded
+        .as_ref()
+        .is_some_and(|d| d.material_class.as_deref() == Some("FFF"));
+
+    if matched_spool_id.is_none() && matched_filament_id.is_none() && req.create && creatable {
+        let decoded_ref = decoded.as_ref().expect("creatable implies decoded is Some");
+        match db::create_spool_from_decoded_tag(
+            &state.db.pool,
+            &state.db.engine,
+            &uid_norm,
+            req.format.as_deref(),
+            decoded_ref,
+        )
+        .await
+        {
+            Ok(spool) => {
+                matched_spool_id = Some(spool.id);
+                created = true;
+                // Broadcast the new spool.
+                crate::ws::broadcast(&state.event_tx, "added", "spool", spool.id, &spool);
+            }
+            Err(crate::error::SpoolmanError::TagConflict { .. }) => {
+                // Lost a race — report the winner as an ordinary match.
+                matched_spool_id = db::find_spool_id_by_uid(&state.db.pool, &uid_norm).await?;
+            }
+            Err(e) => {
+                tracing::warn!(uid = %uid_norm, "refused to auto-create spool from decoded tag: {e}");
+                // Values we refused to store must not reach the client either:
+                // report the tag as undecodable, matching upstream behavior.
+                decoded = None;
+            }
+        }
+    }
 
     let matched = matched_spool_id
         .map(|id| ("spool", id))
@@ -102,6 +196,8 @@ pub async fn scan_post(
         None
     };
 
+    let decoded_info = decoded.as_ref().map(decoded_to_info);
+
     let response = ScanTagResponse {
         uid: uid_norm.clone(),
         reader_id: reader_id.clone(),
@@ -111,7 +207,8 @@ pub async fn scan_post(
         matched_filament_id,
         spool: spool_obj,
         filament: filament_obj,
-        created: false,
+        decoded: decoded_info,
+        created,
     };
 
     if state
@@ -120,9 +217,7 @@ pub async fn scan_post(
     {
         // Wrap in the scan event envelope: {type, resource, date, payload}.
         // serde_json::to_value respects skip_serializing_if so None fields are omitted.
-        let date = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string();
+        let date = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
         let payload_val = serde_json::to_value(&response).unwrap_or_default();
         let envelope = serde_json::json!({
             "type": "scanned",

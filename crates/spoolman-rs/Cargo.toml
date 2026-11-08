@@ -33,6 +33,10 @@ sqlx = { version = "0.9", features = [
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+# Tag decoding (OpenPrintTag CBOR payloads)
+ciborium = "0.2"
+base64 = "0.22"
+
 # Date/time
 chrono = { workspace = true }
 

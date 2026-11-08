@@ -6,7 +6,7 @@ use sqlx::AnyPool;
 use crate::{
     db::{
         extra_field,
-        query::{parse_sort, Pagination, WhereBuilder},
+        query::{dtp, parse_sort, tp, Pagination, WhereBuilder},
     },
     error::{Result, SpoolmanError},
     models::{CreateVendorRequest, UpdateVendorRequest, VendorResponse},
@@ -136,7 +136,7 @@ pub async fn find(
     let pag = Pagination::new(filter.limit, filter.offset);
 
     // Count
-    let count_sql = format!("SELECT COUNT(*) FROM vendor v {final_where}");
+    let count_sql = tp(&format!("SELECT COUNT(*) FROM vendor v {final_where}"));
     let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
@@ -147,11 +147,11 @@ pub async fn find(
     let total: i64 = count_q.fetch_one(pool).await?;
 
     // Data — CAST(datetime AS TEXT) so AnyPool can decode as String.
-    let data_sql = format!(
+    let data_sql = tp(&format!(
         "SELECT v.id, CAST(v.registered AS TEXT) AS registered, v.name, v.comment, \
          v.empty_spool_weight, v.external_id \
          FROM vendor v {final_where} {order_sql} LIMIT ? OFFSET ?"
-    );
+    ));
     let mut q = sqlx::query(sqlx::AssertSqlSafe(&*data_sql));
     for b in &wb.binds {
         q = q.bind(b.clone());
@@ -195,10 +195,10 @@ pub(crate) fn build_final_where(base_where: &str, extra_clauses: &[String]) -> S
 }
 
 pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<VendorResponse> {
-    let raw = sqlx::query(
+    let raw = sqlx::query(sqlx::AssertSqlSafe(&*tp(
         "SELECT id, CAST(registered AS TEXT) AS registered, name, comment, \
          empty_spool_weight, external_id FROM vendor WHERE id = ?",
-    )
+    )))
     .bind(id)
     .fetch_optional(pool)
     .await?
@@ -216,12 +216,13 @@ pub async fn create(
 ) -> Result<VendorResponse> {
     let now = utc_now_str();
 
+    let dt = dtp();
     let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres both support RETURNING id.
-        sqlx::query_scalar(
+        sqlx::query_scalar(sqlx::AssertSqlSafe(&*tp(&format!(
             "INSERT INTO vendor (registered, name, comment, empty_spool_weight, external_id) \
-             VALUES (?, ?, ?, ?, ?) RETURNING id",
-        )
+             VALUES ({dt}, ?, ?, ?, ?) RETURNING id",
+        ))))
         .bind(&now)
         .bind(&req.name)
         .bind(&req.comment)
@@ -232,10 +233,10 @@ pub async fn create(
     } else {
         // MySQL: RETURNING is not supported; use LAST_INSERT_ID() inside a transaction.
         let mut tx = pool.begin().await?;
-        sqlx::query(
+        sqlx::query(sqlx::AssertSqlSafe(&*tp(&format!(
             "INSERT INTO vendor (registered, name, comment, empty_spool_weight, external_id) \
-             VALUES (?, ?, ?, ?, ?)",
-        )
+             VALUES ({dt}, ?, ?, ?, ?)",
+        ))))
         .bind(&now)
         .bind(&req.name)
         .bind(&req.comment)
@@ -295,7 +296,7 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateVendorRequest) -> Resul
 
     if !sets.is_empty() {
         let set_sql = sets.join(", ");
-        let sql = format!("UPDATE vendor SET {set_sql} WHERE id = ?");
+        let sql = tp(&format!("UPDATE vendor SET {set_sql} WHERE id = ?"));
         let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
         for b in binds {
             q = match b {
@@ -322,11 +323,21 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateVendorRequest) -> Resul
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
     // Remove extra field values first; vendor_field.vendor_id has no ON DELETE CASCADE.
-    sqlx::query("DELETE FROM vendor_field WHERE vendor_id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
-    let result = sqlx::query("DELETE FROM vendor WHERE id = ?")
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM vendor_field WHERE vendor_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    // Orphan filaments rather than cascade-deleting them: set vendor_id to NULL.
+    // Upstream SQLAlchemy does this implicitly; raw SQL needs it explicit.
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "UPDATE filament SET vendor_id = NULL WHERE vendor_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*tp("DELETE FROM vendor WHERE id = ?")))
         .bind(id)
         .execute(pool)
         .await
@@ -334,8 +345,7 @@ pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
             if let sqlx::Error::Database(ref db_err) = e {
                 if db_err.kind() == sqlx::error::ErrorKind::ForeignKeyViolation {
                     return SpoolmanError::DeleteConflict(
-                        "Failed to delete vendor, see server logs for more information."
-                            .to_owned(),
+                        "Failed to delete vendor, see server logs for more information.".to_owned(),
                     );
                 }
             }

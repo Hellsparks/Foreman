@@ -412,7 +412,6 @@ fn run_engine(engine: &str, workspace: &Path, pytest_bin: &Path, tests_int: &Pat
 
     // Run pytest.
     let status = Command::new(pytest_bin)
-        .arg("--exitfirst")
         .arg("tests")
         .current_dir(tests_int)
         .env("SPOOLMAN_HOST", "127.0.0.1")
@@ -586,9 +585,13 @@ fn start_container(engine: &str) -> Result<Container, String> {
         }
     }
 
-    // MariaDB: extra time for the server to fully initialise after port opens.
+    // Extra time for the DB server to fully initialise after port opens.
+    // TCP accepts before the SQL layer is ready; without this the connection
+    // is reset immediately.
     if engine == "mariadb" {
         thread::sleep(Duration::from_secs(5));
+    } else if engine == "postgres" {
+        thread::sleep(Duration::from_secs(3));
     }
 
     println!("{engine} DB ready.");

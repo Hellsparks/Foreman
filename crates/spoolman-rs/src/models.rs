@@ -331,6 +331,10 @@ pub struct ScanTagRequest {
     pub name: Option<String>,
     #[serde(default)]
     pub format: Option<String>,
+    #[serde(default)]
+    pub payload_b64: Option<String>,
+    #[serde(default)]
+    pub create: bool,
 }
 
 /// Response from POST /tag/scan.
@@ -352,7 +356,45 @@ pub struct ScanTagResponse {
     /// Full filament object — present in broadcasts when the UID resolves to a filament.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filament: Option<Box<FilamentResponse>>,
+    /// Decoded tag payload — present when `format` + `payload_b64` are given and parseable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decoded: Option<TagDecodedInfo>,
     pub created: bool,
+}
+
+/// Decoded tag payload fields — mirrors upstream `TagDecodedInfo`.
+#[derive(Debug, Serialize)]
+pub struct TagDecodedInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub article_number: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_hex: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub density: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spool_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extruder_temp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bed_temp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance_uuid: Option<String>,
 }
 
 /// One entry in GET /tag/reader.

@@ -15,7 +15,64 @@
 //! ## Pagination
 //! `limit` / `offset` with `x-total-count` response header.
 
+use std::fmt::Write;
+use std::sync::OnceLock;
+
 use crate::db::{vendor::normalise_dt_bound, Engine};
+
+// ---------------------------------------------------------------------------
+// Placeholder translation — `?` → `$N` for PostgreSQL
+// ---------------------------------------------------------------------------
+//
+// sqlx 0.9's AnyPool does not automatically translate `?` parameter markers to
+// the engine-native `$N` form when the backend is PostgreSQL.  All queries in
+// this crate use `?`, which is understood by SQLite and MySQL but NOT Postgres.
+//
+// Rather than threading `engine` through every function, we store it in a
+// module-global OnceLock (set once during Db::connect, never changes) and
+// expose `tp()` which rewrites `?` → `$1`, `$2`, … when running on Postgres.
+
+static GLOBAL_ENGINE: OnceLock<Engine> = OnceLock::new();
+
+/// Called once from `Db::connect` to register the engine dialect.
+pub fn set_global_engine(engine: Engine) {
+    GLOBAL_ENGINE.set(engine).ok(); // first caller wins; idempotent
+}
+
+/// Placeholder expression for a datetime bind parameter.
+///
+/// SQLite stores datetimes as TEXT, so a bare `?` suffices.
+/// PostgreSQL requires an explicit cast to `TIMESTAMP WITHOUT TIME ZONE`.
+/// Use this inside `format!()` for datetime columns, then wrap with `tp()`.
+pub fn dtp() -> &'static str {
+    match GLOBAL_ENGINE.get() {
+        Some(Engine::Postgres) => "?::TIMESTAMP",
+        _ => "?",
+    }
+}
+
+/// Translate `?` placeholders to `$N` when the backend is PostgreSQL.
+///
+/// Returns the input unchanged for SQLite/MySQL.  Cheap no-op when the SQL
+/// contains no `?` at all.
+pub fn tp(sql: &str) -> String {
+    match GLOBAL_ENGINE.get() {
+        Some(Engine::Postgres) if sql.contains('?') => {
+            let mut out = String::with_capacity(sql.len() + 32);
+            let mut n = 0u32;
+            for ch in sql.chars() {
+                if ch == '?' {
+                    n += 1;
+                    write!(out, "${n}").unwrap();
+                } else {
+                    out.push(ch);
+                }
+            }
+            out
+        }
+        _ => sql.to_owned(),
+    }
+}
 
 #[allow(unused_imports)]
 use chrono; // used by validate_datetime_filter

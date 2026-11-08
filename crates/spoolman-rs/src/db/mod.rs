@@ -18,7 +18,7 @@ use crate::{
 /// Which SQL dialect the pool is speaking.
 ///
 /// CockroachDB uses the Postgres wire protocol, so it shares the Postgres path.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Engine {
     Sqlite,
     Postgres, // also CockroachDB
@@ -95,6 +95,8 @@ impl Db {
         }
 
         let engine = Engine::from(&config.db_type);
+        // Register the engine globally so `tp()` can translate `?` → `$N` for Postgres.
+        query::set_global_engine(engine);
         let db = Db { pool, engine };
         db.startup_check().await?;
         Ok(db)
@@ -168,10 +170,12 @@ impl Db {
 
         // The table was just created in the fresh-DB path, so there's exactly
         // zero rows — no INSERT OR IGNORE / ON CONFLICT needed.
-        sqlx::query("INSERT INTO alembic_version (version_num) VALUES (?)")
-            .bind("")
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(sqlx::AssertSqlSafe(&*query::tp(
+            "INSERT INTO alembic_version (version_num) VALUES (?)",
+        )))
+        .bind("")
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
