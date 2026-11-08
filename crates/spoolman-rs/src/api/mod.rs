@@ -40,6 +40,13 @@ pub fn parse_filament_extra_params(uri: &Uri) -> Vec<(String, String)> {
     parse_prefixed_extra_params(uri, "filament.extra.")
 }
 
+/// Extract `filament.vendor.extra.*` query parameters from the request URI.
+///
+/// Returns a `Vec<(key, value)>` where `key` is the part after `"filament.vendor.extra."`.
+pub fn parse_vendor_extra_params(uri: &Uri) -> Vec<(String, String)> {
+    parse_prefixed_extra_params(uri, "filament.vendor.extra.")
+}
+
 fn parse_prefixed_extra_params(uri: &Uri, prefix: &str) -> Vec<(String, String)> {
     let query = uri.query().unwrap_or("");
     // URL-decode the query string and split into key=value pairs.

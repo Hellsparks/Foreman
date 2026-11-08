@@ -321,10 +321,26 @@ pub async fn update(pool: &AnyPool, id: i64, req: &UpdateVendorRequest) -> Resul
 }
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
-    let result = sqlx::query("DELETE FROM vendor WHERE id = ?")
+    // Remove extra field values first; vendor_field.vendor_id has no ON DELETE CASCADE.
+    sqlx::query("DELETE FROM vendor_field WHERE vendor_id = ?")
         .bind(id)
         .execute(pool)
         .await?;
+    let result = sqlx::query("DELETE FROM vendor WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            if let sqlx::Error::Database(ref db_err) = e {
+                if db_err.kind() == sqlx::error::ErrorKind::ForeignKeyViolation {
+                    return SpoolmanError::DeleteConflict(
+                        "Failed to delete vendor, see server logs for more information."
+                            .to_owned(),
+                    );
+                }
+            }
+            SpoolmanError::Database(e)
+        })?;
     if result.rows_affected() == 0 {
         return Err(SpoolmanError::NotFound(format!("vendor with id {id}")));
     }

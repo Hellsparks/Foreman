@@ -571,6 +571,11 @@ pub async fn update(
 }
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
+    // Remove extra field values first; filament_field.filament_id has no ON DELETE CASCADE.
+    sqlx::query("DELETE FROM filament_field WHERE filament_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
     let result = sqlx::query("DELETE FROM filament WHERE id = ?")
         .bind(id)
         .execute(pool)

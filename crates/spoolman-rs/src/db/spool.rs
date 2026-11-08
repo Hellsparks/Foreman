@@ -222,8 +222,12 @@ pub struct SpoolFilter {
     pub sort: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
-    /// Dynamic `extra.<key>=<value>` query params.
+    /// Dynamic `extra.<key>=<value>` query params (spool's own extra fields).
     pub extra_filters: Vec<(String, String)>,
+    /// Dynamic `filament.extra.<key>=<value>` query params.
+    pub filament_extra_filters: Vec<(String, String)>,
+    /// Dynamic `filament.vendor.extra.<key>=<value>` query params.
+    pub vendor_extra_filters: Vec<(String, String)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +334,40 @@ pub async fn find(
     )
     .await?;
 
-    let final_where = crate::db::vendor::build_final_where(&base_where, &extra_sql.where_clauses);
+    // Extra-field filters on the spool's filament (filament.extra.<key>=<value>).
+    let filament_extra_sql = extra_field::build_extra_sql(
+        pool,
+        engine,
+        "filament",
+        "f",
+        "filament_field",
+        "filament_id",
+        &filter.filament_extra_filters,
+        &[],
+    )
+    .await?;
+
+    // Extra-field filters on the filament's vendor (filament.vendor.extra.<key>=<value>).
+    let vendor_extra_sql = extra_field::build_extra_sql(
+        pool,
+        engine,
+        "vendor",
+        "v",
+        "vendor_field",
+        "vendor_id",
+        &filter.vendor_extra_filters,
+        &[],
+    )
+    .await?;
+
+    let all_extra_clauses: Vec<String> = extra_sql
+        .where_clauses
+        .iter()
+        .chain(filament_extra_sql.where_clauses.iter())
+        .chain(vendor_extra_sql.where_clauses.iter())
+        .cloned()
+        .collect();
+    let final_where = crate::db::vendor::build_final_where(&base_where, &all_extra_clauses);
 
     let mut all_order_parts = extra_sql.order_frags.clone();
     all_order_parts.extend(regular_sort_parts);
@@ -349,7 +386,12 @@ pub async fn find(
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
     }
-    for b in &extra_sql.where_binds {
+    for b in extra_sql
+        .where_binds
+        .iter()
+        .chain(filament_extra_sql.where_binds.iter())
+        .chain(vendor_extra_sql.where_binds.iter())
+    {
         count_q = count_q.bind(b.clone());
     }
     let total: i64 = count_q.fetch_one(pool).await?;
@@ -359,7 +401,12 @@ pub async fn find(
     for b in &wb.binds {
         q = q.bind(b.clone());
     }
-    for b in &extra_sql.where_binds {
+    for b in extra_sql
+        .where_binds
+        .iter()
+        .chain(filament_extra_sql.where_binds.iter())
+        .chain(vendor_extra_sql.where_binds.iter())
+    {
         q = q.bind(b.clone());
     }
     for b in &extra_sql.order_binds {
@@ -849,6 +896,9 @@ pub async fn rename_location(pool: &AnyPool, old_name: &str, new_name: &str) -> 
 /// Returns the number of spools changed.
 ///
 /// Mirrors `spoolman/database/spool.py::rename_field_value`.
+/// Maximum length for the `location` column.
+const LOCATION_MAX_LEN: usize = 64;
+
 pub async fn rename_field_value(
     pool: &AnyPool,
     field: &str,
@@ -856,6 +906,11 @@ pub async fn rename_field_value(
     new_value: &str,
 ) -> Result<i64> {
     if field == "location" {
+        if new_value.len() > LOCATION_MAX_LEN {
+            return Err(SpoolmanError::BadRequest(format!(
+                "Location value is too long (max {LOCATION_MAX_LEN} characters)."
+            )));
+        }
         let result = sqlx::query("UPDATE spool SET location = ? WHERE location = ?")
             .bind(new_value)
             .bind(value)
@@ -865,6 +920,29 @@ pub async fn rename_field_value(
     }
 
     if let Some(key) = field.strip_prefix("extra.") {
+        use crate::models::ExtraFieldType;
+
+        // Validate that the extra field key is registered.
+        let known = extra_field::get_definitions(pool, "spool").await?;
+        let field_def = known.iter().find(|f| f.key == key).ok_or_else(|| {
+            SpoolmanError::BadRequest(format!("Unknown spool extra field '{key}'."))
+        })?;
+
+        // Numeric, range, and multi_choice fields hold non-atomic values and cannot be renamed.
+        let is_unrenameable = matches!(
+            field_def.field_type,
+            ExtraFieldType::Integer
+                | ExtraFieldType::IntegerRange
+                | ExtraFieldType::Float
+                | ExtraFieldType::FloatRange
+        ) || field_def.multi_choice.unwrap_or(false);
+        if is_unrenameable {
+            return Err(SpoolmanError::BadRequest(format!(
+                "Extra field '{key}' cannot have its values renamed \
+                 (numeric and multi_choice fields hold non-atomic values)."
+            )));
+        }
+
         // Encode the value as a JSON string (the way it's stored in spool_field.value).
         let encoded_old = serde_json::to_string(value)?;
         let encoded_new = serde_json::to_string(new_value)?;
@@ -881,6 +959,179 @@ pub async fn rename_field_value(
         "Cannot rename values of '{field}'. Only fields the spool itself owns can be renamed: \
          location, or 'extra.<spool extra field key>'."
     )))
+}
+
+// ---------------------------------------------------------------------------
+// Spool grouping — sort helpers
+// ---------------------------------------------------------------------------
+
+/// Known filament columns that can be used as sort keys via `filament.{col}`.
+const FILAMENT_SORTABLE_COLS: &[(&str, &str)] = &[
+    ("name", "f.name"),
+    ("density", "f.density"),
+    ("diameter", "f.diameter"),
+    ("weight", "f.weight"),
+    ("spool_weight", "f.spool_weight"),
+    ("material", "f.material"),
+    ("article_number", "f.article_number"),
+    ("settings_extruder_temp", "f.settings_extruder_temp"),
+    ("settings_bed_temp", "f.settings_bed_temp"),
+    ("settings_print_speed", "f.settings_print_speed"),
+    ("color_hex", "f.color_hex"),
+    ("lot_nr", "f.lot_nr"),
+];
+
+/// Known vendor columns that can be used as sort keys via `filament.vendor.{col}`.
+const VENDOR_SORTABLE_COLS: &[(&str, &str)] = &[
+    ("name", "v.name"),
+    ("empty_spool_weight", "v.empty_spool_weight"),
+    ("external_id", "v.external_id"),
+    ("comment", "v.comment"),
+];
+
+/// Build the ORDER BY clause (and any extra sort binds) for a group query.
+///
+/// Sort term syntax: `group.vendor_name:asc`, `filament.extra.{key}:desc`, etc.
+/// Unknown keys are silently ignored (spec).  NULLs always sort last.
+///
+/// Returns `(order_by_sql, sort_binds)`.  `order_by_sql` already includes "ORDER BY ".
+async fn build_group_order_by(
+    pool: &AnyPool,
+    engine: &Engine,
+    sort_param: Option<&str>,
+    group_by: &str,
+) -> Result<(String, Vec<String>)> {
+    let raw = parse_sort(sort_param, "");
+    if raw.is_empty() {
+        return Ok((format!("ORDER BY {} ASC", group_key_col(group_by)), vec![]));
+    }
+
+    let mut frags: Vec<String> = Vec::new();
+    let mut binds: Vec<String> = Vec::new();
+
+    for clause in &raw {
+        let key = &clause.column;
+        let ascending = clause.ascending;
+        let dir = if ascending { "ASC" } else { "DESC" };
+
+        // --- group.* sort keys ---
+        if let Some(gkey) = key.strip_prefix("group.") {
+            match gkey {
+                "vendor_name" => {
+                    // Null vendor always last, regardless of direction.
+                    frags.push(format!(
+                        "(v.name IS NULL) ASC, v.name {dir}"
+                    ));
+                }
+                "title" => {
+                    frags.push(format!("({} IS NULL) ASC, {} {dir}", group_title_col(group_by), group_title_col(group_by)));
+                }
+                "last_used" => {
+                    frags.push(format!(
+                        "(last_used IS NULL) ASC, last_used {dir}"
+                    ));
+                }
+                "spool_count" => frags.push(format!("spool_count {dir}")),
+                "in_use_count" => frags.push(format!("in_use_count {dir}")),
+                "total_remaining_weight" => frags.push(format!("total_remaining_weight {dir}")),
+                "filament_count"
+                    // Only valid for vendor grouping (but silently ignored otherwise).
+                    if group_by == "vendor" =>
+                {
+                    frags.push(format!("filament_count {dir}"));
+                }
+                _ => {} // unknown group.* → ignored
+            }
+            continue;
+        }
+
+        // --- filament.vendor.extra.{key} ---
+        if let Some(rest) = key.strip_prefix("filament.vendor.extra.") {
+            let vendor_sorts: &[(String, bool)] = &[(rest.to_owned(), ascending)];
+            let esql = extra_field::build_extra_sql(
+                pool,
+                engine,
+                "vendor",
+                "v",
+                "vendor_field",
+                "vendor_id",
+                &[],
+                vendor_sorts,
+            )
+            .await?;
+            frags.extend(esql.order_frags);
+            binds.extend(esql.order_binds);
+            continue;
+        }
+
+        // --- filament.extra.{key} ---
+        if let Some(rest) = key.strip_prefix("filament.extra.") {
+            let fil_sorts: &[(String, bool)] = &[(rest.to_owned(), ascending)];
+            let esql = extra_field::build_extra_sql(
+                pool,
+                engine,
+                "filament",
+                "f",
+                "filament_field",
+                "filament_id",
+                &[],
+                fil_sorts,
+            )
+            .await?;
+            frags.extend(esql.order_frags);
+            binds.extend(esql.order_binds);
+            continue;
+        }
+
+        // --- filament.vendor.{known_col} ---
+        if let Some(rest) = key.strip_prefix("filament.vendor.") {
+            if let Some(&(_, sql_col)) = VENDOR_SORTABLE_COLS.iter().find(|(n, _)| *n == rest) {
+                frags.push(format!("({sql_col} IS NULL) ASC, {sql_col} {dir}"));
+            }
+            // unknown vendor col → silently ignored
+            continue;
+        }
+
+        // --- filament.{known_col} ---
+        if let Some(rest) = key.strip_prefix("filament.") {
+            if let Some(&(_, sql_col)) = FILAMENT_SORTABLE_COLS.iter().find(|(n, _)| *n == rest) {
+                frags.push(format!("({sql_col} IS NULL) ASC, {sql_col} {dir}"));
+            }
+            // unknown filament col → silently ignored
+            continue;
+        }
+
+        // Any other prefix → silently ignored
+    }
+
+    if frags.is_empty() {
+        return Ok((format!("ORDER BY {} ASC", group_key_col(group_by)), vec![]));
+    }
+
+    Ok((format!("ORDER BY {}", frags.join(", ")), binds))
+}
+
+/// SQL expression for the group key column (used for default ordering).
+/// Uses `f.id` / `v.id` which are valid in both the main and include_empty paths.
+fn group_key_col(group_by: &str) -> &'static str {
+    match group_by {
+        "filament" => "f.id",
+        "vendor" => "v.id",
+        "material" => "NULLIF(f.material, '')",
+        "location" => "NULLIF(s.location, '')",
+        _ => "group_key",
+    }
+}
+
+/// SQL expression for the "title" of the group entity.
+fn group_title_col(group_by: &str) -> &'static str {
+    match group_by {
+        "filament" => "f.name",
+        "vendor" => "v.name",
+        "material" => "NULLIF(f.material, '')",
+        "location" => "NULLIF(s.location, '')",
+        _ => "group_key",
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +1163,10 @@ pub struct SpoolGroupFilter {
     pub extra_filters: Vec<(String, String)>,
     /// Dynamic `filament.extra.<key>=<value>` query params (filament extra fields).
     pub filament_extra_filters: Vec<(String, String)>,
+    /// Raw sort string (e.g. `"group.vendor_name:asc,group.title:asc"`).
+    pub sort: Option<String>,
+    /// When true, hydrate a `spools` or `filaments` preview list on each group.
+    pub preview: bool,
 }
 
 /// One row of the aggregation query.
@@ -988,11 +1243,24 @@ pub async fn find_groups(
         // NULL and empty string are both "no location".
         "NULLIF(s.location, '')".into()
     } else if let Some(key) = group_by.strip_prefix("extra.") {
-        // Validate that the extra field exists for spool.
+        use crate::models::ExtraFieldType;
+        // Validate that the extra field exists for spool and is groupable.
         let known = extra_field::get_definitions(pool, "spool").await?;
-        if !known.iter().any(|f| f.key == key) {
+        let field = known.iter().find(|f| f.key == key).ok_or_else(|| {
+            SpoolmanError::BadRequest(format!("Unknown spool extra field '{key}'."))
+        })?;
+        // Numeric range fields and multi_choice hold non-atomic values and can't be grouped.
+        let is_ungroupable = matches!(
+            field.field_type,
+            ExtraFieldType::Integer
+                | ExtraFieldType::IntegerRange
+                | ExtraFieldType::Float
+                | ExtraFieldType::FloatRange
+        ) || field.multi_choice.unwrap_or(false);
+        if is_ungroupable {
             return Err(SpoolmanError::BadRequest(format!(
-                "Unknown spool extra field '{key}'."
+                "Extra field '{key}' cannot be used as a group_by axis \
+                 (numeric and multi_choice fields hold non-atomic values)."
             )));
         }
         // Extra-field values are JSON-encoded strings.  An empty JSON string ('""') is
@@ -1023,7 +1291,7 @@ pub async fn find_groups(
 
     let base_where = wb.sql();
 
-    // Extra-field filters (e.g. extra.shelf=A).
+    // Extra-field filters for spool (e.g. extra.shelf=A).
     let extra_sql = extra_field::build_extra_sql(
         pool,
         engine,
@@ -1036,8 +1304,31 @@ pub async fn find_groups(
     )
     .await?;
 
-    let where_sql = crate::db::vendor::build_final_where(&base_where, &extra_sql.where_clauses);
+    // Extra-field filters for filament (e.g. filament.extra.grade=Premium).
+    let filament_extra_sql = extra_field::build_extra_sql(
+        pool,
+        engine,
+        "filament",
+        "f",
+        "filament_field",
+        "filament_id",
+        &filter.filament_extra_filters,
+        &[],
+    )
+    .await?;
+
+    let all_extra_clauses: Vec<String> = extra_sql
+        .where_clauses
+        .iter()
+        .chain(filament_extra_sql.where_clauses.iter())
+        .cloned()
+        .collect();
+    let where_sql = crate::db::vendor::build_final_where(&base_where, &all_extra_clauses);
     let pag = Pagination::new(filter.limit, filter.offset);
+
+    // Sort ORDER BY.
+    let (order_by_sql, sort_binds) =
+        build_group_order_by(pool, engine, filter.sort.as_deref(), group_by).await?;
 
     // Build the extra-field join clause if needed (for group_by=extra.<key>).
     let extra_join = if let Some(key) = group_by.strip_prefix("extra.") {
@@ -1078,7 +1369,7 @@ pub async fn find_groups(
          {extra_join} \
          {where_sql} \
          GROUP BY {group_col_sql} \
-         ORDER BY {group_col_sql} ASC \
+         {order_by_sql} \
          LIMIT ? OFFSET ?"
     );
 
@@ -1099,7 +1390,7 @@ pub async fn find_groups(
     for b in &wb.binds {
         count_q = count_q.bind(b.clone());
     }
-    for b in &extra_sql.where_binds {
+    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
         count_q = count_q.bind(b.clone());
     }
     let total_count: i64 = count_q.fetch_one(pool).await?;
@@ -1109,7 +1400,10 @@ pub async fn find_groups(
     for b in &wb.binds {
         q = q.bind(b.clone());
     }
-    for b in &extra_sql.where_binds {
+    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+        q = q.bind(b.clone());
+    }
+    for b in &sort_binds {
         q = q.bind(b.clone());
     }
     q = q.bind(pag.limit).bind(pag.offset);
@@ -1172,7 +1466,7 @@ pub async fn find_groups(
     for b in &wb.binds {
         totals_q = totals_q.bind(b.clone());
     }
-    for b in &extra_sql.where_binds {
+    for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
         totals_q = totals_q.bind(b.clone());
     }
     let totals_row = totals_q.fetch_one(pool).await?;
@@ -1227,7 +1521,86 @@ pub async fn find_groups(
             filament: filament_obj,
             vendor: vendor_obj,
             filament_count: gr.filament_count,
+            spools: None,
+            filaments: None,
         });
+    }
+
+    // --- Preview population ---
+    if filter.preview && group_by == "filament" {
+        // Build a preview WHERE that reuses the same spool-level filters, plus a per-group
+        // filament_id condition.  Bind order: wb.binds → extra_sql.where_binds →
+        // filament_extra_sql.where_binds → fid.
+        let preview_where_prefix = if where_sql.is_empty() {
+            "WHERE s.filament_id = ?".to_owned()
+        } else {
+            format!("{where_sql} AND s.filament_id = ?")
+        };
+        let preview_sql = format!(
+            "SELECT s.id, s.initial_weight, s.used_weight \
+             FROM spool s \
+             JOIN filament f ON f.id = s.filament_id \
+             LEFT JOIN vendor v ON v.id = f.vendor_id \
+             {preview_where_prefix} \
+             ORDER BY s.id ASC LIMIT 5"
+        );
+        for group in &mut results {
+            let fid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
+            group.spools = Some(if let Some(fid) = fid {
+                let mut q = sqlx::query(sqlx::AssertSqlSafe(&*preview_sql));
+                for b in &wb.binds {
+                    q = q.bind(b.clone());
+                }
+                for b in extra_sql.where_binds.iter().chain(filament_extra_sql.where_binds.iter()) {
+                    q = q.bind(b.clone());
+                }
+                q = q.bind(fid);
+                let rows = q.fetch_all(pool).await?;
+                let mut prev = Vec::new();
+                for row in &rows {
+                    use sqlx::Row as _;
+                    let id: i64 = row.try_get("id")?;
+                    let initial_weight: Option<f64> = row.try_get("initial_weight")?;
+                    let used_weight: f64 = row.try_get("used_weight")?;
+                    let remaining_weight =
+                        initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
+                    prev.push(crate::models::SpoolPreview {
+                        id,
+                        remaining_weight,
+                        initial_weight,
+                    });
+                }
+                prev
+            } else {
+                vec![]
+            });
+        }
+    } else if filter.preview && group_by == "vendor" {
+        for group in &mut results {
+            let vid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
+            group.filaments = Some(if let Some(vid) = vid {
+                let rows = sqlx::query(
+                    "SELECT id, color_hex, multi_color_hexes, multi_color_direction \
+                     FROM filament WHERE vendor_id = ? ORDER BY name, id LIMIT 4",
+                )
+                .bind(vid)
+                .fetch_all(pool)
+                .await?;
+                let mut prev = Vec::new();
+                for row in &rows {
+                    use sqlx::Row as _;
+                    prev.push(crate::models::FilamentPreview {
+                        id: row.try_get("id")?,
+                        color_hex: row.try_get("color_hex")?,
+                        multi_color_hexes: row.try_get("multi_color_hexes")?,
+                        multi_color_direction: row.try_get("multi_color_direction")?,
+                    });
+                }
+                prev
+            } else {
+                vec![]
+            });
+        }
     }
 
     Ok((results, total_count, total_spools, total_remaining_weight))
@@ -1290,11 +1663,15 @@ async fn find_groups_include_empty(
         crate::db::vendor::build_final_where(&base_where, &filament_extra_sql.where_clauses);
     let pag = Pagination::new(filter.limit, filter.offset);
 
-    // Remaining weight — uses COALESCE for s.* because they can be NULL (no spool).
-    let remaining_expr = "CASE WHEN COALESCE(s.initial_weight, f.weight, 0.0) \
-         - COALESCE(s.used_weight, 0.0) < 0 \
-         THEN 0.0 \
-         ELSE COALESCE(s.initial_weight, f.weight, 0.0) - COALESCE(s.used_weight, 0.0) END";
+    // Sort ORDER BY.
+    let (order_by_sql, sort_binds) =
+        build_group_order_by(pool, engine, filter.sort.as_deref(), group_by).await?;
+
+    // Remaining weight — zero when there is no spool row (LEFT JOIN returns NULL s.id)
+    // or when the spool has no initial_weight, matching the per-spool into_response logic.
+    let remaining_expr = "CASE WHEN s.id IS NULL OR s.initial_weight IS NULL THEN 0.0 \
+         WHEN s.initial_weight - COALESCE(s.used_weight, 0.0) < 0 THEN 0.0 \
+         ELSE s.initial_weight - COALESCE(s.used_weight, 0.0) END";
 
     let (from_clause, group_col, extra_agg) = if group_by == "filament" {
         (
@@ -1330,7 +1707,7 @@ async fn find_groups_include_empty(
          {from_clause} \
          {where_sql} \
          GROUP BY {group_col} \
-         ORDER BY {group_col} ASC \
+         {order_by_sql} \
          LIMIT ? OFFSET ?"
     );
 
@@ -1359,6 +1736,9 @@ async fn find_groups_include_empty(
         q = q.bind(b.clone());
     }
     for b in &filament_extra_sql.where_binds {
+        q = q.bind(b.clone());
+    }
+    for b in &sort_binds {
         q = q.bind(b.clone());
     }
     q = q.bind(pag.limit).bind(pag.offset);
@@ -1457,7 +1837,78 @@ async fn find_groups_include_empty(
             filament: filament_obj,
             vendor: vendor_obj,
             filament_count: gr.filament_count,
+            spools: None,
+            filaments: None,
         });
+    }
+
+    // --- Preview population (include_empty path) ---
+    if filter.preview && group_by == "filament" {
+        // No spool-level filters are allowed with include_empty, so a simple
+        // per-filament query suffices — just apply the archived guard.
+        let archived_cond = if !filter.allow_archived {
+            " AND (s.archived = 0 OR s.archived IS NULL)"
+        } else {
+            ""
+        };
+        let preview_sql = format!(
+            "SELECT s.id, s.initial_weight, s.used_weight \
+             FROM spool s \
+             WHERE s.filament_id = ?{archived_cond} \
+             ORDER BY s.id ASC LIMIT 5"
+        );
+        for group in &mut results {
+            let fid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
+            group.spools = Some(if let Some(fid) = fid {
+                let rows = sqlx::query(sqlx::AssertSqlSafe(&*preview_sql))
+                    .bind(fid)
+                    .fetch_all(pool)
+                    .await?;
+                let mut prev = Vec::new();
+                for row in &rows {
+                    use sqlx::Row as _;
+                    let id: i64 = row.try_get("id")?;
+                    let initial_weight: Option<f64> = row.try_get("initial_weight")?;
+                    let used_weight: f64 = row.try_get("used_weight")?;
+                    let remaining_weight =
+                        initial_weight.map(|iw| f64::max(0.0, iw - used_weight));
+                    prev.push(crate::models::SpoolPreview {
+                        id,
+                        remaining_weight,
+                        initial_weight,
+                    });
+                }
+                prev
+            } else {
+                vec![]
+            });
+        }
+    } else if filter.preview && group_by == "vendor" {
+        for group in &mut results {
+            let vid = group.key.as_ref().and_then(|k| k.parse::<i64>().ok());
+            group.filaments = Some(if let Some(vid) = vid {
+                let rows = sqlx::query(
+                    "SELECT id, color_hex, multi_color_hexes, multi_color_direction \
+                     FROM filament WHERE vendor_id = ? ORDER BY name, id LIMIT 4",
+                )
+                .bind(vid)
+                .fetch_all(pool)
+                .await?;
+                let mut prev = Vec::new();
+                for row in &rows {
+                    use sqlx::Row as _;
+                    prev.push(crate::models::FilamentPreview {
+                        id: row.try_get("id")?,
+                        color_hex: row.try_get("color_hex")?,
+                        multi_color_hexes: row.try_get("multi_color_hexes")?,
+                        multi_color_direction: row.try_get("multi_color_direction")?,
+                    });
+                }
+                prev
+            } else {
+                vec![]
+            });
+        }
     }
 
     Ok((results, total_count, total_spools, total_remaining_weight))

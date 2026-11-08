@@ -1,15 +1,16 @@
 //! Tag link/unlink + scan relay endpoints — mirrors `spoolman/api/v1/tag.py`.
 
 use axum::{
-    extract::{Path, State, WebSocketUpgrade},
+    extract::{ConnectInfo, Path, State, WebSocketUpgrade},
     http::StatusCode,
     response::Response,
     Json,
 };
+use std::net::SocketAddr;
 
 use crate::{
     api::error::ApiResult,
-    db::tag as db,
+    db::{filament as filament_db, tag as db},
     models::{ScanTagRequest, ScanTagResponse, TagInfo, TagLinkRequest, TagReaderInfo},
     state::AppState,
     ws::ScanBroadcastEvent,
@@ -26,6 +27,10 @@ pub async fn link_tag(
     Json(req): Json<TagLinkRequest>,
 ) -> ApiResult<(StatusCode, Json<TagInfo>)> {
     let tag = db::link_spool(&state.db.pool, spool_id, &req.uid, req.format.as_deref()).await?;
+    // Broadcast spool "updated" so open spool WebSocket subscribers see the new tag.
+    if let Ok(spool) = crate::db::spool::find_by_id(&state.db.pool, spool_id).await {
+        crate::ws::broadcast(&state.event_tx, "updated", "spool", spool_id, &spool);
+    }
     Ok((StatusCode::CREATED, Json(tag)))
 }
 
@@ -35,6 +40,10 @@ pub async fn unlink_tag(
     Path((spool_id, uid)): Path<(i64, String)>,
 ) -> ApiResult<StatusCode> {
     db::unlink_spool(&state.db.pool, spool_id, &uid).await?;
+    // Broadcast spool "updated" so open spool WebSocket subscribers see the empty tag list.
+    if let Ok(spool) = crate::db::spool::find_by_id(&state.db.pool, spool_id).await {
+        crate::ws::broadcast(&state.event_tx, "updated", "spool", spool_id, &spool);
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -47,11 +56,26 @@ pub async fn unlink_tag(
 /// Looks up the UID, registers with the dedup relay, and broadcasts if
 /// the dedup window allows.
 pub async fn scan_post(
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     State(state): State<AppState>,
     Json(req): Json<ScanTagRequest>,
 ) -> ApiResult<Json<ScanTagResponse>> {
     let uid_norm = db::normalize_uid(&req.uid)?;
-    let reader_id = req.reader_id.as_deref().unwrap_or("unknown").to_owned();
+
+    // When no reader_id is supplied, derive one from the client's IP address.
+    let reader_id = match req.reader_id.as_deref() {
+        Some(rid) => {
+            // reader_id is used as a WebSocket path segment — reject chars that would break routing.
+            if rid.contains(' ') || rid.contains('/') {
+                return Err(crate::error::SpoolmanError::ValidationError(
+                    "reader_id must not contain spaces or slashes.".into(),
+                )
+                .into());
+            }
+            rid.to_owned()
+        }
+        None => format!("ip-{}", peer.ip()),
+    };
 
     let matched_spool_id = db::find_spool_id_by_uid(&state.db.pool, &uid_norm).await?;
     let matched_filament_id = db::find_filament_id_by_uid(&state.db.pool, &uid_norm).await?;
@@ -60,6 +84,24 @@ pub async fn scan_post(
         .map(|id| ("spool", id))
         .or_else(|| matched_filament_id.map(|id| ("filament", id)));
 
+    // Fetch the full entity when matched so the broadcast payload is self-contained.
+    let spool_obj = if let Some(sid) = matched_spool_id {
+        crate::db::spool::find_by_id(&state.db.pool, sid)
+            .await
+            .ok()
+            .map(Box::new)
+    } else {
+        None
+    };
+    let filament_obj = if let Some(fid) = matched_filament_id {
+        filament_db::find_by_id(&state.db.pool, fid)
+            .await
+            .ok()
+            .map(Box::new)
+    } else {
+        None
+    };
+
     let response = ScanTagResponse {
         uid: uid_norm.clone(),
         reader_id: reader_id.clone(),
@@ -67,6 +109,8 @@ pub async fn scan_post(
         format: req.format.clone(),
         matched_spool_id,
         matched_filament_id,
+        spool: spool_obj,
+        filament: filament_obj,
         created: false,
     };
 
@@ -74,8 +118,23 @@ pub async fn scan_post(
         .scan_relay
         .register(&reader_id, req.name.as_deref(), &uid_norm, matched)
     {
-        let json = serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_owned());
-        let _ = state.scan_tx.send(ScanBroadcastEvent { reader_id, json });
+        // Wrap in the scan event envelope: {type, resource, date, payload}.
+        // serde_json::to_value respects skip_serializing_if so None fields are omitted.
+        let date = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string();
+        let payload_val = serde_json::to_value(&response).unwrap_or_default();
+        let envelope = serde_json::json!({
+            "type": "scanned",
+            "resource": "tag_scan",
+            "date": date,
+            "payload": payload_val,
+        });
+        let json = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".to_owned());
+        let _ = state.scan_tx.send(ScanBroadcastEvent {
+            reader_id: reader_id.clone(),
+            json,
+        });
     }
 
     Ok(Json(response))

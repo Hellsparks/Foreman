@@ -88,6 +88,8 @@ async fn list_inner(
     }
 
     let extra_filters = crate::api::parse_extra_params(&uri);
+    let filament_extra_filters = crate::api::parse_filament_extra_params(&uri);
+    let vendor_extra_filters = crate::api::parse_vendor_extra_params(&uri);
 
     // Tag UID filter: resolve to spool IDs before the main query.
     let ids = if let Some(ref tag_uid) = q.tag {
@@ -114,6 +116,8 @@ async fn list_inner(
         limit: q.limit,
         offset: q.offset,
         extra_filters,
+        filament_extra_filters,
+        vendor_extra_filters,
     };
     let (items, total) = db::find(&state.db.pool, &state.db.engine, &filter).await?;
     let mut headers = HeaderMap::new();
@@ -246,8 +250,10 @@ pub struct SpoolGroupQuery {
     pub first_used: Option<String>,
     pub last_used: Option<String>,
     pub registered: Option<String>,
+    pub sort: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub preview: Option<bool>,
 }
 
 /// GET {base_path}/api/v1/spool/group
@@ -292,10 +298,12 @@ pub async fn find_groups(
         first_used: q.first_used,
         last_used: q.last_used,
         registered: q.registered,
+        sort: q.sort,
         limit: q.limit,
         offset: q.offset,
         extra_filters,
         filament_extra_filters,
+        preview: q.preview.unwrap_or(false),
     };
 
     let (groups, total_count, total_spools, total_remaining_weight) =
@@ -328,6 +336,12 @@ pub async fn rename_field_value(
     Path(field): Path<String>,
     Json(req): Json<RenameFieldValueRequest>,
 ) -> ApiResult<Json<RenameFieldValueResult>> {
+    if req.value.is_empty() || req.new_value.is_empty() {
+        return Err(SpoolmanError::ValidationError(
+            "value and new_value must not be empty.".into(),
+        )
+        .into());
+    }
     let count = db::rename_field_value(&state.db.pool, &field, &req.value, &req.new_value).await?;
-    Ok(Json(RenameFieldValueResult { count }))
+    Ok(Json(RenameFieldValueResult { spools_updated: count }))
 }
