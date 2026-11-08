@@ -83,14 +83,14 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - Export upstream's OpenAPI JSON from a running upstream instance and commit it as `crates/spoolman-rs/tests/fixtures/openapi-v0.27.1.json`; add a test that diffs our route list against it.
 
 ### 1.1 Database layer
-- [ ] `sqlx` with SQLite, Postgres, MySQL features; one `Db` trait/enum with per-engine SQL where needed.
-- [ ] Schema identical to upstream at alembic head of v0.27.1 (tables: `vendor`, `filament`, `spool`, `setting`, `vendor_field`, `filament_field`, `spool_field`, `tag`, plus `alembic_version`).
-- [ ] Startup check: read `alembic_version`.
+- [x] `sqlx` with SQLite feature (session 4); Postgres, MySQL, tls-rustls, any added in session 5.
+- [x] Schema identical to upstream at alembic head of v0.27.1 (tables: `vendor`, `filament`, `spool`, `setting`, `vendor_field`, `filament_field`, `spool_field`, `tag`, plus `alembic_version`).
+- [x] Startup check: read `alembic_version`.
   - equals our known head → run.
   - older known revision → apply the equivalent migrations (ported per engine) and write the same `alembic_version` values Alembic would, so the DB can still be opened by Python Spoolman.
   - unknown/newer → refuse to start with a clear message.
-- [ ] Fresh DB created by spoolman-rs must be openable by upstream Python Spoolman v0.27.1 (test this).
-- [ ] Respect upstream env vars (`SPOOLMAN_DB_TYPE`, `SPOOLMAN_DB_HOST`, `_PORT`, `_NAME`, `_USERNAME`, `_PASSWORD`/`_PASSWORD_FILE`, `SPOOLMAN_DIR_DATA`, `SPOOLMAN_BASE_PATH`, `SPOOLMAN_HOST`, `SPOOLMAN_PORT`, automatic backup vars — confirm full list in `env.py`). Default SQLite path must match upstream's default location so an existing install is found.
+- [ ] Fresh DB created by spoolman-rs must be openable by upstream Python Spoolman v0.27.1 (test this — deferred to 1.5 integration gate, requires a running Python Spoolman).
+- [x] Respect upstream env vars (`SPOOLMAN_DB_TYPE`, `SPOOLMAN_DB_HOST`, `_PORT`, `_NAME`, `_USERNAME`, `_PASSWORD`/`_PASSWORD_FILE`, `SPOOLMAN_DIR_DATA`, `SPOOLMAN_BASE_PATH`, `SPOOLMAN_HOST`, `SPOOLMAN_PORT`, `SPOOLMAN_AUTOMATIC_BACKUP`, `SPOOLMAN_DIR_LOGS`, `SPOOLMAN_DIR_BACKUPS` — full list confirmed from `env.py`). Default SQLite path matches upstream's default location (`~/.local/share/spoolman/spoolman.db` on Linux).
 
 ### 1.2 REST API (`{base_path}/api/v1`)
 - [ ] vendor, filament, spool CRUD with upstream filtering (comma lists, empty-value semantics, extra-field filters), sorting, pagination (incl. total-count header — check upstream for exact name).
@@ -149,3 +149,13 @@ fish_add_path --prepend ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin
 After that, `cargo` and `rustc` resolve to the working toolchain.
 
 **ts-rs chrono feature not in scaffold brief:** `ts-rs` v10 requires the `chrono-impl` feature to derive `TS` for `DateTime<Utc>`. Added `chrono-impl` to `ts-rs` workspace dependency. Not a contradiction with upstream — just a dependency detail not mentioned in the doc.
+
+### Session 4 — 2026-11-08
+
+**`RUSTUP_TOOLCHAIN=stable` required for `cargo test`:** On this machine rustup attempts to auto-install old toolchain versions (1.57.0) during the build, which causes `--check-cfg` to be rejected. All `cargo` commands must be prefixed with `RUSTUP_TOOLCHAIN=stable` (or the full toolchain path) to prevent this.
+
+**Migration SQL split strategy:** sqlx's `execute()` on SQLite only processes a single statement per call. Multi-statement migration SQL blocks must be split on `;` and executed one statement at a time. Implemented in `migrations.rs::apply_from`.
+
+**`92793c8a937c` color_hex alpha migration is a no-op for SQLite:** Upstream uses an Alembic `batch_alter_table` to widen `color_hex` from 6 to 8 chars. SQLite does not enforce VARCHAR lengths, so the migration records the revision but runs no SQL. The column accepts 8-char values regardless.
+
+**"Fresh DB openable by Python Spoolman" test deferred:** This requires a running Python Spoolman instance. Deferred to section 1.5 (compatibility gate), which already calls for running `tests_integration/` against a live instance.

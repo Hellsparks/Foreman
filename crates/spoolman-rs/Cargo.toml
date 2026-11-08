@@ -11,11 +11,31 @@ path = "src/bin/main.rs"
 
 [dependencies]
 foreman-core = { path = "../foreman-core" }
+
+# Async runtime
 tokio = { workspace = true }
+
+# Web (axum added when API is implemented in 1.2)
+# axum = { workspace = true }
+
+# Database — session 4: SQLite only.
+# Session 5 adds: postgres, mysql, tls-rustls, any
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+
+# Serialisation
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+# Error handling
 thiserror = { workspace = true }
+
+# Logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-axum = { workspace = true }
-tower-http = { workspace = true }
+
+# OS paths (for default data dir matching upstream platformdirs)
+dirs = { workspace = true }
+
+[dev-dependencies]
+# Temporary directories for database tests
+tempfile = "3"
