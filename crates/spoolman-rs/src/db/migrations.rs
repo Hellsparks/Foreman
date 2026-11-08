@@ -11,7 +11,10 @@
 
 use sqlx::AnyPool;
 
-use crate::error::{Result, SpoolmanError};
+use crate::{
+    db::query::tp,
+    error::{Result, SpoolmanError},
+};
 
 use super::Engine;
 
@@ -587,10 +590,12 @@ pub async fn apply_from(
         }
 
         // Record the new revision — same value alembic would write.
-        sqlx::query("UPDATE alembic_version SET version_num = ?")
-            .bind(migration.revision)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(sqlx::AssertSqlSafe(&*tp(
+            "UPDATE alembic_version SET version_num = ?",
+        )))
+        .bind(migration.revision)
+        .execute(&mut *tx)
+        .await?;
 
         tx.commit().await?;
 

@@ -50,8 +50,10 @@ impl IntoResponse for ApiError {
 
         let (status, message) = match &self.0 {
             SpoolmanError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
+            SpoolmanError::DeleteConflict(msg) => (StatusCode::FORBIDDEN, msg.clone()),
             SpoolmanError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
-            SpoolmanError::MeasureError(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            SpoolmanError::ValidationError(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
+            SpoolmanError::MeasureError(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             SpoolmanError::Config(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             SpoolmanError::Database(e) => {
                 tracing::error!("database error: {e}");

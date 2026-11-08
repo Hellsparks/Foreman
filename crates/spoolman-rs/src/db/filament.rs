@@ -6,7 +6,7 @@ use sqlx::AnyPool;
 use crate::{
     db::{
         extra_field,
-        query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
+        query::{dtp, parse_sort, tp, Pagination, WhereBuilder},
         tag,
         vendor::{normalise_dt, utc_now_str},
         Engine,
@@ -139,10 +139,13 @@ pub struct FilamentFilter {
     pub material: Option<String>,
     pub article_number: Option<String>,
     pub external_id: Option<String>,
-    pub color_hex: Option<String>,
+    /// Pre-computed list of IDs from colour-similarity search; `None` means no ID filter.
+    pub ids: Option<Vec<i64>>,
     pub sort: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// Dynamic `extra.<key>=<value>` query params.
+    pub extra_filters: Vec<(String, String)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -157,42 +160,112 @@ pub async fn find(
     let mut wb = WhereBuilder::new();
     wb.add_str_opt("f.name", filter.name.as_deref(), engine);
     wb.add_int_opt("f.vendor_id", filter.vendor_id.as_deref());
-    wb.add_str_opt("v.name", filter.vendor_name.as_deref(), engine);
+    wb.add_str_required_opt("v.name", filter.vendor_name.as_deref(), engine);
     wb.add_str_opt("f.material", filter.material.as_deref(), engine);
     wb.add_str_opt("f.article_number", filter.article_number.as_deref(), engine);
     wb.add_str_opt("f.external_id", filter.external_id.as_deref(), engine);
-    wb.add_str_opt("f.color_hex", filter.color_hex.as_deref(), engine);
 
-    let where_sql = wb.sql();
+    // Colour-similarity pre-filter: restrict to matched IDs.
+    if let Some(ids) = &filter.ids {
+        if ids.is_empty() {
+            // No matches from colour search → return empty result set.
+            return Ok((Vec::new(), 0));
+        }
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        for id in ids {
+            wb.binds.push(id.to_string());
+        }
+        wb.push_raw_clause(format!("f.id IN ({placeholders})"));
+    }
+
+    let base_where = wb.sql();
+
+    // --- Extra-field handling ---
     let raw_sort = parse_sort(filter.sort.as_deref(), "id:asc");
-    let sort_clauses = qualify_sort(
-        &raw_sort,
-        &[
-            ("id", "f.id"),
-            ("registered", "f.registered"),
-            ("name", "f.name"),
-            ("material", "f.material"),
-            ("density", "f.density"),
-            ("diameter", "f.diameter"),
-            ("weight", "f.weight"),
-            ("vendor.name", "v.name"),
-        ],
-    );
-    let order_sql = order_by_sql(&sort_clauses);
+    let mut regular_sort_parts: Vec<String> = Vec::new();
+    let mut extra_sort_items: Vec<(String, bool)> = Vec::new();
+    let qualifications: &[(&str, &str)] = &[
+        ("id", "f.id"),
+        ("registered", "f.registered"),
+        ("name", "f.name"),
+        ("vendor_id", "f.vendor_id"),
+        ("material", "f.material"),
+        ("price", "f.price"),
+        ("density", "f.density"),
+        ("diameter", "f.diameter"),
+        ("weight", "f.weight"),
+        ("spool_weight", "f.spool_weight"),
+        ("article_number", "f.article_number"),
+        ("comment", "f.comment"),
+        ("settings_extruder_temp", "f.settings_extruder_temp"),
+        ("settings_bed_temp", "f.settings_bed_temp"),
+        ("color_hex", "f.color_hex"),
+        ("vendor.id", "v.id"),
+        ("vendor.registered", "v.registered"),
+        ("vendor.name", "v.name"),
+        ("vendor.comment", "v.comment"),
+    ];
+    for clause in &raw_sort {
+        if let Some(key) = clause.column.strip_prefix("extra.") {
+            extra_sort_items.push((key.to_owned(), clause.ascending));
+        } else {
+            let qualified = qualifications
+                .iter()
+                .find(|(bare, _)| *bare == clause.column)
+                .map(|(_, q)| *q)
+                .unwrap_or(&clause.column);
+            let dir = if clause.ascending { "ASC" } else { "DESC" };
+            regular_sort_parts.push(format!("({qualified} IS NULL) ASC, {qualified} {dir}"));
+        }
+    }
+
+    let extra_sql = extra_field::build_extra_sql(
+        pool,
+        engine,
+        "filament",
+        "f",
+        "filament_field",
+        "filament_id",
+        &filter.extra_filters,
+        &extra_sort_items,
+    )
+    .await?;
+
+    let final_where = crate::db::vendor::build_final_where(&base_where, &extra_sql.where_clauses);
+
+    let mut all_order_parts = extra_sql.order_frags.clone();
+    all_order_parts.extend(regular_sort_parts);
+    let order_sql = if all_order_parts.is_empty() {
+        String::new()
+    } else {
+        format!("ORDER BY {}", all_order_parts.join(", "))
+    };
+
     let pag = Pagination::new(filter.limit, filter.offset);
 
-    let count_sql = format!(
-        "SELECT COUNT(*) FROM filament f LEFT JOIN vendor v ON v.id = f.vendor_id {where_sql}"
-    );
-    let mut count_q = sqlx::query_scalar::<_, i64>(&count_sql);
+    let count_sql = tp(&format!(
+        "SELECT COUNT(*) FROM filament f LEFT JOIN vendor v ON v.id = f.vendor_id {final_where}"
+    ));
+    let mut count_q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*count_sql));
     for b in &wb.binds {
+        count_q = count_q.bind(b.clone());
+    }
+    for b in &extra_sql.where_binds {
         count_q = count_q.bind(b.clone());
     }
     let total: i64 = count_q.fetch_one(pool).await?;
 
-    let data_sql = format!("{FILAMENT_SELECT} {where_sql} {order_sql} LIMIT ? OFFSET ?");
-    let mut q = sqlx::query(&data_sql);
+    let data_sql = tp(&format!(
+        "{FILAMENT_SELECT} {final_where} {order_sql} LIMIT ? OFFSET ?"
+    ));
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(&*data_sql));
     for b in &wb.binds {
+        q = q.bind(b.clone());
+    }
+    for b in &extra_sql.where_binds {
+        q = q.bind(b.clone());
+    }
+    for b in &extra_sql.order_binds {
         q = q.bind(b.clone());
     }
     q = q.bind(pag.limit).bind(pag.offset);
@@ -232,13 +305,57 @@ pub async fn find(
     Ok((results, total))
 }
 
+/// Return the IDs of all filaments whose colour is within `similarity_threshold` of
+/// `color_query_hex` (CIE94 delta-E).  Mirrors upstream `filament.find_by_color`.
+pub async fn find_by_color(
+    pool: &AnyPool,
+    color_query_hex: &str,
+    similarity_threshold: f64,
+) -> Result<Vec<i64>> {
+    let query_rgb = crate::math::hex_to_rgb(color_query_hex).ok_or_else(|| {
+        SpoolmanError::BadRequest(format!("Invalid color hex: {color_query_hex}"))
+    })?;
+    let query_lab = crate::math::rgb_to_lab(query_rgb);
+
+    let rows = sqlx::query("SELECT id, color_hex, multi_color_hexes FROM filament")
+        .fetch_all(pool)
+        .await?;
+
+    let mut matched = Vec::new();
+    for row in &rows {
+        use sqlx::Row;
+        let id: i64 = row.try_get("id")?;
+        let color_hex: Option<String> = row.try_get("color_hex")?;
+        let multi_color_hexes: Option<String> = row.try_get("multi_color_hexes")?;
+
+        let raw_colors: Vec<&str> = if let Some(ref hex) = color_hex {
+            vec![hex.as_str()]
+        } else if let Some(ref hexes) = multi_color_hexes {
+            hexes.split(',').collect()
+        } else {
+            continue;
+        };
+
+        for color in raw_colors {
+            if let Some(rgb) = crate::math::hex_to_rgb(color) {
+                let lab = crate::math::rgb_to_lab(rgb);
+                if crate::math::delta_e(query_lab, lab) <= similarity_threshold {
+                    matched.push(id);
+                    break;
+                }
+            }
+        }
+    }
+    Ok(matched)
+}
+
 pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<FilamentResponse> {
-    let sql = format!("{FILAMENT_SELECT} WHERE f.id = ?");
-    let row = sqlx::query(&sql)
+    let sql = tp(&format!("{FILAMENT_SELECT} WHERE f.id = ?"));
+    let row = sqlx::query(sqlx::AssertSqlSafe(&*sql))
         .bind(id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| SpoolmanError::NotFound(format!("filament {id}")))?;
+        .ok_or_else(|| SpoolmanError::NotFound(format!("filament with id {id}")))?;
 
     let parsed = FilamentRow::from_row(&row)?;
     let vendor_id = parsed.vendor_id;
@@ -251,18 +368,78 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<FilamentResponse> {
     Ok(resp)
 }
 
+/// Validate multi-color fields in a filament create/update request.
+///
+/// Rules mirror upstream Spoolman's Pydantic validators:
+/// - `color_hex` and `multi_color_hexes` are mutually exclusive.
+/// - Each hex color must be 6 or 8 valid hex characters (optional leading '#').
+/// - `multi_color_hexes` requires at least 2 colors.
+/// - If `multi_color_hexes` is set, `multi_color_direction` must be set too.
+/// - If `multi_color_direction` is set, `multi_color_hexes` must be set too.
+fn validate_multi_color(
+    color_hex: Option<&str>,
+    multi_color_hexes: Option<&str>,
+    multi_color_direction: Option<&str>,
+) -> Result<()> {
+    if color_hex.is_some() && multi_color_hexes.is_some() {
+        return Err(SpoolmanError::ValidationError(
+            "Cannot specify both color_hex and multi_color_hexes.".into(),
+        ));
+    }
+    if let Some(hexes) = multi_color_hexes {
+        // Validate each hex code.
+        for raw in hexes.split(',') {
+            let hex = raw.trim_start_matches('#').to_uppercase();
+            if hex.is_empty()
+                || !hex.chars().all(|c| c.is_ascii_hexdigit())
+                || hex.len() != 6 && hex.len() != 8
+            {
+                return Err(SpoolmanError::ValidationError(
+                    "Invalid character in color code or color code length.".into(),
+                ));
+            }
+        }
+        // Need at least 2 colors.
+        if hexes.split(',').count() < 2 {
+            return Err(SpoolmanError::ValidationError(
+                "Must specify at least two colors in multi_color_hexes.".into(),
+            ));
+        }
+        // Direction required when hexes present.
+        if multi_color_direction.is_none() {
+            return Err(SpoolmanError::ValidationError(
+                "Multi-color filament must have multi_color_direction set.".into(),
+            ));
+        }
+    } else if multi_color_direction.is_some() {
+        // Direction without hexes.
+        return Err(SpoolmanError::ValidationError(
+            "Single-color filament must not have multi_color_direction set.".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub async fn create(
     pool: &AnyPool,
     engine: &Engine,
     req: &CreateFilamentRequest,
 ) -> Result<FilamentResponse> {
+    validate_multi_color(
+        req.color_hex.as_deref(),
+        req.multi_color_hexes.as_deref(),
+        req.multi_color_direction.as_deref(),
+    )?;
     let now = utc_now_str();
+    let dt = dtp();
 
-    const INSERT_SQL: &str = "INSERT INTO filament \
+    let insert_sql = format!(
+        "INSERT INTO filament \
          (registered, name, vendor_id, material, price, density, diameter, weight, \
           spool_weight, article_number, comment, settings_extruder_temp, \
           settings_bed_temp, color_hex, multi_color_hexes, multi_color_direction, external_id) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+         VALUES ({dt},?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    );
 
     macro_rules! bind_all {
         ($q:expr) => {
@@ -288,13 +465,17 @@ pub async fn create(
 
     let id: i64 = if !matches!(engine, Engine::Mysql) {
         // SQLite (3.35+) and Postgres support RETURNING id.
-        bind_all!(sqlx::query_scalar(&format!("{INSERT_SQL} RETURNING id")))
-            .fetch_one(pool)
-            .await?
+        bind_all!(sqlx::query_scalar(sqlx::AssertSqlSafe(&*tp(&format!(
+            "{insert_sql} RETURNING id"
+        )))))
+        .fetch_one(pool)
+        .await?
     } else {
         // MySQL: use transaction + LAST_INSERT_ID().
         let mut tx = pool.begin().await?;
-        bind_all!(sqlx::query(INSERT_SQL)).execute(&mut *tx).await?;
+        bind_all!(sqlx::query(sqlx::AssertSqlSafe(&*tp(&insert_sql))))
+            .execute(&mut *tx)
+            .await?;
         let id: i64 = sqlx::query_scalar("SELECT LAST_INSERT_ID()")
             .fetch_one(&mut *tx)
             .await?;
@@ -303,6 +484,7 @@ pub async fn create(
     };
 
     if !req.extra.is_empty() {
+        extra_field::validate_keys(pool, "filament", &req.extra, true).await?;
         extra_field::set_values(pool, "filament_field", "filament_id", id, &req.extra).await?;
     }
 
@@ -365,27 +547,33 @@ pub async fn update(
     maybe_str!(req.multi_color_direction, "multi_color_direction");
     maybe_str!(req.external_id, "external_id");
 
-    if sets.is_empty() {
+    if sets.is_empty() && req.extra.is_none() {
         return find_by_id(pool, id).await;
     }
 
-    let sql = format!("UPDATE filament SET {} WHERE id = ?", sets.join(", "));
-    let mut q = sqlx::query(&sql);
-    for b in binds {
-        q = match b {
-            Bind::Str(s) => q.bind(s),
-            Bind::I64(i) => q.bind(i),
-            Bind::F64(f) => q.bind(f),
-        };
-    }
-    q = q.bind(id);
+    if !sets.is_empty() {
+        let sql = tp(&format!(
+            "UPDATE filament SET {} WHERE id = ?",
+            sets.join(", ")
+        ));
+        let mut q = sqlx::query(sqlx::AssertSqlSafe(&*sql));
+        for b in binds {
+            q = match b {
+                Bind::Str(s) => q.bind(s),
+                Bind::I64(i) => q.bind(i),
+                Bind::F64(f) => q.bind(f),
+            };
+        }
+        q = q.bind(id);
 
-    let result = q.execute(pool).await?;
-    if result.rows_affected() == 0 {
-        return Err(SpoolmanError::NotFound(format!("filament {id}")));
+        let result = q.execute(pool).await?;
+        if result.rows_affected() == 0 {
+            return Err(SpoolmanError::NotFound(format!("filament with id {id}")));
+        }
     }
 
     if let Some(extra) = &req.extra {
+        extra_field::validate_keys(pool, "filament", extra, false).await?;
         extra_field::set_values(pool, "filament_field", "filament_id", id, extra).await?;
     }
 
@@ -393,12 +581,31 @@ pub async fn update(
 }
 
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
-    let result = sqlx::query("DELETE FROM filament WHERE id = ?")
-        .bind(id)
-        .execute(pool)
-        .await?;
+    // Remove extra field values first; filament_field.filament_id has no ON DELETE CASCADE.
+    sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM filament_field WHERE filament_id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "DELETE FROM filament WHERE id = ?",
+    )))
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(ref db_err) = e {
+            if db_err.kind() == sqlx::error::ErrorKind::ForeignKeyViolation {
+                return SpoolmanError::DeleteConflict(
+                    "Failed to delete filament, see server logs for more information.".to_owned(),
+                );
+            }
+        }
+        SpoolmanError::Database(e)
+    })?;
     if result.rows_affected() == 0 {
-        return Err(SpoolmanError::NotFound(format!("filament {id}")));
+        return Err(SpoolmanError::NotFound(format!("filament with id {id}")));
     }
     Ok(())
 }

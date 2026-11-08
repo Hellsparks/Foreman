@@ -20,7 +20,7 @@ axum = { workspace = true }
 tower-http = { workspace = true }
 
 # Database — all three engines + type-erased pool.
-sqlx = { version = "0.8", features = [
+sqlx = { version = "0.9", features = [
     "runtime-tokio",
     "sqlite",
     "postgres",
@@ -32,6 +32,10 @@ sqlx = { version = "0.8", features = [
 # Serialisation
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+# Tag decoding (OpenPrintTag CBOR payloads)
+ciborium = "0.2"
+base64 = "0.22"
 
 # Date/time
 chrono = { workspace = true }

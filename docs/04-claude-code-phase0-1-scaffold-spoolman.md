@@ -64,7 +64,7 @@ CLAUDE.md                   (rules above + pointers to docs/)
 - [ ] Builds on Linux (Wayland) and Windows. Note any NVIDIA/Wayland WebKitGTK workarounds needed in README.
 
 ### 0.6 CI
-- [ ] GitHub Actions: fmt, clippy, test (Linux + Windows), frontend build, type-gen check.
+- [x] GitHub Actions: fmt, clippy, test (Linux + Windows), frontend build, type-gen check.
 
 **Phase 0 done =** `cargo run -p foreman-server` serves the empty shell with a live WS indicator; desktop app opens the same shell in both modes; CI green.
 

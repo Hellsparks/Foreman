@@ -15,12 +15,93 @@ pub mod ws;
 
 use axum::{
     extract::{State, WebSocketUpgrade},
+    http::Uri,
     response::IntoResponse,
     routing::{delete, get, patch, post, put},
     Router,
 };
 
 use crate::state::AppState;
+
+/// Extract `extra.*` query parameters from the request URI.
+///
+/// Serde cannot capture dynamic `extra.<key>` params in a struct because the keys
+/// are not known at compile time.  We parse the raw query string directly instead.
+///
+/// Returns a `Vec<(key, value)>` where `key` is the part after `"extra."`.
+pub fn parse_extra_params(uri: &Uri) -> Vec<(String, String)> {
+    parse_prefixed_extra_params(uri, "extra.")
+}
+
+/// Extract `filament.extra.*` query parameters from the request URI.
+///
+/// Returns a `Vec<(key, value)>` where `key` is the part after `"filament.extra."`.
+pub fn parse_filament_extra_params(uri: &Uri) -> Vec<(String, String)> {
+    parse_prefixed_extra_params(uri, "filament.extra.")
+}
+
+/// Extract `filament.vendor.extra.*` query parameters from the request URI.
+///
+/// Returns a `Vec<(key, value)>` where `key` is the part after `"filament.vendor.extra."`.
+pub fn parse_vendor_extra_params(uri: &Uri) -> Vec<(String, String)> {
+    parse_prefixed_extra_params(uri, "filament.vendor.extra.")
+}
+
+fn parse_prefixed_extra_params(uri: &Uri, prefix: &str) -> Vec<(String, String)> {
+    let query = uri.query().unwrap_or("");
+    // URL-decode the query string and split into key=value pairs.
+    let mut result = Vec::new();
+    for pair in query.split('&') {
+        if pair.is_empty() {
+            continue;
+        }
+        let (k, v) = if let Some(pos) = pair.find('=') {
+            (&pair[..pos], &pair[pos + 1..])
+        } else {
+            (pair, "")
+        };
+        // Percent-decode both key and value.
+        let key = percent_decode(k);
+        if let Some(field_key) = key.strip_prefix(prefix) {
+            let value = percent_decode(v);
+            result.push((field_key.to_owned(), value));
+        }
+    }
+    result
+}
+
+/// Minimal percent-decoder: handles `%XX` sequences (including multi-byte UTF-8) and `+` → space.
+fn percent_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut decoded: Vec<u8> = Vec::with_capacity(s.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(h), Some(l)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
+                decoded.push(h * 16 + l);
+                i += 3;
+                continue;
+            }
+        } else if bytes[i] == b'+' {
+            decoded.push(b' ');
+            i += 1;
+            continue;
+        }
+        decoded.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(decoded)
+        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+}
+
+fn hex_val(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
 
 /// Build the API router mounted at `{base_path}/api/v1`.
 pub fn router(base_path: &str) -> Router<AppState> {
@@ -85,8 +166,9 @@ pub fn router(base_path: &str) -> Router<AppState> {
             "/field/{entity_type}/{key}/values",
             get(extra_field::get_values),
         )
-        // Settings
+        // Settings (both with and without trailing slash to match upstream's FastAPI behaviour)
         .route("/setting", get(setting::get_all))
+        .route("/setting/", get(setting::get_all))
         .route(
             "/setting/{key}",
             get(setting::get_one)

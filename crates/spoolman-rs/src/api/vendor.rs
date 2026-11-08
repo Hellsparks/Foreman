@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode, Uri},
     response::{IntoResponse, Response},
     Json,
 };
@@ -37,6 +37,7 @@ pub struct VendorQuery {
 pub async fn list(
     OptWs(ws): OptWs,
     State(state): State<AppState>,
+    uri: Uri,
     Query(q): Query<VendorQuery>,
 ) -> Response {
     if let Some(ws) = ws {
@@ -45,18 +46,21 @@ pub async fn list(
             crate::api::ws::handle_entity_ws(socket, rx, "vendor", None)
         });
     }
-    list_inner(state, q).await.into_response()
+    list_inner(state, uri, q).await.into_response()
 }
 
 async fn list_inner(
     state: AppState,
+    uri: Uri,
     q: VendorQuery,
 ) -> ApiResult<(StatusCode, HeaderMap, Json<Vec<VendorResponse>>)> {
+    let extra_filters = crate::api::parse_extra_params(&uri);
     let filter = db::VendorFilter {
         name: q.name,
         sort: q.sort,
         limit: q.limit,
         offset: q.offset,
+        extra_filters,
     };
     let (vendors, total) = db::find(&state.db.pool, &state.db.engine, &filter).await?;
     let mut headers = HeaderMap::new();

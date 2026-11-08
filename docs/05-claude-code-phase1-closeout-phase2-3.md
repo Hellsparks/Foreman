@@ -16,7 +16,7 @@ Same working rules as doc 04 (fish + Windows-safe commands, fmt/clippy/test befo
 | Bambu Lab A1 | Bambu (LAN Only + Developer Mode) | 10.0.0.249 | 24:EC:4A:0C:07:90 | 2.3b Bambu LAN driver, FTPS, camera |
 
 - Both IPs come from DHCP. Ask the owner to reserve them in the router, or the tests break. Put addresses in a gitignored `test-printers.local.toml`, never hard-coded.
-- **HellV0 SSH (temporary, owner will change it):** user `biqu`, password `biqu`. Copy these into `test-printers.local.toml`. Don't put them in code, tests or commits. Once 2.5 works, install the Foreman ed25519 key on HellV0 and switch to key auth.
+- **HellV0 SSH:** see `test-printers.local.toml` for credentials. Don't put them in code, tests or commits. Once 2.5 works, install the Foreman ed25519 key on HellV0 and switch to key auth.
 - Other secrets (A1 access code + serial, Moonraker API key if set) go only in that local file or env vars. Never commit them or write them to logs.
 - A1 notes: it has no RTSPS camera (that's X1). Expect the P1/A1-style JPEG stream; verify the port and framing on this printer. AMS lite may be fitted; check what `report` shows.
 - Never start a real print, move axes or heat anything without asking the owner first. Read-only checks (status, file list) are fine.
@@ -37,7 +37,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] Weekly scheduled job: compare latest `Donkie/Spoolman` tag and the file list of `migrations/versions/` against v0.27.1; open an issue (or fail a non-blocking job) when they differ.
 
 ### C.2 Compatibility gate (was 1.5)
-- [ ] `cargo compat` alias: starts DB containers (Docker **for tests only**), starts spoolman-rs, runs upstream `tests_integration/` with `SPOOLMAN_HOST`/`SPOOLMAN_PORT`. Green on SQLite, Postgres, MariaDB; Cockroach reported.
+- [~] `cargo compat` alias: starts DB containers (Docker **for tests only**), starts spoolman-rs, runs upstream `tests_integration/` with `SPOOLMAN_HOST`/`SPOOLMAN_PORT`. SQLite: 609 pass / 29 fail / 2 err (pre-existing: backup dedup, CORS, vendor fixture ordering). Postgres/MariaDB deferred — needs typed-bind redesign (`?`→`$N` via `tp()` done, but TIMESTAMP/BOOLEAN casts need per-engine bind types); WIP in stash `pg-wip`. Cockroach not yet attempted.
 - [x] Migration test fixture: **owner has put an older real Spoolman DB in the local Foreman folder** — find it (ask if unclear), read its `alembic_version`, copy it to a gitignored `fixtures/` path (never commit it: personal data), start spoolman-rs on the copy, migrate, check row counts + sample spools unchanged, then open the migrated copy in upstream Python v0.27.1.
 - [ ] Moonraker smoke test (containerised Moonraker, or HellV0 at 10.0.0.177 with its `[spoolman]` pointed at spoolman-rs temporarily; restore the original after): `spoolman_connected: true`, set/clear active spool, usage report lowers `used_weight`.
 - [ ] Load test: 50 WebSocket clients + REST churn; record memory and p95 latency vs upstream in `docs/bench.md`.

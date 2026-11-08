@@ -4,6 +4,7 @@ members = [
     "crates/spoolman-rs",
     "crates/foreman-server",
     "crates/foreman-desktop",
+    "xtask",
 ]
 resolver = "2"
 

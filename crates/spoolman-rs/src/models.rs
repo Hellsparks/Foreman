@@ -9,6 +9,40 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+/// Deserializer that rejects explicit JSON `null` for a field that is
+/// otherwise optional (may be absent, but must not be `null` when present).
+///
+/// Used with `#[serde(default, deserialize_with = "deny_null")]` so that:
+/// - absent field → `None` (via `default`)
+/// - `null` in JSON → 422 deserialization error
+/// - any value     → `Some(value)`
+pub fn deny_null<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    struct Visitor<T>(std::marker::PhantomData<T>);
+    impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for Visitor<T> {
+        type Value = Option<T>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "a non-null value")
+        }
+        fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Err(E::custom("Value must not be None."))
+        }
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+            Err(E::custom("Value must not be None."))
+        }
+        fn visit_some<D2: serde::Deserializer<'de>>(
+            self,
+            de: D2,
+        ) -> Result<Self::Value, D2::Error> {
+            Ok(Some(T::deserialize(de)?))
+        }
+    }
+    de.deserialize_option(Visitor::<T>(std::marker::PhantomData))
+}
+
 // ---------------------------------------------------------------------------
 // Vendor
 // ---------------------------------------------------------------------------
@@ -139,9 +173,9 @@ pub struct UpdateFilamentRequest {
     pub material: Option<String>,
     #[serde(default)]
     pub price: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deny_null")]
     pub density: Option<f64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deny_null")]
     pub diameter: Option<f64>,
     #[serde(default)]
     pub weight: Option<f64>,
@@ -175,28 +209,18 @@ pub struct UpdateFilamentRequest {
 pub struct SpoolResponse {
     pub id: i64,
     pub registered: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_used: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub last_used: Option<String>,
     pub filament: FilamentResponse,
     pub used_weight: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_weight: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining_length: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub used_length: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub lot_nr: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
     pub archived: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub price: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_weight: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spool_weight: Option<f64>,
@@ -307,6 +331,10 @@ pub struct ScanTagRequest {
     pub name: Option<String>,
     #[serde(default)]
     pub format: Option<String>,
+    #[serde(default)]
+    pub payload_b64: Option<String>,
+    #[serde(default)]
+    pub create: bool,
 }
 
 /// Response from POST /tag/scan.
@@ -318,11 +346,55 @@ pub struct ScanTagResponse {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
-    /// null when unmatched — always serialised (not skipped on null).
+    /// null when unmatched — always serialised (not skipped) so the client knows the scan
+    /// was processed but found no match.
     pub matched_spool_id: Option<i64>,
-    /// null when unmatched — always serialised.
     pub matched_filament_id: Option<i64>,
+    /// Full spool object — present in broadcasts when the UID resolves to a spool.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spool: Option<Box<SpoolResponse>>,
+    /// Full filament object — present in broadcasts when the UID resolves to a filament.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filament: Option<Box<FilamentResponse>>,
+    /// Decoded tag payload — present when `format` + `payload_b64` are given and parseable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decoded: Option<TagDecodedInfo>,
     pub created: bool,
+}
+
+/// Decoded tag payload fields — mirrors upstream `TagDecodedInfo`.
+#[derive(Debug, Serialize)]
+pub struct TagDecodedInfo {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material_class: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub article_number: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_hex: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub density: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spool_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extruder_temp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bed_temp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance_uuid: Option<String>,
 }
 
 /// One entry in GET /tag/reader.
@@ -389,6 +461,28 @@ pub struct SearchResultFilamentSpool {
 // Spool group
 // ---------------------------------------------------------------------------
 
+/// Minimal spool info included in a filament group when `preview=true`.
+#[derive(Debug, Serialize)]
+pub struct SpoolPreview {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_weight: Option<f64>,
+}
+
+/// Minimal filament info included in a vendor group when `preview=true`.
+#[derive(Debug, Serialize)]
+pub struct FilamentPreview {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_hex: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_color_hexes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_color_direction: Option<String>,
+}
+
 /// One aggregated spool group returned by `GET /spool/group`.
 #[derive(Debug, Serialize)]
 pub struct SpoolGroupResponse {
@@ -410,6 +504,12 @@ pub struct SpoolGroupResponse {
     /// Count of distinct filaments — only present when `group_by = "vendor"`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filament_count: Option<i64>,
+    /// Up to 5 spool previews — only present for filament groups when `preview=true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spools: Option<Vec<SpoolPreview>>,
+    /// Up to 4 filament previews — only present for vendor groups when `preview=true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filaments: Option<Vec<FilamentPreview>>,
 }
 
 /// Body for `PATCH /spool/field/{field}`.
@@ -422,7 +522,7 @@ pub struct RenameFieldValueRequest {
 /// Response for `PATCH /spool/field/{field}`.
 #[derive(Debug, Serialize)]
 pub struct RenameFieldValueResult {
-    pub count: i64,
+    pub spools_updated: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +598,8 @@ pub struct ExtraFieldParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingResponse {
-    pub value: Value,
+    /// Raw JSON-encoded value string (not a parsed JSON value).
+    pub value: String,
     pub is_set: bool,
     #[serde(rename = "type")]
     pub type_: String,

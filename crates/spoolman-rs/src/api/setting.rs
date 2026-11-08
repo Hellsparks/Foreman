@@ -16,6 +16,41 @@ use crate::{
     state::AppState,
 };
 
+/// Validate the content of an `extra_fields_<entity>` setting value.
+/// `raw` is the already-type-validated string containing a JSON array.
+/// Returns `Err(BadRequest)` if the content is malformed.
+fn validate_extra_fields_setting(entity_type: &str, raw: &str) -> crate::api::error::ApiResult<()> {
+    let fields: Vec<crate::models::ExtraField> = serde_json::from_str(raw).map_err(|e| {
+        crate::error::SpoolmanError::BadRequest(format!("Invalid extra field definition: {e}"))
+    })?;
+    for (i, field) in fields.iter().enumerate() {
+        if field.entity_type != entity_type {
+            return Err(crate::error::SpoolmanError::BadRequest(format!(
+                "Extra field at index {i} has entity type {:?}, expected {:?}.",
+                field.entity_type, entity_type
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+// Helper: build SettingResponse from an optional raw stored value and the setting definition.
+fn make_response(def: &db::SettingDef, raw: Option<String>) -> SettingResponse {
+    match raw {
+        Some(v) => SettingResponse {
+            value: v,
+            is_set: true,
+            type_: def.type_name.to_owned(),
+        },
+        None => SettingResponse {
+            value: def.default.to_owned(),
+            is_set: false,
+            type_: def.type_name.to_owned(),
+        },
+    }
+}
+
 /// GET {base_path}/api/v1/setting/{key}
 pub async fn get_one(
     State(state): State<AppState>,
@@ -23,23 +58,8 @@ pub async fn get_one(
 ) -> ApiResult<Json<SettingResponse>> {
     let def = db::find_def(&key)
         .ok_or_else(|| SpoolmanError::NotFound(format!("setting '{key}' does not exist")))?;
-
-    let (value, is_set) = match db::get(&state.db.pool, &key).await? {
-        Some(raw) => {
-            let v: Value = serde_json::from_str(&raw)?;
-            (v, true)
-        }
-        None => {
-            let v: Value = serde_json::from_str(def.default)?;
-            (v, false)
-        }
-    };
-
-    Ok(Json(SettingResponse {
-        value,
-        is_set,
-        type_: def.type_name.to_owned(),
-    }))
+    let raw = db::get(&state.db.pool, &key).await?;
+    Ok(Json(make_response(def, raw)))
 }
 
 /// GET {base_path}/api/v1/setting/
@@ -51,21 +71,11 @@ pub async fn get_all(
 
     let mut result = serde_json::Map::new();
     for def in db::SETTINGS {
-        let (value, is_set) = if let Some(raw) = set_map.get(def.key) {
-            let v: Value = serde_json::from_str(raw).unwrap_or(Value::Null);
-            (v, true)
-        } else {
-            let v: Value = serde_json::from_str(def.default).unwrap_or(Value::Null);
-            (v, false)
-        };
+        let raw = set_map.get(def.key).cloned();
+        let resp = make_response(def, raw);
         result.insert(
             def.key.to_owned(),
-            serde_json::to_value(SettingResponse {
-                value,
-                is_set,
-                type_: def.type_name.to_owned(),
-            })
-            .unwrap_or(Value::Null),
+            serde_json::to_value(resp).unwrap_or(Value::Null),
         );
     }
 
@@ -85,13 +95,28 @@ pub async fn set_one(
     let reset = match &body {
         None => true,
         Some(Json(Value::Null)) => true,
+        // An empty string body resets the setting (mirrors upstream Python `if body`).
+        Some(Json(Value::String(s))) if s.is_empty() => true,
         Some(Json(_)) => false,
     };
 
     if reset {
         db::delete(&state.db.pool, &key).await?;
     } else {
-        let raw = body.unwrap().0.to_string();
+        // For string values: store the raw string chars (not the JSON encoding).
+        // For other types: use the JSON representation.
+        let raw = match body.unwrap().0 {
+            Value::String(s) => s,
+            other => other.to_string(),
+        };
+        // Validate type before storing: parse `raw` as JSON and check against def.type_name.
+        if let Some(msg) = db::validate_type(def, &raw) {
+            return Err(crate::error::SpoolmanError::ValidationError(msg).into());
+        }
+        // For extra_fields_* settings, validate that each element is a well-formed ExtraField.
+        if let Some(entity_type) = key.strip_prefix("extra_fields_") {
+            validate_extra_fields_setting(entity_type, &raw)?;
+        }
         if matches!(state.db.engine, crate::db::Engine::Mysql) {
             db::set_mysql(&state.db.pool, &key, &raw).await?;
         } else {
@@ -100,22 +125,8 @@ pub async fn set_one(
     }
 
     // Return the new value (or the default if reset).
-    let (value, is_set) = match db::get(&state.db.pool, &key).await? {
-        Some(raw) => {
-            let v: Value = serde_json::from_str(&raw)?;
-            (v, true)
-        }
-        None => {
-            let v: Value = serde_json::from_str(def.default)?;
-            (v, false)
-        }
-    };
-
-    Ok(Json(SettingResponse {
-        value,
-        is_set,
-        type_: def.type_name.to_owned(),
-    }))
+    let raw = db::get(&state.db.pool, &key).await?;
+    Ok(Json(make_response(def, raw)))
 }
 
 /// DELETE {base_path}/api/v1/setting/{key}  (reset to default)
