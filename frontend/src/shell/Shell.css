@@ -233,6 +233,20 @@ body {
   flex-shrink: 0;
   background: var(--fw-surface);
   border-bottom: 1px solid var(--fw-border);
+  /* Prevent text/element selection and HTML drag-and-drop from hijacking
+     the Wayland window-drag initiated via startDragging(). */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Suppress HTML drag on all media/interactive children so the browser
+   never starts a drag-and-drop gesture over the Tauri drag zone. */
+.topbar img,
+.topbar svg,
+.topbar a {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 /* Fake search field — will become command palette trigger */

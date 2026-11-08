@@ -86,7 +86,7 @@ export default function TopBar({
   const win = IS_TAURI ? getCurrentWindow() : null;
 
   return (
-    <header className="topbar" role="banner">
+    <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
       {/* Command palette trigger */}
       <button
         type="button"
@@ -122,7 +122,11 @@ export default function TopBar({
         style={{ flex: 1, cursor: IS_TAURI ? "grab" : undefined }}
         onMouseDown={
           win
-            ? (e) => { if (e.button === 0) win.startDragging(); }
+            ? (e) => {
+                if (e.button !== 0 || e.detail === 2) return;
+                e.preventDefault();
+                win.startDragging();
+              }
             : undefined
         }
         onDoubleClick={win ? () => win.toggleMaximize() : undefined}
