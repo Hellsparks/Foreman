@@ -83,9 +83,7 @@ export default function TopBar({
   onModeChange,
   attentionCount,
 }: TopBarProps) {
-  const handleDragAreaDblClick = IS_TAURI
-    ? () => getCurrentWindow().toggleMaximize()
-    : undefined;
+  const win = IS_TAURI ? getCurrentWindow() : null;
 
   return (
     <header className="topbar" role="banner">
@@ -115,11 +113,19 @@ export default function TopBar({
         <kbd className="topbar__kbd">Ctrl K</kbd>
       </button>
 
-      {/* Spacer — drag region when inside Tauri */}
+      {/* Spacer — drag region when inside Tauri.
+          data-tauri-drag-region works on Windows/X11; on Wayland we need
+          startDragging() called directly from the mousedown event so the
+          compositor receives the correct input serial. */}
       <div
-        style={{ flex: 1 }}
-        {...(IS_TAURI ? { "data-tauri-drag-region": true } : {})}
-        onDoubleClick={handleDragAreaDblClick}
+        data-tauri-drag-region
+        style={{ flex: 1, cursor: IS_TAURI ? "grab" : undefined }}
+        onMouseDown={
+          win
+            ? (e) => { if (e.button === 0) win.startDragging(); }
+            : undefined
+        }
+        onDoubleClick={win ? () => win.toggleMaximize() : undefined}
       />
 
       {/* Scan button */}
