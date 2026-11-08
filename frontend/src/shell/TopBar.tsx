@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ConnectionState } from "../hooks/useEventStream";
 import { THEMES, type Mode, type Theme } from "../hooks/useAppearance";
 
@@ -17,6 +18,54 @@ const CONN_LABEL: Record<ConnectionState, string> = {
   disconnected: "Offline",
 };
 
+/** True only when running inside the Tauri shell. */
+const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+function WindowControls() {
+  const win = getCurrentWindow();
+
+  return (
+    <div className="topbar__wc" role="group" aria-label="Window controls">
+      {/* Minimize */}
+      <button
+        type="button"
+        className="topbar__wc-btn"
+        aria-label="Minimize"
+        onClick={() => win.minimize()}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <line x1="1" y1="5" x2="9" y2="5" />
+        </svg>
+      </button>
+
+      {/* Maximize / restore */}
+      <button
+        type="button"
+        className="topbar__wc-btn"
+        aria-label="Maximize or restore"
+        onClick={() => win.toggleMaximize()}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <rect x="1" y="1" width="8" height="8" />
+        </svg>
+      </button>
+
+      {/* Close */}
+      <button
+        type="button"
+        className="topbar__wc-btn topbar__wc-btn--close"
+        aria-label="Close"
+        onClick={() => win.close()}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <line x1="1" y1="1" x2="9" y2="9" />
+          <line x1="9" y1="1" x2="1" y2="9" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 interface TopBarProps {
   connectionState: ConnectionState;
   theme: Theme;
@@ -34,6 +83,10 @@ export default function TopBar({
   onModeChange,
   attentionCount,
 }: TopBarProps) {
+  const handleDragAreaDblClick = IS_TAURI
+    ? () => getCurrentWindow().toggleMaximize()
+    : undefined;
+
   return (
     <header className="topbar" role="banner">
       {/* Command palette trigger */}
@@ -62,8 +115,12 @@ export default function TopBar({
         <kbd className="topbar__kbd">Ctrl K</kbd>
       </button>
 
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
+      {/* Spacer — drag region when inside Tauri */}
+      <div
+        style={{ flex: 1 }}
+        {...(IS_TAURI ? { "data-tauri-drag-region": true } : {})}
+        onDoubleClick={handleDragAreaDblClick}
+      />
 
       {/* Scan button */}
       <button type="button" className="topbar__btn" aria-label="Scan QR or NFC tag">
@@ -202,6 +259,9 @@ export default function TopBar({
         <span className="topbar__conn-dot" />
         <span className="topbar__conn-label">{CONN_LABEL[connectionState]}</span>
       </div>
+
+      {/* Window controls — Tauri only */}
+      {IS_TAURI && <WindowControls />}
     </header>
   );
 }

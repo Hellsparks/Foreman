@@ -503,6 +503,48 @@ body {
   border-top: 1px solid var(--fw-border);
 }
 
+/* ── Window controls (Tauri undecorated) ─────────────────────────────────── */
+.topbar__wc {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--fw-space-2);
+  flex-shrink: 0;
+}
+
+.topbar__wc-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--fw-radius-control);
+  color: var(--fw-muted);
+  cursor: pointer;
+  transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
+}
+
+.topbar__wc-btn:hover {
+  background: var(--fw-background);
+  color: var(--fw-text);
+}
+
+.topbar__wc-btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+.topbar__wc-btn--close:hover {
+  background: var(--fw-danger);
+  color: var(--fw-on-accent);
+}
+
+/* ── Edge resize handles (Tauri / KDE Wayland fallback) ──────────────────── */
+/* TODO: startResizeDragging via Tauri API if undecorated resize breaks on KDE Wayland */
+
 /* ── Phone layout (≤ 430 px) ─────────────────────────────────────────────── */
 @media (max-width: 430px) {
   .rail {

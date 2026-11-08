@@ -11,9 +11,11 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Foreman",
         "width": 1280,
-        "height": 800
+        "height": 800,
+        "decorations": false
       }
     ],
     "security": {
