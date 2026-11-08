@@ -2,8 +2,10 @@ pub mod extra_field;
 pub mod filament;
 pub mod migrations;
 pub mod query;
+pub mod search;
 pub mod setting;
 pub mod spool;
+pub mod tag;
 pub mod vendor;
 
 use sqlx::AnyPool;

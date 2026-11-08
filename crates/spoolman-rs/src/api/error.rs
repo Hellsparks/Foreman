@@ -25,6 +25,23 @@ impl From<serde_json::Error> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if let SpoolmanError::TagConflict {
+            message,
+            spool_id,
+            filament_id,
+        } = &self.0
+        {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "message": message,
+                    "spool_id": spool_id,
+                    "filament_id": filament_id,
+                })),
+            )
+                .into_response();
+        }
+
         let (status, message) = match &self.0 {
             SpoolmanError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
             SpoolmanError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
@@ -49,6 +66,7 @@ impl IntoResponse for ApiError {
                 tracing::error!("JSON error: {e}");
                 (StatusCode::INTERNAL_SERVER_ERROR, "JSON error".to_owned())
             }
+            SpoolmanError::TagConflict { .. } => unreachable!("handled above"),
         };
         (status, Json(json!({ "message": message }))).into_response()
     }

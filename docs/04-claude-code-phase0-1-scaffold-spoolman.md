@@ -97,12 +97,13 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - [x] spool `use` (by weight and by length → weight via density/diameter) and `measure`; first/last used timestamps.
 - [x] extra fields (`/field/{entity}/{key}`): definitions in `setting`, values JSON-encoded in `*_field` tables. Basic validation (choice field requires choices/multi_choice; type/multi_choice cannot change).
 - [x] settings (`/setting`, `/setting/{key}`), info (`/info`), health (`/health`), find endpoints (`/material`, `/location`, `/lot-number`, `/article-number`), location rename (`PATCH /location/{location}`).
-- [ ] archived spool filter + backup endpoint, export, search, externaldb (SpoolmanDB cache/proxy), tags (NFC/OpenPrintTag) and scan relay.
+- [x] search (`GET /search`), externaldb stubs (`/external/filament`, `/external/filament/search`, `/external/material`), tags (NFC link/unlink: `POST /spool/{id}/tag`, `DELETE /spool/{id}/tag/{uid}`) and scan relay (`POST /tag/scan`, `GET /tag/reader`).
+- [ ] archived spool filter + backup endpoint, export.
 - [ ] Error responses match upstream status codes and body shape.
 
 ### 1.3 WebSockets
-- [ ] Same paths and subscription tree as `ws.py` (all-events root, per-collection, per-item), same event JSON (type, resource, date, payload), same triggers (added/updated/deleted, including spool updates caused by filament changes).
-- [ ] Scan relay websockets with upstream debounce (3 s) and reader registry semantics.
+- [x] Same paths and subscription tree as `ws.py` (all-events root `/api/v1/`, per-collection `/vendor`|`/filament`|`/spool`, per-item `/{id}`), same event JSON (`{type, resource, date, payload}`), same triggers (added/updated/deleted on CRUD; updated on spool use/measure).
+- [x] Scan relay websockets with upstream debounce (3 s) and reader registry semantics (`GET /tag/scan`, `GET /tag/scan/{reader_id}`).
 
 ### 1.4 Packaging
 - [ ] Standalone binary `spoolman-rs` (for people who only want the Spoolman replacement).
@@ -172,6 +173,14 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **`archived` filter in spool find uses `s.archived = ?` with bind `"0"` string:** Because `WhereBuilder` stores all binds as `String`, the boolean filter passes `"0"` or `"1"` as strings. SQLite accepts this for integer comparisons (implicit cast), and Postgres/MySQL also coerce. No issue found, documented here for clarity.
 
 **extra field `weight_from_length` formula:** Upstream uses `volume_mm3 = length * π * (d/2)²`; existing `length_from_weight` used `radius_cm = d/20`. Both are mathematically equivalent but expressed differently — verified they invert each other correctly.
+
+### Session 8 — 2026-11-08
+
+**`Option<WebSocketUpgrade>` does not satisfy Axum 0.8 `Handler` trait bounds:** Using `Option<WebSocketUpgrade>` as a handler argument fails because Axum 0.8's macro-generated `Handler` impls do not cover this combination. Fix: a custom `OptWs(pub Option<WebSocketUpgrade>)` extractor that explicitly implements `FromRequestParts<S>` by calling `WebSocketUpgrade::from_request_parts` and wrapping errors in `Ok(None)`. This avoids the blanket `Option<T>` impl issue entirely.
+
+**`db::search` takes `&Engine` but only uses it in `attach_filament_spools` (not yet):** The `_engine` parameter is prefixed as unused. Engine-specific SQL for the search path is deferred to session 10 (SQL LIKE filter optimisation).
+
+**External DB (SpoolmanDB) download/cache deferred:** `api/external.rs` returns empty arrays. The external DB download, cache, and proxy logic is deferred to session 10 per the original plan.
 
 ### Session 6 — 2026-11-08
 

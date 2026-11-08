@@ -31,6 +31,14 @@ pub enum SpoolmanError {
     /// JSON serialization/deserialization error.
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// 409 conflict — tag UID already linked to a different entity.
+    #[error("{message}")]
+    TagConflict {
+        message: String,
+        spool_id: Option<i64>,
+        filament_id: Option<i64>,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, SpoolmanError>;

@@ -39,6 +39,9 @@ chrono = { workspace = true }
 # Error handling
 thiserror = { workspace = true }
 
+# Async futures utilities (needed for WebSocket split)
+futures-util = "0.3"
+
 # Logging
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

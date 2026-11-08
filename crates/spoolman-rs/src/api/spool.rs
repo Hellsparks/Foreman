@@ -1,10 +1,13 @@
-//! Spool REST endpoints — mirrors `spoolman/api/v1/spool.py`.
+//! Spool REST + WebSocket endpoints — mirrors `spoolman/api/v1/spool.py`.
 
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     Json,
 };
+
+use crate::api::ws::OptWs;
 use serde::Deserialize;
 
 use crate::{
@@ -48,10 +51,23 @@ pub struct SpoolQuery {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// GET {base_path}/api/v1/spool
+/// GET {base_path}/api/v1/spool  (also accepts WS upgrade → all spool events)
 pub async fn list(
+    OptWs(ws): OptWs,
     State(state): State<AppState>,
     Query(q): Query<SpoolQuery>,
+) -> Response {
+    if let Some(ws) = ws {
+        let rx = state.event_tx.subscribe();
+        return ws
+            .on_upgrade(move |socket| crate::api::ws::handle_entity_ws(socket, rx, "spool", None));
+    }
+    list_inner(state, q).await.into_response()
+}
+
+async fn list_inner(
+    state: AppState,
+    q: SpoolQuery,
 ) -> ApiResult<(StatusCode, HeaderMap, Json<Vec<SpoolResponse>>)> {
     let filter = db::SpoolFilter {
         filament_name: q.filament_name,
@@ -78,11 +94,22 @@ pub async fn list(
     Ok((StatusCode::OK, headers, Json(items)))
 }
 
-/// GET {base_path}/api/v1/spool/{id}
+/// GET {base_path}/api/v1/spool/{id}  (also accepts WS upgrade → events for this spool)
 pub async fn get_one(
+    OptWs(ws): OptWs,
     State(state): State<AppState>,
     Path(id): Path<i64>,
-) -> ApiResult<Json<SpoolResponse>> {
+) -> Response {
+    if let Some(ws) = ws {
+        let rx = state.event_tx.subscribe();
+        return ws.on_upgrade(move |socket| {
+            crate::api::ws::handle_entity_ws(socket, rx, "spool", Some(id))
+        });
+    }
+    get_one_inner(state, id).await.into_response()
+}
+
+async fn get_one_inner(state: AppState, id: i64) -> ApiResult<Json<SpoolResponse>> {
     let spool = db::find_by_id(&state.db.pool, id).await?;
     Ok(Json(spool))
 }
@@ -93,6 +120,7 @@ pub async fn create(
     Json(req): Json<CreateSpoolRequest>,
 ) -> ApiResult<(StatusCode, Json<SpoolResponse>)> {
     let spool = db::create(&state.db.pool, &state.db.engine, &req).await?;
+    crate::ws::broadcast(&state.event_tx, "added", "spool", spool.id, &spool);
     Ok((StatusCode::CREATED, Json(spool)))
 }
 
@@ -103,12 +131,15 @@ pub async fn update(
     Json(req): Json<UpdateSpoolRequest>,
 ) -> ApiResult<Json<SpoolResponse>> {
     let spool = db::update(&state.db.pool, id, &req).await?;
+    crate::ws::broadcast(&state.event_tx, "updated", "spool", spool.id, &spool);
     Ok(Json(spool))
 }
 
 /// DELETE {base_path}/api/v1/spool/{id}
 pub async fn delete(State(state): State<AppState>, Path(id): Path<i64>) -> ApiResult<StatusCode> {
+    let spool = db::find_by_id(&state.db.pool, id).await?;
     db::delete(&state.db.pool, id).await?;
+    crate::ws::broadcast(&state.event_tx, "deleted", "spool", spool.id, &spool);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -124,16 +155,18 @@ pub async fn use_spool(
         )
         .into());
     }
-    if let Some(w) = req.use_weight {
-        return Ok(Json(db::use_weight(&state.db.pool, id, w).await?));
-    }
-    if let Some(l) = req.use_length {
-        return Ok(Json(db::use_length(&state.db.pool, id, l).await?));
-    }
-    Err(
-        SpoolmanError::BadRequest("Either use_weight or use_length must be specified.".into())
-            .into(),
-    )
+    let spool = if let Some(w) = req.use_weight {
+        db::use_weight(&state.db.pool, id, w).await?
+    } else if let Some(l) = req.use_length {
+        db::use_length(&state.db.pool, id, l).await?
+    } else {
+        return Err(SpoolmanError::BadRequest(
+            "Either use_weight or use_length must be specified.".into(),
+        )
+        .into());
+    };
+    crate::ws::broadcast(&state.event_tx, "updated", "spool", spool.id, &spool);
+    Ok(Json(spool))
 }
 
 /// PUT {base_path}/api/v1/spool/{id}/measure
@@ -142,5 +175,7 @@ pub async fn measure_spool(
     Path(id): Path<i64>,
     Json(req): Json<SpoolMeasureRequest>,
 ) -> ApiResult<Json<SpoolResponse>> {
-    Ok(Json(db::measure(&state.db.pool, id, req.weight).await?))
+    let spool = db::measure(&state.db.pool, id, req.weight).await?;
+    crate::ws::broadcast(&state.event_tx, "updated", "spool", spool.id, &spool);
+    Ok(Json(spool))
 }

@@ -1,15 +1,21 @@
 //! Axum router for the spoolman-rs HTTP API.
 
 pub mod error;
+pub mod external;
 pub mod extra_field;
 pub mod filament;
 pub mod other;
+pub mod search;
 pub mod setting;
 pub mod spool;
+pub mod tag;
 pub mod vendor;
+pub mod ws;
 
 use axum::{
-    routing::{get, patch, post, put},
+    extract::{State, WebSocketUpgrade},
+    response::IntoResponse,
+    routing::{delete, get, patch, post, put},
     Router,
 };
 
@@ -18,6 +24,8 @@ use crate::state::AppState;
 /// Build the API router mounted at `{base_path}/api/v1`.
 pub fn router(base_path: &str) -> Router<AppState> {
     let api = Router::new()
+        // Root WebSocket — subscribe to all entity events
+        .route("/", get(root_ws))
         // Health / Info
         .route("/health", get(other::health))
         .route("/info", get(other::info))
@@ -47,6 +55,19 @@ pub fn router(base_path: &str) -> Router<AppState> {
         )
         .route("/spool/{id}/use", put(spool::use_spool))
         .route("/spool/{id}/measure", put(spool::measure_spool))
+        // Tag link / unlink
+        .route("/spool/{id}/tag", post(tag::link_tag))
+        .route("/spool/{id}/tag/{uid}", delete(tag::unlink_tag))
+        // Tag scan relay
+        .route("/tag/scan", post(tag::scan_post).get(tag::scan_ws_any))
+        .route("/tag/scan/{reader_id}", get(tag::scan_ws_reader))
+        .route("/tag/reader", get(tag::list_readers))
+        // Search
+        .route("/search", get(search::search_handler))
+        // External DB stubs
+        .route("/external/filament", get(external::get_filaments))
+        .route("/external/filament/search", get(external::search_filaments))
+        .route("/external/material", get(external::get_materials))
         // Extra fields (definitions)
         .route("/field/{entity_type}", get(extra_field::get_definitions))
         .route(
@@ -78,4 +99,10 @@ pub fn router(base_path: &str) -> Router<AppState> {
     } else {
         Router::new().nest(&format!("{base_path}/api/v1"), api)
     }
+}
+
+/// GET/WS {base_path}/api/v1/  — subscribe to all entity events (all types).
+async fn root_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
+    let rx = state.event_tx.subscribe();
+    ws.on_upgrade(move |socket| ws::handle_entity_ws(socket, rx, "", None))
 }

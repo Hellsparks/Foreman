@@ -1,12 +1,13 @@
 //! Spool database queries.
 
-use serde_json::{Map, Value};
+use serde_json::Map;
 use sqlx::AnyPool;
 
 use crate::{
     db::{
         extra_field,
         query::{order_by_sql, parse_sort, qualify_sort, Pagination, WhereBuilder},
+        tag,
         vendor::{normalise_dt, utc_now_str},
         Engine,
     },
@@ -168,7 +169,7 @@ impl SpoolRow {
             price: self.price,
             initial_weight: self.initial_weight,
             spool_weight: self.spool_weight,
-            tags: Vec::<Value>::new(),
+            tags: vec![],
             extra: Map::new(),
         }
     }
@@ -292,6 +293,7 @@ pub async fn find(
         extra_field::get_values_batch(pool, "filament_field", "filament_id", &filament_ids).await?;
     let mut v_extras =
         extra_field::get_values_batch(pool, "vendor_field", "vendor_id", &vendor_ids).await?;
+    let mut tags_map = tag::get_spool_tags_batch(pool, &spool_ids).await?;
 
     let mut results = Vec::with_capacity(parsed.len());
     for r in parsed {
@@ -310,6 +312,7 @@ pub async fn find(
                 v.extra = e;
             }
         }
+        resp.tags = tags_map.remove(&sid).unwrap_or_default();
         results.push(resp);
     }
     Ok((results, total))
@@ -332,6 +335,7 @@ pub async fn find_by_id(pool: &AnyPool, id: i64) -> Result<SpoolResponse> {
     if let (Some(vid), Some(ref mut v)) = (vendor_id, resp.filament.vendor.as_mut()) {
         v.extra = extra_field::get_values(pool, "vendor_field", "vendor_id", vid).await?;
     }
+    resp.tags = tag::get_spool_tags(pool, id).await?;
     Ok(resp)
 }
 

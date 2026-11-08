@@ -199,7 +199,7 @@ pub struct SpoolResponse {
     pub initial_weight: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spool_weight: Option<f64>,
-    pub tags: Vec<Value>,
+    pub tags: Vec<TagInfo>,
     pub extra: Map<String, Value>,
 }
 
@@ -260,6 +260,128 @@ pub struct UpdateSpoolRequest {
     pub price: Option<f64>,
     #[serde(default)]
     pub extra: Option<Map<String, Value>>,
+}
+
+// ---------------------------------------------------------------------------
+// Tag
+// ---------------------------------------------------------------------------
+
+/// A single NFC/RFID tag linked to a spool, embedded in spool responses.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TagInfo {
+    pub id: i64,
+    pub uid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    pub added: String,
+}
+
+/// Body for POST /spool/{id}/tag — link a physical tag to a spool.
+#[derive(Debug, Deserialize)]
+pub struct TagLinkRequest {
+    pub uid: String,
+    #[serde(default)]
+    pub format: Option<String>,
+}
+
+/// 409 body returned when a UID is already linked to something else.
+#[derive(Debug, Serialize)]
+pub struct TagConflictMessage {
+    pub message: String,
+    pub spool_id: Option<i64>,
+    pub filament_id: Option<i64>,
+}
+
+// ---------------------------------------------------------------------------
+// Scan relay
+// ---------------------------------------------------------------------------
+
+/// Body for POST /tag/scan.
+#[derive(Debug, Deserialize)]
+pub struct ScanTagRequest {
+    pub uid: String,
+    #[serde(default)]
+    pub reader_id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub format: Option<String>,
+}
+
+/// Response from POST /tag/scan.
+#[derive(Debug, Serialize)]
+pub struct ScanTagResponse {
+    pub uid: String,
+    pub reader_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    /// null when unmatched — always serialised (not skipped on null).
+    pub matched_spool_id: Option<i64>,
+    /// null when unmatched — always serialised.
+    pub matched_filament_id: Option<i64>,
+    pub created: bool,
+}
+
+/// One entry in GET /tag/reader.
+#[derive(Debug, Serialize)]
+pub struct TagReaderInfo {
+    pub reader_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub last_seen: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_uid: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+/// Top-level result from GET /search.
+#[derive(Debug, Serialize)]
+pub struct SearchResults {
+    pub spools: Vec<SearchResultSpool>,
+    pub filaments: Vec<SearchResultFilament>,
+    pub vendors: Vec<SearchResultVendor>,
+    pub is_color_query: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchResultSpool {
+    pub spool: SpoolResponse,
+    pub match_field: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchResultFilament {
+    pub filament: FilamentResponse,
+    pub match_field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spools: Option<Vec<SearchResultFilamentSpool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spool_count: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchResultVendor {
+    pub vendor: VendorResponse,
+    pub match_field: String,
+}
+
+/// Minimal spool summary included with a filament search result.
+#[derive(Debug, Serialize)]
+pub struct SearchResultFilamentSpool {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub initial_weight: Option<f64>,
+    pub used_weight: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining_weight: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    pub archived: bool,
 }
 
 // ---------------------------------------------------------------------------
