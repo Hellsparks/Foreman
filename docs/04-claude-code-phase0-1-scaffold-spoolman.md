@@ -83,7 +83,7 @@ Clients that must keep working: Moonraker `[spoolman]` (uses Spoolman's websocke
 - Export upstream's OpenAPI JSON from a running upstream instance and commit it as `crates/spoolman-rs/tests/fixtures/openapi-v0.27.1.json`; add a test that diffs our route list against it.
 
 ### 1.1 Database layer
-- [x] `sqlx` with SQLite feature (session 4); Postgres, MySQL, tls-rustls, any added in session 5.
+- [x] `sqlx` with SQLite, Postgres, MySQL, tls-rustls, any features; `Db` holds `AnyPool` + `Engine` enum; per-engine SQL in each `Migration`.
 - [x] Schema identical to upstream at alembic head of v0.27.1 (tables: `vendor`, `filament`, `spool`, `setting`, `vendor_field`, `filament_field`, `spool_field`, `tag`, plus `alembic_version`).
 - [x] Startup check: read `alembic_version`.
   - equals our known head → run.
@@ -159,3 +159,7 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **`92793c8a937c` color_hex alpha migration is a no-op for SQLite:** Upstream uses an Alembic `batch_alter_table` to widen `color_hex` from 6 to 8 chars. SQLite does not enforce VARCHAR lengths, so the migration records the revision but runs no SQL. The column accepts 8-char values regardless.
 
 **"Fresh DB openable by Python Spoolman" test deferred:** This requires a running Python Spoolman instance. Deferred to section 1.5 (compatibility gate), which already calls for running `tests_integration/` against a live instance.
+
+**`AnyPool::connect` does not set SQLite `create_if_missing`:** Unlike `SqlitePool::connect_with(opts.create_if_missing(true))`, `AnyPool::connect(url)` opens SQLite in read-write-only mode (no create). `From<SqliteConnectOptions>` is not implemented for `AnyConnectOptions` in sqlx 0.8. Workaround: `std::fs::File::create` the SQLite file explicitly before calling `AnyPool::connect`, then run WAL/FK PRAGMA commands as the first query.
+
+**SQLite error code 1 is generic:** `is_table_not_found` must not short-circuit on a non-nil error code — SQLite code 1 (`SQLITE_ERROR`) is used for many errors including "no such table". Logic changed to check Postgres/MySQL specific codes first, then always fall through to a message-prefix check.

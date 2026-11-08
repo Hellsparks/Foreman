@@ -18,9 +18,15 @@ tokio = { workspace = true }
 # Web (axum added when API is implemented in 1.2)
 # axum = { workspace = true }
 
-# Database — session 4: SQLite only.
-# Session 5 adds: postgres, mysql, tls-rustls, any
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+# Database — all three engines + type-erased pool.
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "sqlite",
+    "postgres",
+    "mysql",
+    "tls-rustls",
+    "any",
+] }
 
 # Serialisation
 serde = { workspace = true }

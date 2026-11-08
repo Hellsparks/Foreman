@@ -2,14 +2,14 @@ use std::{env, fs, path::PathBuf};
 
 use crate::error::{Result, SpoolmanError};
 
-/// Database back-end.
-///
-/// Session 4 only compiles SQLite; Postgres / MySQL are added in session 5.
+/// Database back-end selected by `SPOOLMAN_DB_TYPE`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DbType {
     Sqlite,
-    // Postgres,  // session 5
-    // Mysql,     // session 5
+    Postgres,
+    /// CockroachDB speaks the Postgres wire protocol; uses the same driver.
+    Cockroachdb,
+    Mysql,
 }
 
 /// All configuration that spoolman-rs reads from SPOOLMAN_* environment variables.
@@ -107,9 +107,34 @@ impl SpoolmanConfig {
         self.data_dir.join("spoolman.db")
     }
 
-    /// SQLite connection URL for sqlx.
+    /// SQLite connection URL for sqlx `AnyPool`.
     pub fn sqlite_url(&self) -> String {
         format!("sqlite://{}", self.sqlite_path().display())
+    }
+
+    /// Build the sqlx connection URL for the configured database back-end.
+    pub fn connection_url(&self) -> Result<String> {
+        match &self.db_type {
+            DbType::Sqlite => Ok(self.sqlite_url()),
+
+            DbType::Postgres | DbType::Cockroachdb => {
+                let host = self.db_host.as_deref().unwrap_or("localhost");
+                let port = self.db_port.unwrap_or(5432);
+                let name = self.db_name.as_deref().unwrap_or("spoolman");
+                let user = self.db_username.as_deref().unwrap_or("spoolman");
+                let pass = self.db_password.as_deref().unwrap_or("");
+                Ok(format!("postgres://{user}:{pass}@{host}:{port}/{name}"))
+            }
+
+            DbType::Mysql => {
+                let host = self.db_host.as_deref().unwrap_or("localhost");
+                let port = self.db_port.unwrap_or(3306);
+                let name = self.db_name.as_deref().unwrap_or("spoolman");
+                let user = self.db_username.as_deref().unwrap_or("spoolman");
+                let pass = self.db_password.as_deref().unwrap_or("");
+                Ok(format!("mysql://{user}:{pass}@{host}:{port}/{name}"))
+            }
+        }
     }
 }
 
@@ -130,9 +155,12 @@ fn resolve_data_dir() -> PathBuf {
 fn parse_db_type() -> Result<DbType> {
     match env::var("SPOOLMAN_DB_TYPE").as_deref() {
         Ok("sqlite") | Err(_) => Ok(DbType::Sqlite),
+        Ok("postgres") => Ok(DbType::Postgres),
+        Ok("cockroachdb") => Ok(DbType::Cockroachdb),
+        Ok("mysql") => Ok(DbType::Mysql),
         Ok(other) => Err(SpoolmanError::Config(format!(
-            "SPOOLMAN_DB_TYPE='{other}' is not supported in this build; \
-             only 'sqlite' is available until session 5 adds postgres/mysql"
+            "SPOOLMAN_DB_TYPE='{other}' is not recognised; \
+             expected one of: sqlite, postgres, mysql, cockroachdb"
         ))),
     }
 }
