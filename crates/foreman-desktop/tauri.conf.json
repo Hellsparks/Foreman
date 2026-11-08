@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "app.foreman.desktop",
   "build": {
-    "beforeDevCommand": "npm --prefix ../../frontend run dev",
+    "beforeDevCommand": "npm --prefix ../frontend run dev",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../frontend/dist"
   },
