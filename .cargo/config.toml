@@ -1,0 +1,21 @@
+# Cargo aliases for Foreman development.
+# All commands work in fish shell and on Windows (they call cargo sub-commands,
+# not shell scripts).
+
+# Set TS_RS_EXPORT_DIR so ts-rs writes all generated types to one place
+# regardless of which crate is running the test.
+# This path is relative to the *workspace root* (where this config lives).
+[env]
+TS_RS_EXPORT_DIR = { value = "frontend/src/api/types", relative = true }
+
+[alias]
+# Run the headless server
+server = "run -p foreman-server"
+
+# Type generation: runs ts-rs export_bindings tests with the export dir set
+gen-types = "test --all -- export_bindings --nocapture"
+
+# Quality checks (run before every commit)
+fmt-check = "fmt --all -- --check"
+lint = "clippy --all-targets -- -D warnings"
+check-all = ["fmt-check", "lint", "test --all"]

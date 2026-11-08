@@ -1,0 +1,21 @@
+[package]
+name = "spoolman-rs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "spoolman-rs"
+path = "src/bin/main.rs"
+
+[dependencies]
+foreman-core = { path = "../foreman-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }

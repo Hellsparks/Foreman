@@ -1,0 +1,357 @@
+/* Fieldwork v0.1 — original semantic tokens. See DESIGN.md for contracts. */
+:root {
+  --fw-background: #F5F3EC;
+  --fw-surface: #ECEAE2;
+  --fw-raised: #FFFDF7;
+  --fw-text: #252820;
+  --fw-muted: #64675C;
+  --fw-border: #D2D3C7;
+  --fw-accent: #DA4B27;
+  --fw-accent-hover: #BF3D1C;
+  --fw-on-accent: #FFFFFF;
+  --fw-inverse: #252820;
+  --fw-on-inverse: #F5F3EC;
+  --fw-success: #386348;
+  --fw-warning: #795A12;
+  --fw-danger: #B02E25;
+  --fw-info: #345F87;
+  --fw-focus: #345F87;
+  --fw-sans: Arial, Helvetica, sans-serif;
+  --fw-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --fw-type-display: 64px;
+  --fw-type-heading: 32px;
+  --fw-type-subheading: 24px;
+  --fw-type-body: 16px;
+  --fw-type-ui: 14px;
+  --fw-type-label: 12px;
+  --fw-line-display: 1.02;
+  --fw-line-heading: 1.15;
+  --fw-line-body: 1.6;
+  --fw-tracking-display: -0.045em;
+  --fw-tracking-heading: -0.025em;
+  --fw-tracking-label: 0.06em;
+  --fw-space-1: 4px;
+  --fw-space-2: 8px;
+  --fw-space-3: 12px;
+  --fw-space-4: 16px;
+  --fw-space-6: 24px;
+  --fw-space-8: 32px;
+  --fw-space-12: 48px;
+  --fw-space-16: 64px;
+  --fw-space-24: 96px;
+  --fw-radius-control: 2px;
+  --fw-radius-panel: 0px;
+  --fw-radius-pill: 999px;
+  --fw-control-height: 44px;
+  --fw-duration-fast: 120ms;
+  --fw-duration-normal: 180ms;
+  --fw-shadow-overlay: 0 4px 16px #2528201A;
+  --fw-scrim: #25282066;
+}
+@media (max-width: 640px) { :root { --fw-type-display: 40px; --fw-type-heading: 28px; --fw-line-display: 1.05; } }
+/* Opt-in reusable primitives; no global element reset. */
+.fw-button { min-height: var(--fw-control-height); padding: 0 var(--fw-space-4); border: 1px solid transparent; border-radius: var(--fw-radius-control); background: var(--fw-accent-hover); color: var(--fw-on-accent); font: 600 14px var(--fw-mono); cursor: pointer; transition: background var(--fw-duration-fast); }
+.fw-button:hover { background: var(--fw-button-hover); }
+.fw-button:active { transform: translateY(1px); }
+.fw-button--secondary { background: transparent; border-color: var(--fw-muted); color: var(--fw-text); }
+.fw-button--secondary:hover { background: var(--fw-surface); }
+.fw-button:disabled { background: var(--fw-surface); color: var(--fw-muted); border-color: var(--fw-border); cursor: not-allowed; transform: none; }
+.fw-field { width: 100%; min-height: var(--fw-control-height); border: 1px solid var(--fw-muted); border-radius: var(--fw-radius-control); padding: var(--fw-space-3); color: var(--fw-text); background: var(--fw-raised); font: 16px var(--fw-sans); }
+.fw-field[aria-invalid=true] { border-color: var(--fw-danger); }
+.fw-panel { padding: var(--fw-space-6); background: var(--fw-raised); border: 1px solid var(--fw-border); border-radius: var(--fw-radius-panel); }
+.fw-button:focus-visible, .fw-field:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .fw-button { transition: none; } }
+
+
+/* APPEARANCE v0.2 — put data-fw-theme and data-fw-mode on <html>.
+   Scheme: fieldwork | vector | foundry | olive. Mode: light | dark.
+   No attributes preserves original Fieldwork light. These are original palettes. */
+:root {
+  color-scheme: light;
+  --fw-button-hover: #A93216;
+  --fw-success-bg: #E3EBDD; --fw-warning-bg: #F1E9CF;
+  --fw-danger-bg: #F5E2DB; --fw-info-bg: #E1E8EF;
+}
+:root[data-fw-mode="light"] {
+  color-scheme: light;
+  --fw-success: #386348; --fw-warning: #795A12; --fw-danger: #B02E25;
+  --fw-info: #345F87; --fw-success-bg: #E3EBDD; --fw-warning-bg: #F1E9CF;
+  --fw-danger-bg: #F5E2DB; --fw-info-bg: #E1E8EF;
+  --fw-scrim: #25282066; --fw-shadow-overlay: 0 4px 16px #2528201A;
+}
+:root[data-fw-mode="dark"] {
+  color-scheme: dark;
+  --fw-success: #A8D6B1; --fw-warning: #EAD08E; --fw-danger: #FFB4A4;
+  --fw-info: #A9CDED; --fw-success-bg: #263C2C; --fw-warning-bg: #3E3521;
+  --fw-danger-bg: #432C27; --fw-info-bg: #283745;
+  --fw-scrim: #00000099; --fw-shadow-overlay: 0 4px 16px #00000055;
+}
+:root[data-fw-theme] { --fw-inverse: var(--fw-text); --fw-on-inverse: var(--fw-background); }
+:root[data-fw-theme="fieldwork"][data-fw-mode="light"] {
+  --fw-background:#F5F3EC; --fw-surface:#ECEAE2; --fw-raised:#FFFDF7;
+  --fw-text:#252820; --fw-muted:#64675C; --fw-border:#D2D3C7;
+  --fw-accent:#DA4B27; --fw-accent-hover:#BF3D1C; --fw-on-accent:#FFFFFF;
+  --fw-button-hover:#A93216; --fw-focus:#345F87;
+}
+:root[data-fw-theme="fieldwork"][data-fw-mode="dark"] {
+  --fw-background:#191B18; --fw-surface:#232620; --fw-raised:#2C3028;
+  --fw-text:#F0F0E5; --fw-muted:#AFB4A6; --fw-border:#484D42;
+  --fw-accent:#F57951; --fw-accent-hover:#F57951; --fw-on-accent:#1C2119;
+  --fw-button-hover:#FF9574; --fw-focus:#9CC7F0;
+}
+:root[data-fw-theme="vector"][data-fw-mode="light"] {
+  --fw-background:#F1F3E9; --fw-surface:#E5E9DA; --fw-raised:#FAFCF3;
+  --fw-text:#192119; --fw-muted:#59634E; --fw-border:#C8CFBC;
+  --fw-accent:#C4E830; --fw-accent-hover:#455900; --fw-on-accent:#FFFFFF;
+  --fw-button-hover:#344400; --fw-focus:#4F398A;
+}
+:root[data-fw-theme="vector"][data-fw-mode="dark"] {
+  --fw-background:#101510; --fw-surface:#1B231A; --fw-raised:#242E22;
+  --fw-text:#EDF4DB; --fw-muted:#AFBE9B; --fw-border:#43503C;
+  --fw-accent:#D5FA39; --fw-accent-hover:#D5FA39; --fw-on-accent:#192000;
+  --fw-button-hover:#E6FF82; --fw-focus:#C1A7FF;
+}
+:root[data-fw-theme="foundry"][data-fw-mode="light"] {
+  --fw-background:#F1F1F1; --fw-surface:#E5E5E5; --fw-raised:#FFFFFF;
+  --fw-text:#202020; --fw-muted:#606060; --fw-border:#CCCCCC;
+  --fw-accent:#595959; --fw-accent-hover:#3D3D3D; --fw-on-accent:#FFFFFF;
+  --fw-button-hover:#242424; --fw-focus:#454545;
+}
+:root[data-fw-theme="foundry"][data-fw-mode="dark"] {
+  --fw-background:#151515; --fw-surface:#212121; --fw-raised:#2B2B2B;
+  --fw-text:#EEEEEE; --fw-muted:#AFAFAF; --fw-border:#4A4A4A;
+  --fw-accent:#D5D5D5; --fw-accent-hover:#D5D5D5; --fw-on-accent:#171717;
+  --fw-button-hover:#FFFFFF; --fw-focus:#DDDDDD;
+}
+:root[data-fw-theme="olive"][data-fw-mode="light"] {
+  --fw-background:#F0EDDF; --fw-surface:#E5E0CD; --fw-raised:#FAF7EA;
+  --fw-text:#282C20; --fw-muted:#62664F; --fw-border:#CBCBB7;
+  --fw-accent:#8A7438; --fw-accent-hover:#5D622D; --fw-on-accent:#FFFFFF;
+  --fw-button-hover:#44491D; --fw-focus:#385D7A;
+}
+:root[data-fw-theme="olive"][data-fw-mode="dark"] {
+  --fw-background:#1B2017; --fw-surface:#262E20; --fw-raised:#303A28;
+  --fw-text:#EEEEDD; --fw-muted:#B5B99F; --fw-border:#505B43;
+  --fw-accent:#C2C78D; --fw-accent-hover:#C2C78D; --fw-on-accent:#202717;
+  --fw-button-hover:#DDE2A8; --fw-focus:#A5C5DF;
+}
+/* Component bindings: primary buttons use --fw-accent-hover by historical
+   contract (base fill), --fw-button-hover for hover, --fw-on-accent for text.
+   Status fills must use *-bg tokens, never fixed light-only hex values.
+   Border is a separator, not a control boundary: use --fw-muted for inputs. */
+
+
+/* CONTROLS v0.3 — native inputs, theme-aware states, opt-in primitives.
+   Wrapper: label.fw-control.fw-control--switch | --check | --radio.
+   Include a labelled input and optional .fw-control-copy / .fw-state spans.
+   Range fill: set --fw-range-fill to (value-min)/(max-min)*100%.
+   Switch input uses type=checkbox role=switch. Labels provide 44px+ targets. */
+:root {
+  --fw-control-active: var(--fw-accent-hover);
+  --fw-control-on: var(--fw-on-accent);
+  --fw-control-off: var(--fw-surface);
+  --fw-control-boundary: var(--fw-muted);
+}
+.fw-control { display:flex; align-items:center; gap:12px; min-height:48px; cursor:pointer; color:var(--fw-text); font:14px/1.5 var(--fw-sans); }
+.fw-control input { box-sizing:border-box; flex-shrink:0; margin:0; appearance:none; background:var(--fw-control-off); border:1px solid var(--fw-control-boundary); cursor:pointer; }
+.fw-control input:checked { background:var(--fw-control-active); border-color:var(--fw-control-active); }
+.fw-control input:focus-visible,.fw-range:focus-visible,.fw-segment button:focus-visible,.fw-stepper button:focus-visible { outline:2px solid var(--fw-focus); outline-offset:4px; }
+.fw-control--switch input { width:44px; height:24px; border-radius:2px; position:relative; }
+.fw-control--switch input::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; background:var(--fw-muted); transition:transform 120ms; }
+.fw-control--switch input:checked::after { transform:translateX(20px); background:var(--fw-control-on); }
+.fw-control--check input { width:22px; height:22px; border-radius:2px; display:grid; place-content:center; }
+.fw-control--check input:checked::after { content:''; width:10px; height:5px; border:solid var(--fw-control-on); border-width:0 0 2px 2px; transform:translateY(-1px) rotate(-45deg); }
+.fw-control--radio input { width:22px; height:22px; border-radius:50%; display:grid; place-content:center; }
+.fw-control--radio input:checked::after { content:''; width:8px; height:8px; border-radius:50%; background:var(--fw-control-on); }
+.fw-control:has(input:disabled) { color:var(--fw-muted); cursor:not-allowed; }
+.fw-control input:disabled { cursor:not-allowed; border-style:dashed; background:var(--fw-surface); }
+.fw-control input:disabled::after { background:var(--fw-muted); }
+.fw-control-copy { flex:1; }.fw-control-copy small { display:block; color:var(--fw-muted); font-size:12px; }
+.fw-state { font:11px var(--fw-mono); color:var(--fw-muted); }
+.fw-control:has(input:checked:not(:disabled)) .fw-state { color:var(--fw-text); }
+.fw-range { box-sizing:border-box; appearance:none; width:100%; height:8px; margin:18px 0; border:1px solid var(--fw-muted); border-radius:0; background:linear-gradient(to right,var(--fw-control-active) 0%,var(--fw-control-active) var(--fw-range-fill,50%),var(--fw-control-off) var(--fw-range-fill,50%),var(--fw-control-off) 100%); cursor:pointer; }
+.fw-range::-webkit-slider-thumb { appearance:none; width:20px; height:24px; background:var(--fw-control-active); border:2px solid var(--fw-control-on); border-radius:2px; box-shadow:0 0 0 1px var(--fw-muted); }
+.fw-range::-moz-range-thumb { width:16px; height:20px; background:var(--fw-control-active); border:2px solid var(--fw-control-on); border-radius:2px; }
+.fw-range:disabled { filter:grayscale(1); cursor:not-allowed; background:var(--fw-surface); }
+.fw-range:disabled::-webkit-slider-thumb { background:var(--fw-muted); }
+.fw-segment { display:flex; border:1px solid var(--fw-muted); padding:3px; gap:3px; }
+.fw-segment button { flex:1; min-height:44px; border:0; background:transparent; color:var(--fw-text); font:12px var(--fw-mono); cursor:pointer; }
+.fw-segment button[aria-pressed=true] { background:var(--fw-control-active); color:var(--fw-control-on); }
+.fw-stepper { display:inline-flex; align-items:center; border:1px solid var(--fw-muted); }
+.fw-stepper button { width:44px; min-height:44px; background:var(--fw-surface); color:var(--fw-text); border:0; font-size:20px; cursor:pointer; }
+.fw-stepper button:hover:not(:disabled) { background:var(--fw-control-active); color:var(--fw-control-on); }
+.fw-stepper button:disabled { color:var(--fw-muted); cursor:not-allowed; }
+.fw-stepper output { min-width:60px; text-align:center; font:16px var(--fw-mono); }
+@media(prefers-reduced-motion:reduce) { .fw-control--switch input::after { transition:none; } }
+
+
+/* MOTION v0.4 — behavior and state wiring contracts in DESIGN.md. */
+:root {
+  --fw-duration-expand:240ms;
+  --fw-ease-standard:cubic-bezier(.2,0,0,1);
+  --fw-motion-offset:8px;
+}
+.fw-sidebar { width:176px; flex-shrink:0; overflow:hidden; background:var(--fw-surface); border-right:1px solid var(--fw-border); transition:width var(--fw-duration-expand) var(--fw-ease-standard); }
+.fw-sidebar[data-expanded=false] { width:56px; }
+.fw-sidebar button { display:flex; align-items:center; gap:12px; width:100%; min-height:44px; padding:0 16px; background:transparent; border:0; color:var(--fw-text); text-align:left; white-space:nowrap; font:12px var(--fw-mono); }
+.fw-sidebar button[aria-current=page] { background:var(--fw-control-active); color:var(--fw-control-on); }
+.fw-sidebar .fw-nav-label { opacity:1; transition:opacity var(--fw-duration-fast); }
+.fw-sidebar[data-expanded=false] .fw-nav-label { opacity:0; }
+.fw-collapse { height:0; overflow:hidden; transition:height calc(var(--fw-duration-expand) * 1.333) var(--fw-ease-standard); }
+.fw-collapse[data-open=true] { height:var(--fw-collapse-height,auto); }
+.fw-collapse > div { display:flow-root; }
+.fw-chevron { display:inline-block; transition:transform var(--fw-duration-normal) var(--fw-ease-standard); }
+[aria-expanded=true] .fw-chevron { transform:rotate(90deg); }
+.fw-popover { position:absolute; z-index:5; top:calc(100% + 8px); right:0; width:216px; padding:4px; background:var(--fw-raised); border:1px solid var(--fw-muted); box-shadow:var(--fw-shadow-overlay); animation:fw-enter var(--fw-duration-normal) var(--fw-ease-standard); }
+.fw-popover button { display:block; width:100%; text-align:left; min-height:44px; background:transparent; color:var(--fw-text); border:0; padding:0 12px; font:12px var(--fw-mono); }
+.fw-popover button:hover,.fw-popover button:focus-visible { background:var(--fw-surface); }
+.fw-tabs { display:flex; border-bottom:1px solid var(--fw-border); }
+.fw-tabs [role=tab] { flex:1; min-height:44px; padding:8px; background:transparent; border:0; border-bottom:2px solid transparent; color:var(--fw-muted); font:12px var(--fw-mono); }
+.fw-tabs [aria-selected=true] { border-bottom-color:var(--fw-control-active); color:var(--fw-text); }
+.fw-tab-panel { animation:fw-enter var(--fw-duration-normal) var(--fw-ease-standard); }
+.fw-motion button:focus-visible { outline:2px solid var(--fw-focus); outline-offset:-3px; }
+@keyframes fw-enter { from { opacity:0; transform:translateY(var(--fw-motion-offset)); } to { opacity:1; transform:translateY(0); } }
+.fw-motion[data-reduced=true] *, .fw-motion[data-reduced=true] *::after { transition:none!important; animation:none!important; }
+@media(prefers-reduced-motion:reduce) {
+  .fw-sidebar,.fw-nav-label,.fw-collapse,.fw-chevron,.fw-popover,.fw-tab-panel { transition:none!important; animation:none!important; }
+}
+
+
+/* MODALS v0.5 — native dialog.showModal(); behavior in MotionModals. */
+.fw-dialog { margin:auto; box-sizing:border-box; width:min(520px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:0; border:1px solid var(--fw-muted); border-radius:0; background:var(--fw-raised); color:var(--fw-text); box-shadow:var(--fw-shadow-overlay); }
+.fw-dialog[open] { animation:fw-enter var(--fw-duration-normal) var(--fw-ease-standard); }
+.fw-dialog::backdrop { background:var(--fw-scrim); }
+.fw-dialog header,.fw-dialog .dialog-body,.fw-dialog footer { padding:var(--fw-space-6); }
+.fw-dialog header { border-bottom:1px solid var(--fw-border); display:flex; justify-content:space-between; gap:var(--fw-space-4); align-items:flex-start; }
+.fw-dialog h3 { margin:8px 0 0; font:500 24px var(--fw-sans); }
+.fw-dialog footer { display:flex; justify-content:flex-end; gap:var(--fw-space-2); border-top:1px solid var(--fw-border); flex-wrap:wrap; }
+.fw-dialog p { font:14px/1.6 var(--fw-sans); color:var(--fw-muted); }
+.fw-dialog label { display:block; margin-bottom:8px; font:12px var(--fw-mono); }
+.fw-dialog input { box-sizing:border-box; width:100%; min-height:44px; padding:12px; border:1px solid var(--fw-muted); background:var(--fw-background); color:var(--fw-text); font:16px var(--fw-sans); }
+.fw-dialog button:focus-visible,.fw-dialog input:focus-visible { outline:2px solid var(--fw-focus); outline-offset:3px; }
+@media(prefers-reduced-motion:reduce) { .fw-dialog[open] { animation:none; } }
+.dialog-action { min-height:44px; padding:0 16px; border:1px solid var(--fw-muted); background:transparent; color:var(--fw-text); font:600 14px var(--fw-mono); cursor:pointer; }
+.dialog-action:hover { background:var(--fw-surface); }
+.dialog-action.primary { border-color:transparent; background:var(--fw-accent-hover); color:var(--fw-on-accent); }
+.dialog-action.primary:hover { background:var(--fw-button-hover); }
+.dialog-action.danger { border-color:var(--fw-danger); color:var(--fw-danger); }
+.dialog-error { color:var(--fw-danger)!important; }
+
+
+
+/* POPUPS v0.6 — behavior and live announcements in MotionPopups. */
+.popup-anchor { position:relative; display:inline-flex; max-width:100%; }
+.fw-info-popup { position:absolute; bottom:calc(100% + 8px); left:0; z-index:8; width:min(300px,calc(100vw - 88px)); box-sizing:border-box; padding:16px; border:1px solid var(--fw-muted); background:var(--fw-raised); color:var(--fw-text); box-shadow:var(--fw-shadow-overlay); animation:fw-enter var(--fw-duration-normal) var(--fw-ease-standard); }
+.fw-info-popup h4 { margin:0 0 8px; font-size:16px; }
+.fw-info-popup p { margin:0 0 12px; font-size:14px; line-height:1.6; color:var(--fw-muted); }
+@keyframes fw-popup-enter { from { transform:translateY(8px); } to { transform:translateY(0); } }
+.fw-info-popup,.fw-tooltip { animation-name:fw-popup-enter; }
+.dialog-action:disabled { opacity:.55; cursor:not-allowed; background:var(--fw-surface); color:var(--fw-muted); border-color:var(--fw-border); }
+.popup-demo-tools { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin:24px 0; }
+.fw-tooltip { position:absolute; top:calc(100% + 8px); left:0; z-index:9; width:max-content; max-width:min(260px,calc(100vw - 88px)); padding:8px 12px; box-sizing:border-box; border:1px solid var(--fw-muted); background:var(--fw-raised); color:var(--fw-text); font:12px/1.5 var(--fw-mono); box-shadow:var(--fw-shadow-overlay); animation:fw-popup-enter var(--fw-duration-fast) var(--fw-ease-standard); pointer-events:auto; }
+.fw-toast-stack { display:grid; gap:8px; min-height:96px; margin-top:24px; }
+.fw-toast { display:flex; align-items:flex-start; gap:12px; padding:16px; border:1px solid var(--fw-muted); border-left:3px solid var(--fw-info); background:var(--fw-raised); color:var(--fw-text); animation:fw-enter var(--fw-duration-normal) var(--fw-ease-standard); }
+.fw-toast-copy { flex:1; min-width:0; }
+.fw-toast strong { font-size:14px; font-weight:600; }
+.fw-toast p { font-size:14px; color:var(--fw-muted); margin:8px 0; line-height:1.5; }
+.fw-toast .dialog-action { padding:0 12px; }
+.fw-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media(prefers-reduced-motion:reduce) { .fw-info-popup,.fw-tooltip,.fw-toast { animation:none; } }
+
+/* Spatial explorer — opt-in local browsing pattern. Markup in App.jsx / FileBrowser. */
+:root { --fw-spatial-depth:22px; --fw-spatial-tilt:-12deg; }
+.fw-browser { border:1px solid var(--fw-border); background:var(--fw-raised); min-width:0; }
+.fw-browser button,.fw-browser input { font:12px var(--fw-mono); }
+.fw-browser button { cursor:pointer; }
+.fw-browser button:focus-visible,.fw-browser input:focus-visible { outline:2px solid var(--fw-focus); outline-offset:-3px; }
+.fw-browser-top,.fw-browser-tools,.fw-browser-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; border-bottom:1px solid var(--fw-border); flex-wrap:wrap; }
+.fw-browser-top { background:var(--fw-surface); }
+.fw-browser-title { display:flex; align-items:center; gap:12px; font:12px var(--fw-mono); letter-spacing:.06em; }
+.fw-browser-signal { width:8px; height:8px; background:var(--fw-control-active); }
+.fw-browser-actions { display:flex; gap:4px; flex-wrap:wrap; }
+.fw-browser .fb-button { border:1px solid var(--fw-muted); background:transparent; color:var(--fw-text); padding:0 12px; min-height:44px; }
+.fw-browser .fb-button:hover { background:var(--fw-surface); }
+.fw-browser .fb-button[aria-pressed=true] { background:var(--fw-control-active); color:var(--fw-control-on); border-color:var(--fw-control-active); }
+.fw-browser .fb-button:disabled { color:var(--fw-muted); border-color:var(--fw-border); cursor:not-allowed; }
+.fw-browser-search { display:flex; align-items:center; gap:12px; flex:1; min-width:180px; max-width:300px; }
+.fw-browser input { min-height:44px; min-width:0; width:100%; padding:12px; border:1px solid var(--fw-muted); background:var(--fw-background); color:var(--fw-text); box-sizing:border-box; }
+.fw-browser-crumbs { display:flex; align-items:center; gap:4px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--fw-border); }
+.fw-browser-crumbs button { border:0; background:transparent; color:var(--fw-muted); min-height:36px; padding:0 8px; }
+.fw-browser-crumbs button[aria-current] { color:var(--fw-text); font-weight:bold; }
+.fw-browser-body { display:grid; grid-template-columns:140px minmax(0,1fr); }
+.fw-browser-locations { border-right:1px solid var(--fw-border); padding:20px 8px; background:var(--fw-background); }
+.fw-browser-locations>span { display:block; padding:0 8px 12px; font:10px var(--fw-mono); color:var(--fw-muted); }
+.fw-browser-locations button { display:flex; align-items:center; gap:8px; text-align:left; width:100%; padding:12px 8px; min-height:44px; background:none; border:1px solid transparent; color:var(--fw-muted); }
+.fw-browser-locations button[aria-current] { color:var(--fw-text); border-color:var(--fw-border); background:var(--fw-surface); }
+.fw-browser-content { min-width:0; position:relative; background:radial-gradient(circle at center,var(--fw-border) 1px,transparent 1px); background-size:24px 24px; }
+.fw-file-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:24px 16px; gap:16px; min-height:350px; align-content:start; }
+.fw-file-card { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; padding:12px 4px; border:1px solid transparent; background:transparent; color:var(--fw-text); text-align:center; }
+.fw-file-card:hover,.fw-file-card[aria-pressed=true] { border-color:var(--fw-muted); background:var(--fw-surface); }
+.fw-file-card strong { font:500 13px var(--fw-sans); overflow-wrap:anywhere; line-height:1.4; }
+.fw-file-card small { font:10px/1.5 var(--fw-mono); color:var(--fw-muted); }
+.fw-file-art { display:block; position:relative; width:86px; height:86px; perspective:450px; margin:4px auto 10px; }
+.fw-file-object { position:absolute; inset:12px 6px; transform:rotateX(10deg) rotateY(var(--fw-spatial-tilt)); transform-style:preserve-3d; transition:transform var(--fw-duration-expand,240ms) var(--fw-ease-standard,ease); }
+.fw-file-card:hover .fw-file-object { transform:rotateX(0deg) rotateY(-4deg) translateY(-5px); }
+.fw-folder-back { position:absolute; inset:3px 0 0; background:var(--fw-surface); border:1px solid var(--fw-muted); }
+.fw-folder-back:before { content:''; position:absolute; width:36%; height:9px; top:-9px; left:-1px; background:var(--fw-surface); border:1px solid var(--fw-muted); border-bottom:0; }
+.fw-folder-paper { position:absolute; inset:12px 7px 4px; border:1px solid var(--fw-muted); background:var(--fw-raised); transform:translateZ(6px) rotate(-5deg); }
+.fw-folder-front { position:absolute; inset:22px 0 -5px; background:var(--fw-surface); border:1px solid var(--fw-control-active); border-top:3px solid var(--fw-control-active); transform:translateZ(var(--fw-spatial-depth)) rotateX(-18deg); transform-origin:bottom; box-shadow:0 8px 8px var(--fw-scrim); }
+.fw-document-face { position:absolute; inset:-2px 10px -2px; background:var(--fw-raised); border:1px solid var(--fw-muted); transform:translateZ(10px); box-shadow:5px 5px 0 var(--fw-surface),6px 6px 0 var(--fw-border); display:flex; flex-direction:column; justify-content:space-between; padding:10px 6px; font:10px var(--fw-mono); color:var(--fw-muted); }
+.fw-document-face b { color:var(--fw-text); font-size:16px; }
+.fw-browser[data-view=flat] .fw-file-object { transform:none!important; }
+.fw-browser[data-view=flat] .fw-folder-front,.fw-browser[data-view=flat] .fw-folder-paper,.fw-browser[data-view=flat] .fw-document-face { transform:none; box-shadow:none; }
+.fw-browser-foot { border-top:1px solid var(--fw-border); border-bottom:0; font:10px/1.5 var(--fw-mono); color:var(--fw-muted); }
+.fw-file-inspector { padding:24px; border-top:1px solid var(--fw-border); background:var(--fw-background); }
+.fw-file-inspector header { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:20px; }
+.fw-file-inspector h3 { margin:8px 0; font-size:24px; overflow-wrap:anywhere; }
+.fw-file-inspector pre { white-space:pre-wrap; overflow-wrap:anywhere; margin:16px 0 24px; padding:20px; background:var(--fw-surface); border:1px solid var(--fw-border); font:12px/1.8 var(--fw-mono); }
+.fw-browser-form { display:flex; gap:8px; align-items:end; flex-wrap:wrap; padding:16px; border-bottom:1px solid var(--fw-border); }
+.fw-browser-form label { display:grid; gap:8px; flex:1; font:12px var(--fw-mono); min-width:160px; }
+.fw-browser-error { color:var(--fw-danger); font:12px var(--fw-mono); flex-basis:100%; margin:4px 0; }
+.fw-browser-empty { padding:40px 24px; min-height:250px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; }
+@media(max-width:700px) { .fw-browser-body{grid-template-columns:1fr} .fw-browser-locations{display:flex;gap:4px;overflow:auto;border-right:0;border-bottom:1px solid var(--fw-border);padding:8px} .fw-browser-locations>span{display:none} .fw-browser-locations button{width:auto;flex-shrink:0} .fw-file-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px} .fw-browser-search{max-width:none} .fw-file-inspector{padding:16px} }
+@media(prefers-reduced-motion:reduce) { .fw-file-object{transition:none!important;transform:none!important} .fw-folder-front,.fw-folder-paper,.fw-document-face{transform:none;box-shadow:none} }
+
+/* Local mesh-inspection reference. Geometry/interaction logic lives in ModelViewer. */
+.fw-model-viewer { border:1px solid var(--fw-border); margin-bottom:32px; background:var(--fw-surface); }
+.fw-model-head, .fw-model-toolbar, .fw-model-footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; border-bottom:1px solid var(--fw-border); flex-wrap:wrap; }
+.fw-model-head h3 { margin:0; font-size:18px; }
+.fw-model-toolbar button { min-height:44px; }
+.fw-model-toolbar label { display:flex; gap:12px; align-items:center; }
+.fw-model-file { max-width:100%; font:inherit; }
+.fw-model-canvas { width:100%; height:400px; display:block; touch-action:none; cursor:grab; background:var(--fw-background); }
+.fw-model-canvas:active { cursor:grabbing; }
+.fw-model-footer { border-top:1px solid var(--fw-border); border-bottom:0; font-size:12px; }
+.fw-model-error { padding:16px; color:var(--fw-danger); background:var(--fw-danger-bg); }
+.fw-model-help { padding:0 16px; color:var(--fw-muted); font-size:13px; }
+.fw-model-viewer :focus-visible { outline:2px solid var(--fw-focus); outline-offset:3px; }
+.fw-file-location-title { font:12px/1.5 var(--fw-mono); color:var(--fw-muted); margin:0 0 16px; }
+.fw-browser-search { position:relative; }
+@media(max-width:600px) { .fw-model-canvas{height:300px} .fw-model-toolbar{align-items:flex-start;flex-direction:column} }
+.fw-search-label { display:block; font:10px/1.5 var(--fw-mono); color:var(--fw-muted); margin-bottom:4px; }
+
+
+
+/* Standalone application frame. See ApplicationWindow in App.jsx for behavior. */
+.fw-window{border:1px solid var(--fw-muted);background:var(--fw-raised);color:var(--fw-text);position:relative;min-width:0}
+.fw-window-titlebar{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--fw-border);background:var(--fw-surface);min-height:44px;padding-left:var(--fw-space-4);gap:var(--fw-space-2)}
+.fw-window-title{font:var(--fw-type-label) var(--fw-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.fw-window-actions{display:flex;flex-shrink:0}.fw-window button{cursor:pointer;font:var(--fw-type-label) var(--fw-mono);color:var(--fw-text)}
+.fw-window-actions button{width:44px;min-height:44px;border:0;border-left:1px solid var(--fw-border);background:transparent;font-size:18px}
+.fw-window button:hover{background:var(--fw-surface)}.fw-window-actions button:last-child:hover{background:var(--fw-danger-bg);color:var(--fw-danger)}
+.fw-window-menubar{display:flex;gap:0;padding:0;border:0;flex-wrap:nowrap;flex-shrink:0;margin-right:auto}
+.fw-window-menu-anchor{position:relative}.fw-window-menu-trigger{min-height:44px;padding:0 var(--fw-space-3);border:0;background:transparent}.fw-window-menu-trigger[aria-expanded=true]{background:var(--fw-control-active);color:var(--fw-control-on)}
+.fw-window-menu{position:absolute;top:100%;left:0;z-index:10;min-width:200px;max-width:calc(100vw - 80px);padding:var(--fw-space-1);background:var(--fw-raised);border:1px solid var(--fw-muted);box-shadow:var(--fw-shadow-overlay)}
+.fw-window-menu button{display:block;min-height:44px;width:100%;text-align:left;border:0;background:transparent;padding:var(--fw-space-2) var(--fw-space-3)}
+.fw-window-body{padding:var(--fw-space-6);min-height:240px}.fw-window[data-maximized=true] .fw-window-body{min-height:400px}.fw-window-body h3{font-size:var(--fw-type-subheading);font-weight:500;margin:var(--fw-space-3) 0}.fw-window-body p{color:var(--fw-muted);font-size:var(--fw-type-ui);line-height:var(--fw-line-body)}
+.fw-window-document{border:1px solid var(--fw-border);padding:var(--fw-space-4);margin-top:var(--fw-space-6)}.fw-window-status{padding:var(--fw-space-3) var(--fw-space-4);border-top:1px solid var(--fw-border);font:var(--fw-type-label)/1.5 var(--fw-mono);color:var(--fw-muted)}
+.fw-window :focus-visible{outline:2px solid var(--fw-focus);outline-offset:-3px}
+@media(max-width:640px){.fw-window-body{padding:var(--fw-space-4)}.fw-window-titlebar{padding-left:var(--fw-space-2);gap:var(--fw-space-1)}.fw-window-title{flex:0 0 18px;font-size:0}.fw-window-title:before{content:'◫';font-size:14px}.fw-window-menu-trigger{padding:0 var(--fw-space-2)}.fw-window-menu{min-width:170px}.fw-window-actions button{width:36px}}
+
+/* Hierarchical index; native links and separate disclosure buttons. */
+.fw-index-row{display:flex;align-items:center}.fw-index-row>a{flex:1;min-width:0}
+.fw-index-toggle{flex-shrink:0;width:32px;min-height:44px;border:0;background:transparent;color:var(--fw-muted);cursor:pointer}
+.fw-index-children{margin-left:18px;border-left:1px solid var(--fw-border);padding-left:var(--fw-space-2)}
+.fw-index-children a{display:block;font-size:11px;min-height:36px;padding:var(--fw-space-2)}
+.fw-index-toggle:focus-visible{outline:2px solid var(--fw-focus);outline-offset:-2px}
+

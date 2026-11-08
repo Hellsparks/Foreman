@@ -1,0 +1,46 @@
+[package]
+name = "foreman-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "foreman-server"
+path = "src/main.rs"
+
+[dependencies]
+foreman-core = { path = "../foreman-core" }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialisation
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Config
+config = { workspace = true }
+
+# Type generation
+ts-rs = { workspace = true }
+
+# Utilities
+chrono = { workspace = true }
+dirs = { workspace = true }
+
+# WebSocket futures helper
+futures-util = "0.3"

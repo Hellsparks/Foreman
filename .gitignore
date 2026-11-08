@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Vendor (read-only reference clones — not committed)
+vendor/
+
+# Tauri
+src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Env / secrets
+.env
+*.env.local
+
+# Generated types
+frontend/src/api/types/

@@ -1,0 +1,12 @@
+[package]
+name = "foreman-desktop"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# Tauri 2 integration is added in session 3.
+# This is a placeholder lib crate so the workspace compiles from the start.
+
+[dependencies]
+foreman-core = { path = "../foreman-core" }
