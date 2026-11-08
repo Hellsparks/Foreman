@@ -14,7 +14,9 @@ use crate::{
     api::error::ApiResult,
     db::{filament as db, tag as db_tag},
     error::SpoolmanError,
-    models::{CreateFilamentRequest, FilamentResponse, TagInfo, TagLinkRequest, UpdateFilamentRequest},
+    models::{
+        CreateFilamentRequest, FilamentResponse, TagInfo, TagLinkRequest, UpdateFilamentRequest,
+    },
     state::AppState,
 };
 

@@ -265,11 +265,36 @@ pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::
     }
 
     let defaults = [
-        DefaultField { key: "url",               name: "Link",                 field_type: ExtraFieldType::Text,    unit: None      },
-        DefaultField { key: "hue_td",             name: "Hueforge TD",          field_type: ExtraFieldType::Float,   unit: Some("TD") },
-        DefaultField { key: "swatch",             name: "Has printed swatch",   field_type: ExtraFieldType::Boolean, unit: None      },
-        DefaultField { key: "orcaslicer_config",  name: "OrcaSlicer Config",    field_type: ExtraFieldType::Text,    unit: None      },
-        DefaultField { key: "material_modifier",  name: "Material Modifier",    field_type: ExtraFieldType::Text,    unit: None      },
+        DefaultField {
+            key: "url",
+            name: "Link",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
+        DefaultField {
+            key: "hue_td",
+            name: "Hueforge TD",
+            field_type: ExtraFieldType::Float,
+            unit: Some("TD"),
+        },
+        DefaultField {
+            key: "swatch",
+            name: "Has printed swatch",
+            field_type: ExtraFieldType::Boolean,
+            unit: None,
+        },
+        DefaultField {
+            key: "orcaslicer_config",
+            name: "OrcaSlicer Config",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
+        DefaultField {
+            key: "material_modifier",
+            name: "Material Modifier",
+            field_type: ExtraFieldType::Text,
+            unit: None,
+        },
     ];
 
     let existing = get_definitions(pool, "filament").await?;

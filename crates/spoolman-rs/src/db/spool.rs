@@ -739,14 +739,12 @@ pub async fn rename_field_value(
         // Encode the value as a JSON string (the way it's stored in spool_field.value).
         let encoded_old = serde_json::to_string(value)?;
         let encoded_new = serde_json::to_string(new_value)?;
-        let result = sqlx::query(
-            "UPDATE spool_field SET value = ? WHERE key = ? AND value = ?",
-        )
-        .bind(encoded_new)
-        .bind(key)
-        .bind(encoded_old)
-        .execute(pool)
-        .await?;
+        let result = sqlx::query("UPDATE spool_field SET value = ? WHERE key = ? AND value = ?")
+            .bind(encoded_new)
+            .bind(key)
+            .bind(encoded_old)
+            .execute(pool)
+            .await?;
         return Ok(result.rows_affected() as i64);
     }
 
@@ -860,8 +858,7 @@ pub async fn find_groups(
 
     // Remaining weight expression — mirrors upstream's formula:
     //   max(0, coalesce(initial_weight, filament.weight) - used_weight)
-    let remaining_expr =
-        "CASE WHEN COALESCE(s.initial_weight, f.weight, 0.0) - s.used_weight < 0 \
+    let remaining_expr = "CASE WHEN COALESCE(s.initial_weight, f.weight, 0.0) - s.used_weight < 0 \
          THEN 0.0 \
          ELSE COALESCE(s.initial_weight, f.weight, 0.0) - s.used_weight END";
 
@@ -917,8 +914,7 @@ pub async fn find_groups(
         let group_key: Option<String> = row.try_get("group_key").ok().flatten();
         let spool_count: i64 = row.try_get("spool_count").unwrap_or(0);
         let in_use_count: i64 = row.try_get("in_use_count").unwrap_or(0);
-        let total_remaining_weight: f64 =
-            row.try_get("total_remaining_weight").unwrap_or(0.0);
+        let total_remaining_weight: f64 = row.try_get("total_remaining_weight").unwrap_or(0.0);
         let last_used: Option<String> = row.try_get_unchecked("last_used").ok().flatten();
         let filament_count: Option<i64> = if group_by == "vendor" {
             row.try_get("filament_count").ok()
@@ -966,8 +962,7 @@ pub async fn find_groups(
     };
 
     // Hydrate grouped entities (filament or vendor).
-    let mut results: Vec<crate::models::SpoolGroupResponse> =
-        Vec::with_capacity(group_rows.len());
+    let mut results: Vec<crate::models::SpoolGroupResponse> = Vec::with_capacity(group_rows.len());
 
     for gr in group_rows {
         let filament_obj = if group_by == "filament" {

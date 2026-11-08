@@ -25,6 +25,10 @@ Thumbs.db
 .env
 *.env.local
 
+# Test fixtures — may contain personal data, never commit
+fixtures/
+test-printers.local.toml
+
 # Generated types are COMMITTED and checked in CI.
 # Do not add frontend/src/api/types/ here.
 # Run `cargo gen-types` after changing API DTOs.

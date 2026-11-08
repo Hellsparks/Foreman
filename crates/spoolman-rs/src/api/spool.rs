@@ -211,10 +211,9 @@ pub async fn find_groups(
 ) -> ApiResult<(StatusCode, HeaderMap, Json<Vec<SpoolGroupResponse>>)> {
     let group_by = q.group_by.unwrap_or_default();
     if group_by.is_empty() {
-        return Err(SpoolmanError::BadRequest(
-            "group_by query parameter is required.".into(),
-        )
-        .into());
+        return Err(
+            SpoolmanError::BadRequest("group_by query parameter is required.".into()).into(),
+        );
     }
 
     let filter = db::SpoolGroupFilter {
@@ -260,7 +259,6 @@ pub async fn rename_field_value(
     Path(field): Path<String>,
     Json(req): Json<RenameFieldValueRequest>,
 ) -> ApiResult<Json<RenameFieldValueResult>> {
-    let count =
-        db::rename_field_value(&state.db.pool, &field, &req.value, &req.new_value).await?;
+    let count = db::rename_field_value(&state.db.pool, &field, &req.value, &req.new_value).await?;
     Ok(Json(RenameFieldValueResult { count }))
 }

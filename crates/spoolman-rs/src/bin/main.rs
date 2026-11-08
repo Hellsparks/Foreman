@@ -86,7 +86,10 @@ async fn root_handler(req: Request) -> Response {
         });
         (
             StatusCode::OK,
-            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
             body.to_string(),
         )
             .into_response()

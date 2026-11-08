@@ -90,7 +90,10 @@ async fn all_expected_routes_are_registered() {
             }
             Ok(_) => {} // any non-404 means the route exists
             Err(e) => {
-                missing.push(format!("{} {} (request error: {e})", entry.method, entry.path));
+                missing.push(format!(
+                    "{} {} (request error: {e})",
+                    entry.method, entry.path
+                ));
             }
         }
     }
