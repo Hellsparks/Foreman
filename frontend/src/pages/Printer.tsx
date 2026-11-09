@@ -409,7 +409,7 @@ export default function Printer() {
               <div className="webcam-view">
                 {webcams.length > 0 ? (
                   <img
-                    src={`${api.snapshotUrl(printerId)}?t=${camTs}`}
+                    src={api.snapshotUrl(printerId, camTs)}
                     alt={`${webcams[activeCam]?.name ?? "Webcam"} live view`}
                   />
                 ) : (

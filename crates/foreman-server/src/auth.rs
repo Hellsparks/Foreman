@@ -91,6 +91,12 @@ impl SetupCode {
     pub fn mark_used(&mut self) {
         self.used = true;
     }
+
+    /// The code while it can still be redeemed (desktop Mode A prefills it).
+    pub fn current(&self, now: Instant) -> Option<&str> {
+        (!self.used && now.saturating_duration_since(self.created) <= SETUP_CODE_TTL)
+            .then_some(self.code.as_str())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -150,14 +156,23 @@ pub struct AuthState {
     pub limiter: Mutex<RateLimiter>,
 }
 
-/// Static facts about this server (for `/api/info` and the network setting).
+/// Facts about this server (for `/api/info`, the network setting and mDNS).
 pub struct ServerInfo {
     pub server_id: String,
-    pub name: String,
     pub version: &'static str,
     pub desktop_mode: bool,
     pub configured_host: String,
-    pub bound_host: String,
+    pub port: u16,
+    pub hostname: String,
+    pub magic_dns: Option<String>,
+    /// Host the listener is bound to; sending a new value rebinds it.
+    pub bind: tokio::sync::watch::Sender<String>,
+}
+
+impl ServerInfo {
+    pub fn bound_host(&self) -> String {
+        self.bind.borrow().clone()
+    }
 }
 
 /// Who made the request (inserted by [`require_auth`]).
@@ -194,7 +209,7 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
 // Bind rule
 // ---------------------------------------------------------------------------
 
-fn is_loopback(host: &str) -> bool {
+pub fn is_loopback(host: &str) -> bool {
     host == "localhost"
         || host
             .parse::<IpAddr>()
@@ -291,6 +306,18 @@ pub fn needs_auth(path: &str) -> bool {
     (path.starts_with("/api/") || path.starts_with("/ws/")) && !OPEN_ROUTES.contains(&path)
 }
 
+/// Routes where `?token=` is accepted: WebSockets and files/images opened via
+/// `<img src>` / `<a href>`, none of which can carry an `Authorization` header.
+fn query_token_allowed(method: &axum::http::Method, path: &str) -> bool {
+    path.starts_with("/ws/")
+        || (method == axum::http::Method::GET
+            && path.starts_with("/api/printers/")
+            && (path.ends_with("/snapshot") || path.ends_with("/files/download")))
+}
+
+/// Audit name for sessions minted in-process by the desktop app before an admin exists.
+pub const LOCAL_APP_USER: &str = "local";
+
 /// Reject unauthenticated requests to protected routes; attach [`AuthCtx`] otherwise.
 pub async fn require_auth(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
     let path = req.uri().path().to_owned();
@@ -299,9 +326,9 @@ pub async fn require_auth(State(state): State<AppState>, mut req: Request, next:
     }
     let pool = &state.foreman_db.pool;
 
-    let username = match auth::admin_username(pool).await {
-        Ok(Some(u)) => u,
-        Ok(None) => return unauthorized("setup_required", "this server has no admin account yet"),
+    // No admin yet: only sessions minted in-process by the desktop app (Mode A) exist.
+    let admin = match auth::admin_username(pool).await {
+        Ok(a) => a,
         Err(e) => {
             warn!("auth: admin lookup failed: {e}");
             return unauthorized("unauthorized", "sign in required");
@@ -316,7 +343,7 @@ pub async fn require_auth(State(state): State<AppState>, mut req: Request, next:
         }
     } else {
         let token = session_token(headers).or_else(|| {
-            path.starts_with("/ws/")
+            query_token_allowed(req.method(), &path)
                 .then(|| query_token(&req))
                 .flatten()
         });
@@ -329,12 +356,14 @@ pub async fn require_auth(State(state): State<AppState>, mut req: Request, next:
         }
     };
 
-    match kind {
-        Some(kind) => {
+    match (kind, admin) {
+        (Some(kind), admin) => {
+            let username = admin.unwrap_or_else(|| LOCAL_APP_USER.to_owned());
             req.extensions_mut().insert(AuthCtx { username, kind });
             next.run(req).await
         }
-        None => unauthorized("unauthorized", "sign in required"),
+        (None, None) => unauthorized("setup_required", "this server has no admin account yet"),
+        (None, Some(_)) => unauthorized("unauthorized", "sign in required"),
     }
 }
 

@@ -55,9 +55,36 @@ function formatCode(raw: string): string {
   return s.length > 4 ? `${s.slice(0, 4)}-${s.slice(4)}` : s;
 }
 
-export function SetupView({ info, onDone }: { info: ServerInfo; onDone: (username: string) => void }) {
-  const addr = window.location.host;
-  const [code, setCode] = useState("");
+/** Shared by Setup and Login: where we are and how sessions are returned. */
+export interface ViewProps {
+  info: ServerInfo;
+  /** Server address shown in the frame and server row. */
+  addr: string;
+  /** Desktop app: ask for a bearer token instead of a cookie. */
+  returnToken: boolean;
+  onDone: (username: string, token: string | undefined) => void;
+  /** Desktop app: back to the server picker. */
+  onChange?: () => void;
+}
+
+function ChangeButton({ onChange }: { onChange?: () => void }) {
+  if (!onChange) return null;
+  return (
+    <button type="button" className="auth__btn auth__btn--sm" onClick={onChange}>
+      Change
+    </button>
+  );
+}
+
+export function SetupView({
+  info,
+  addr,
+  returnToken,
+  onDone,
+  onChange,
+  prefillCode,
+}: ViewProps & { prefillCode?: string }) {
+  const [code, setCode] = useState(prefillCode ?? "");
   const [username, setUsername] = useState("admin");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
@@ -82,8 +109,14 @@ export function SetupView({ info, onDone }: { info: ServerInfo; onDone: (usernam
     setBusy(true);
     setError("");
     try {
-      const res = await api.setupAdmin({ code, username: username.trim(), password: pw, remember: true });
-      onDone(res.username);
+      const res = await api.setupAdmin({
+        code,
+        username: username.trim(),
+        password: pw,
+        remember: true,
+        return_token: returnToken,
+      });
+      onDone(res.username, res.token);
     } catch (err) {
       setError(errText(err));
       setBusy(false);
@@ -91,7 +124,7 @@ export function SetupView({ info, onDone }: { info: ServerInfo; onDone: (usernam
   };
 
   return (
-    <AuthShell label={addr} crumb="Claim the server">
+    <AuthShell label={addr} crumb={onChange ? "Step 2 of 2 · Claim the server" : "Claim the server"}>
       <form className="auth__form" onSubmit={(e) => void submit(e)}>
         <div className="auth__server">
           <div style={{ flex: 1 }}>
@@ -100,6 +133,7 @@ export function SetupView({ info, onDone }: { info: ServerInfo; onDone: (usernam
               {addr} · Foreman {info.version} · new server
             </div>
           </div>
+          <ChangeButton onChange={onChange} />
         </div>
         <div>
           <h1 className="auth__title">Set up the admin account</h1>
@@ -174,8 +208,7 @@ export function SetupView({ info, onDone }: { info: ServerInfo; onDone: (usernam
   );
 }
 
-export function LoginView({ info, onDone }: { info: ServerInfo; onDone: (username: string) => void }) {
-  const addr = window.location.host;
+export function LoginView({ info, addr, returnToken, onDone, onChange }: ViewProps) {
   const [username, setUsername] = useState("");
   const [pw, setPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -193,8 +226,13 @@ export function LoginView({ info, onDone }: { info: ServerInfo; onDone: (usernam
     setBusy(true);
     setError("");
     try {
-      const res = await api.login({ username: username.trim(), password: pw, remember });
-      onDone(res.username);
+      const res = await api.login({
+        username: username.trim(),
+        password: pw,
+        remember,
+        return_token: returnToken,
+      });
+      onDone(res.username, res.token);
     } catch (err) {
       setError(errText(err));
       setBusy(false);
@@ -202,7 +240,7 @@ export function LoginView({ info, onDone }: { info: ServerInfo; onDone: (usernam
   };
 
   return (
-    <AuthShell label={addr} crumb="Sign in">
+    <AuthShell label={addr} crumb={onChange ? "Step 2 of 2 · Sign in" : "Sign in"}>
       <form className="auth__form" onSubmit={(e) => void submit(e)}>
         <div className="auth__server">
           <span className="auth__dot" aria-hidden="true" />
@@ -212,6 +250,7 @@ export function LoginView({ info, onDone }: { info: ServerInfo; onDone: (usernam
               {addr} · Foreman {info.version}
             </div>
           </div>
+          <ChangeButton onChange={onChange} />
         </div>
         <div>
           <h1 className="auth__title">Sign in</h1>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type ApiKey, type NetworkSettings } from "../api/client";
 import Button from "../ui/Button";
 import { useAuth } from "./AuthGate";
+import { useRoute } from "../desktop/route";
 
 /** SQLite `YYYY-MM-DD HH:MM:SS` (UTC) → local time. */
 function fmtTime(ts: string | null): string {
@@ -23,11 +24,32 @@ export default function SecuritySettings() {
   const [copied, setCopied] = useState(false);
   const [net, setNet] = useState<NetworkSettings | null>(null);
   const [error, setError] = useState("");
+  const [serverName, setServerName] = useState("");
+  const [savedName, setSavedName] = useState("");
+  const route = useRoute();
 
   useEffect(() => {
     api.listApiKeys().then(setKeys).catch((e) => setError(errText(e)));
     api.getNetwork().then(setNet).catch(() => {});
+    api
+      .serverInfo()
+      .then((i) => {
+        setServerName(i.name);
+        setSavedName(i.name);
+      })
+      .catch(() => {});
   }, []);
+
+  const rename = async () => {
+    setError("");
+    try {
+      const res = await api.renameServer(serverName.trim());
+      setServerName(res.name);
+      setSavedName(res.name);
+    } catch (e) {
+      setError(errText(e));
+    }
+  };
 
   const create = async () => {
     const n = name.trim();
@@ -91,6 +113,48 @@ export default function SecuritySettings() {
           Log out
         </Button>
       </div>
+
+      {route && (
+        <div className="security__row" style={{ marginTop: 2 }}>
+          <span style={{ flex: 1 }}>
+            Connected to <b>{route.serverName}</b>{" "}
+            <span className="auth__hint auth__mono">
+              {route.address}
+              {route.via ? ` · via ${route.via}` : ""}
+            </span>
+          </span>
+          <Button variant="secondary" onClick={route.switchServer}>
+            Switch server
+          </Button>
+        </div>
+      )}
+
+      <h3 className="auth__cap" style={{ margin: "var(--fw-space-6) 0 var(--fw-space-2)", fontWeight: "normal" }}>
+        Server name
+      </h3>
+      <form
+        style={{ display: "flex", gap: "var(--fw-space-2)" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void rename();
+        }}
+      >
+        <input
+          type="text"
+          className="auth__input"
+          style={{ flex: 1 }}
+          aria-label="Server name"
+          value={serverName}
+          maxLength={64}
+          onChange={(e) => setServerName(e.target.value)}
+        />
+        <Button type="submit" variant="secondary" disabled={!serverName.trim() || serverName.trim() === savedName}>
+          Rename
+        </Button>
+      </form>
+      <p className="auth__hint" style={{ margin: "var(--fw-space-2) 0 0" }}>
+        Shown in the app's server list and announced on the LAN.
+      </p>
 
       <h3 className="auth__cap" style={{ margin: "var(--fw-space-6) 0 var(--fw-space-2)", fontWeight: "normal" }}>
         API keys

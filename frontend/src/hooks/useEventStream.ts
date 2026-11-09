@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
+import { onConnectionChange, wsUrl as serverWsUrl } from "../api/conn";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
@@ -29,8 +30,7 @@ const MIN_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
 
 function wsUrl(): string {
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${window.location.host}/ws/events`;
+  return serverWsUrl("/ws/events");
 }
 
 /**
@@ -109,7 +109,19 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
   useEffect(() => {
     mountedRef.current = true;
     connect();
+    // Failover moved to another address: drop the old socket and reconnect at once.
+    const off = onConnectionChange(() => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      reconnectDelayRef.current = MIN_RECONNECT_MS;
+      const old = wsRef.current;
+      if (old) {
+        old.onclose = null;
+        old.close();
+      }
+      connect();
+    });
     return () => {
+      off();
       mountedRef.current = false;
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       wsRef.current?.close();

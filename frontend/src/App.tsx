@@ -11,33 +11,35 @@ import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
 import DevComponents from "./pages/DevComponents";
 import AuthGate from "./auth/AuthGate";
+import DesktopRoot from "./desktop/DesktopRoot";
+import { IS_TAURI } from "./shell/TopBar";
 
 export default function App() {
-  return (
-    <AuthGate>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Shell />}>
-            {/* Default route redirects to Fleet */}
-            <Route index element={<Navigate to="/fleet" replace />} />
-            <Route path="fleet/*" element={<Fleet />} />
-            <Route path="printer/:id" element={<Printer />} />
-            <Route path="jobs/*" element={<Jobs />} />
-            <Route path="library/*" element={<Library />} />
-            <Route path="projects/*" element={<Projects />} />
-            <Route path="filament/*" element={<Filament />} />
-            <Route path="service/*" element={<Service />} />
-            <Route path="tools/*" element={<Tools />} />
-            <Route path="settings/*" element={<Settings />} />
-            {/* Dev-only: not in the rail, reachable by URL */}
-            <Route path="dev/components" element={<DevComponents />} />
-            {/* 404 fallback within the shell */}
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthGate>
+  const app = (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Shell />}>
+          {/* Default route redirects to Fleet */}
+          <Route index element={<Navigate to="/fleet" replace />} />
+          <Route path="fleet/*" element={<Fleet />} />
+          <Route path="printer/:id" element={<Printer />} />
+          <Route path="jobs/*" element={<Jobs />} />
+          <Route path="library/*" element={<Library />} />
+          <Route path="projects/*" element={<Projects />} />
+          <Route path="filament/*" element={<Filament />} />
+          <Route path="service/*" element={<Service />} />
+          <Route path="tools/*" element={<Tools />} />
+          <Route path="settings/*" element={<Settings />} />
+          {/* Dev-only: not in the rail, reachable by URL */}
+          <Route path="dev/components" element={<DevComponents />} />
+          {/* 404 fallback within the shell */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
+  // The desktop app picks a server; the browser talks to the server that served it.
+  return IS_TAURI ? <DesktopRoot>{app}</DesktopRoot> : <AuthGate>{app}</AuthGate>;
 }
 
 function NotFound() {

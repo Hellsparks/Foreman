@@ -71,6 +71,9 @@ aes-gcm = "0.11"
 argon2 = "0.6"
 # Hidden password prompt for `foreman-server reset-admin`
 rpassword = "7"
+# LAN discovery (_foreman._tcp) + own-address listing for /api/info
+mdns-sd = "0.21"
+if-addrs = "0.15"
 
 [profile.release]
 opt-level = 3

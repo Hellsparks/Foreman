@@ -9,12 +9,9 @@ import type { ShellMacro } from "./types/ShellMacro";
 import type { CreateShellMacro } from "./types/CreateShellMacro";
 import type { UpdateShellMacro } from "./types/UpdateShellMacro";
 import type { ApiKey } from "./types/ApiKey";
+import { apiUrl, authHeaders, mediaUrl, wsUrl } from "./conn";
 
 export type { PrinterSsh, UpsertPrinterSsh, SftpEntry, ShellMacro, CreateShellMacro, UpdateShellMacro };
-
-/** Base URL for all API calls.  Empty string = same origin (works in both dev
- *  with Vite proxy and in production served by foreman-server). */
-const BASE = "";
 
 class ApiError extends Error {
   constructor(
@@ -30,14 +27,22 @@ class ApiError extends Error {
 /** Fired when a protected call gets 401 so the app can show the sign-in screen. */
 export const UNAUTHORIZED_EVENT = "foreman:unauthorized";
 
-async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(input, init);
+/** Fetch against the current server, with its bearer token (desktop app) if any. */
+function serverFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(apiUrl(path), {
+    ...init,
+    headers: { ...(init?.headers as Record<string, string> | undefined), ...authHeaders() },
+  });
+}
+
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const res = await serverFetch(path, init);
   if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   return res;
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await apiFetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
@@ -47,7 +52,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await apiFetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -62,7 +67,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function put<T>(path: string, body?: unknown): Promise<T> {
-  const res = await apiFetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -77,7 +82,7 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  const res = await apiFetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     method: "DELETE",
   });
   if (!res.ok) {
@@ -170,7 +175,7 @@ export interface PrinterCapabilities {
 
 /** POST body that doesn't return JSON (204 No Content). */
 async function postNoContent(path: string, body?: unknown): Promise<void> {
-  const res = await apiFetch(`${BASE}${path}`, {
+  const res = await apiFetch(path, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -199,7 +204,7 @@ async function req<T>(
     headers,
     body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined),
   };
-  const res = signalUnauthorized ? await apiFetch(`${BASE}${path}`, init) : await fetch(`${BASE}${path}`, init);
+  const res = signalUnauthorized ? await apiFetch(path, init) : await serverFetch(path, init);
   if (!res.ok) {
     let msg = `${method} ${path} → ${res.status}`;
     let code: string | null = null;
@@ -261,8 +266,9 @@ export const api = {
       api_key: string | null;
     }>,
   ) => put<PrinterWithStatus>(`/api/printers/${id}`, body),
-  /** URL for the camera snapshot proxy — use as <img src>. */
-  snapshotUrl: (id: number) => `/api/printers/${id}/snapshot`,
+  /** URL for the camera snapshot proxy — use as <img src>; `t` busts the cache. */
+  snapshotUrl: (id: number, t?: number) =>
+    mediaUrl(`/api/printers/${id}/snapshot${t ? `?t=${t}` : ""}`),
   /** List active (uncleared) attention items. */
   listAttention: () => get<AttentionItem[]>("/api/attention"),
   /** Dismiss a single attention item. */
@@ -348,10 +354,10 @@ export const api = {
     req<SftpEntry[]>("GET", `/api/printers/${id}/files?${q(path)}`),
   readFile: (id: number, path: string) =>
     req<TextFile>("GET", `/api/printers/${id}/files/read?${q(path)}`),
-  downloadUrl: (id: number, path: string) => `${BASE}/api/printers/${id}/files/download?${q(path)}`,
+  downloadUrl: (id: number, path: string) => mediaUrl(`/api/printers/${id}/files/download?${q(path)}`),
   /** Inline image URL for previews (raster formats only). */
   previewUrl: (id: number, path: string) =>
-    `${BASE}/api/printers/${id}/files/download?${q(path)}&inline=true`,
+    mediaUrl(`/api/printers/${id}/files/download?${q(path)}&inline=true`),
   /** Whole-file write; the server keeps `<file>.bak`. */
   writeFile: (id: number, path: string, content: string) =>
     req<{ ok: boolean; backup: boolean }>("PUT", `/api/printers/${id}/files/write`, { path, content }),
@@ -384,17 +390,15 @@ export const api = {
   deleteShellMacro: (id: number, mid: number) =>
     req<void>("DELETE", `/api/printers/${id}/shell-macros/${mid}`),
   /** WebSocket URL for the SSH terminal. */
-  terminalWsUrl: (id: number, cols: number, rows: number) => {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${window.location.host}/ws/printers/${id}/terminal?cols=${cols}&rows=${rows}`;
-  },
+  terminalWsUrl: (id: number, cols: number, rows: number) =>
+    wsUrl(`/ws/printers/${id}/terminal?cols=${cols}&rows=${rows}`),
   // ── Auth ─────────────────────────────────────────────────────────────────
   serverInfo: () => req<ServerInfo>("GET", "/api/info", undefined, undefined, false),
   me: () => req<{ username: string; kind: string }>("GET", "/api/auth/me", undefined, undefined, false),
-  setupAdmin: (body: { code: string; username: string; password: string; remember: boolean }) =>
-    req<{ username: string }>("POST", "/api/auth/setup", body, undefined, false),
-  login: (body: { username: string; password: string; remember: boolean }) =>
-    req<{ username: string }>("POST", "/api/auth/login", body, undefined, false),
+  setupAdmin: (body: { code: string; username: string; password: string; remember: boolean; return_token?: boolean }) =>
+    req<SessionResponse>("POST", "/api/auth/setup", body, undefined, false),
+  login: (body: { username: string; password: string; remember: boolean; return_token?: boolean }) =>
+    req<SessionResponse>("POST", "/api/auth/login", body, undefined, false),
   logout: () => req<void>("POST", "/api/auth/logout", undefined, undefined, false),
   listApiKeys: () => req<ApiKey[]>("GET", "/api/auth/api-keys"),
   /** `secret` is only returned here, once. */
@@ -404,13 +408,28 @@ export const api = {
   getNetwork: () => req<NetworkSettings>("GET", "/api/settings/network"),
   setNetwork: (allow_lan: boolean) =>
     req<NetworkSettings>("PUT", "/api/settings/network", { allow_lan }),
+  renameServer: (name: string) =>
+    req<{ server_id: string; name: string }>("PUT", "/api/settings/server", { name }),
 };
+
+/** `token` only when `return_token` was asked for (desktop app). */
+export interface SessionResponse {
+  username: string;
+  expires_at: number;
+  token?: string;
+}
+
+export interface ReportedAddress {
+  address: string;
+  kind: "loopback" | "lan_ip" | "lan_name" | "tailscale_ip" | "tailscale_name";
+}
 
 export interface ServerInfo {
   server_id: string;
   name: string;
   version: string;
   needs_setup: boolean;
+  addresses: ReportedAddress[];
 }
 
 export interface NetworkSettings {

@@ -4,6 +4,7 @@ mod auth;
 mod auth_api_tests;
 pub mod config;
 mod driver_manager;
+mod net;
 mod ssh_pool;
 mod state;
 
@@ -19,8 +20,17 @@ use spoolman_rs::{
     db::{extra_field, Db as SpoolmanDb},
     state::AppState as SpoolmanState,
 };
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use tokio::{signal, sync::broadcast};
+use std::{
+    future::IntoFuture as _,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, Instant},
+};
+use tokio::{
+    signal,
+    sync::{broadcast, oneshot, watch},
+};
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
@@ -36,6 +46,42 @@ use state::AppState;
 /// The caller is responsible for initialising a tracing subscriber before
 /// calling this function.
 pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
+    serve_with(cfg, None).await
+}
+
+/// In-process access for the desktop app (Mode A) to the server it embeds.
+#[derive(Clone)]
+pub struct LocalHandle {
+    pool: sqlx::SqlitePool,
+    auth: Arc<auth::AuthState>,
+    pub port: u16,
+}
+
+impl LocalHandle {
+    /// The setup code while no admin exists (so the app can prefill it).
+    pub fn setup_code(&self) -> Option<String> {
+        let slot = self.auth.setup_code.lock().ok()?;
+        slot.as_ref()?.current(Instant::now()).map(str::to_owned)
+    }
+
+    /// A session token for this app; works before an admin exists (audit user "local").
+    pub async fn app_token(&self) -> anyhow::Result<String> {
+        let (token, _) = foreman_core::auth::create_session(
+            &self.pool,
+            auth::REMEMBER_TTL_SECS,
+            Some("127.0.0.1"),
+            Some("foreman-desktop"),
+        )
+        .await?;
+        Ok(token)
+    }
+}
+
+/// [`serve`], optionally handing a [`LocalHandle`] to the caller once the server is up.
+pub async fn serve_with(
+    cfg: config::ServerConfig,
+    ready: Option<oneshot::Sender<LocalHandle>>,
+) -> anyhow::Result<()> {
     info!(
         port = cfg.port,
         host = %cfg.host,
@@ -79,13 +125,25 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     if let Some(reason) = bind_reason {
         warn!(configured = %cfg.host, "{reason}");
     }
+    let hostname = net::hostname();
+    let has_tailscale = net::interface_ips()
+        .iter()
+        .any(|(_, ip)| net::is_tailscale(*ip));
+    let magic_dns = if has_tailscale {
+        net::magic_dns_name().await
+    } else {
+        None
+    };
+    let (bind_tx, mut bind_rx) = watch::channel(bind_host);
     let server_info = Arc::new(auth::ServerInfo {
         server_id: server_id(&foreman_db).await?,
-        name: server_name(&foreman_db).await?,
         version: env!("CARGO_PKG_VERSION"),
         desktop_mode: cfg.desktop_mode,
         configured_host: cfg.host.clone(),
-        bound_host: bind_host.clone(),
+        port: cfg.port,
+        hostname,
+        magic_dns,
+        bind: bind_tx,
     });
     {
         let db = foreman_db.pool.clone();
@@ -161,31 +219,92 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         info: server_info,
     };
 
-    let app = build_router(app_state);
-
-    let addr: SocketAddr = format!("{}:{}", bind_host, cfg.port)
-        .parse()
-        .unwrap_or_else(|_| SocketAddr::from(([127, 0, 0, 1], 9090)));
-
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| anyhow::anyhow!("failed to bind {addr}: {err}"))?;
-
-    info!("listening on http://{addr}");
-    info!("health: http://{addr}/api/health");
-    info!("events: ws://{addr}/ws/events");
+    let app = build_router(app_state.clone());
 
     spawn_spoolman(&cfg).await;
 
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .map_err(|e| anyhow::anyhow!("server error: {e}"))?;
+    let mut ready = ready;
+    let handle = LocalHandle {
+        pool: app_state.foreman_db.pool.clone(),
+        auth: Arc::clone(&app_state.auth),
+        port: cfg.port,
+    };
+
+    // Serve; when the bind host changes (admin created, LAN toggle, rename) move the
+    // listener without touching drivers or open connections.
+    let mut shutdown = std::pin::pin!(shutdown_signal());
+    loop {
+        let host = bind_rx.borrow_and_update().clone();
+        let addr: SocketAddr = format!("{host}:{}", cfg.port)
+            .parse()
+            .unwrap_or_else(|_| SocketAddr::from(([127, 0, 0, 1], cfg.port)));
+        let listener = bind_with_retry(addr).await?;
+        info!("listening on http://{addr}");
+        info!("health: http://{addr}/api/health");
+        info!("events: ws://{addr}/ws/events");
+        if let Some(tx) = ready.take() {
+            let _ = tx.send(handle.clone());
+        }
+
+        let _announcer = if auth::is_loopback(&host) {
+            None
+        } else {
+            let ips: Vec<_> = match addr.ip() {
+                std::net::IpAddr::V4(v4) if !v4.is_unspecified() => vec![v4],
+                _ => net::interface_ips().into_iter().map(|(_, ip)| ip).collect(),
+            };
+            let name = api::auth::server_name(&app_state.foreman_db.pool, &app_state.info.hostname)
+                .await
+                .unwrap_or_else(|_| "Foreman".to_owned());
+            net::announce(
+                &app_state.info.server_id,
+                &name,
+                app_state.info.version,
+                &app_state.info.hostname,
+                cfg.port,
+                &ips,
+            )
+        };
+
+        let server = axum::serve(
+            listener,
+            app.clone()
+                .into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .into_future();
+        tokio::select! {
+            res = server => {
+                res.map_err(|e| anyhow::anyhow!("server error: {e}"))?;
+                break;
+            }
+            _ = &mut shutdown => break,
+            changed = bind_rx.changed() => {
+                if changed.is_err() {
+                    break;
+                }
+            }
+        }
+    }
 
     Ok(())
+}
+
+/// Bind, retrying briefly (the previous listener on the same port may still be closing).
+async fn bind_with_retry(addr: SocketAddr) -> anyhow::Result<tokio::net::TcpListener> {
+    let mut last = None;
+    for _ in 0..10 {
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(l) => return Ok(l),
+            Err(e) => {
+                last = Some(e);
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+        }
+    }
+    Err(anyhow::anyhow!(
+        "failed to bind {addr}: {}",
+        last.map(|e| e.to_string()).unwrap_or_default()
+    ))
 }
 
 /// Persistent server id (UUID v4, created once).
@@ -196,20 +315,6 @@ async fn server_id(db: &ForemanDb) -> anyhow::Result<String> {
     let id = uuid::Uuid::new_v4().to_string();
     repo::setting::set(&db.pool, "server.id", &id).await?;
     Ok(id)
-}
-
-/// Display name: `server.name` setting, else the machine's hostname.
-async fn server_name(db: &ForemanDb) -> anyhow::Result<String> {
-    if let Some(name) = repo::setting::get(&db.pool, "server.name").await? {
-        return Ok(name);
-    }
-    let host = std::env::var("HOSTNAME")
-        .or_else(|_| std::env::var("COMPUTERNAME"))
-        .ok()
-        .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty());
-    Ok(host.unwrap_or_else(|| "Foreman".to_owned()))
 }
 
 /// `foreman-server reset-admin`: set a new admin password from the terminal.
@@ -323,6 +428,10 @@ fn build_router(app_state: AppState) -> Router {
         .route(
             "/api/settings/network",
             get(api::auth::get_network).put(api::auth::put_network),
+        )
+        .route(
+            "/api/settings/server",
+            get(api::auth::get_server).put(api::auth::put_server),
         )
         .route("/api/printers", get(api::printers::list_printers))
         .route("/api/printers", post(api::printers::create_printer))

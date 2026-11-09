@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, UNAUTHORIZED_EVENT, type ServerInfo } from "../api/client";
 import { AuthShell, LoginView, SetupView } from "./AuthScreens";
 import "./Auth.css";
@@ -24,9 +24,26 @@ type Phase =
   | { kind: "login"; info: ServerInfo }
   | { kind: "ready"; info: ServerInfo; username: string };
 
+/** Desktop-app hooks; the browser uses none of these (cookie session, same origin). */
+export interface DesktopAuth {
+  /** Shown in the frame and server row. */
+  address: string;
+  /** Store the bearer token from login/setup. */
+  onToken: (token: string) => Promise<void> | void;
+  /** The token stopped working (logout, expiry, revoked). Mode A mints a new one here. */
+  onSignedOut: () => Promise<void> | void;
+  onChangeServer?: () => void;
+  /** Mode A: prefill the code the embedded server generated. */
+  setupCode?: string;
+  /** Mode A + "Let other devices connect": show setup even though the app token works. */
+  forceSetup?: boolean;
+}
+
 /** Shows Setup or Sign-in until the server accepts our session. */
-export default function AuthGate({ children }: { children: ReactNode }) {
+export default function AuthGate({ children, desktop }: { children: ReactNode; desktop?: DesktopAuth }) {
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
+  const desktopRef = useRef(desktop);
+  desktopRef.current = desktop;
 
   const resolve = useCallback(async () => {
     let info: ServerInfo;
@@ -36,7 +53,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       setPhase({ kind: "offline", message: e instanceof Error ? e.message : String(e) });
       return;
     }
-    if (info.needs_setup) {
+    if (info.needs_setup && desktopRef.current?.forceSetup) {
       setPhase({ kind: "setup", info });
       return;
     }
@@ -44,8 +61,11 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       const me = await api.me();
       setPhase({ kind: "ready", info, username: me.username });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) setPhase({ kind: "login", info });
-      else setPhase({ kind: "offline", message: e instanceof Error ? e.message : String(e) });
+      if (e instanceof ApiError && e.status === 401) {
+        setPhase(info.needs_setup ? { kind: "setup", info } : { kind: "login", info });
+      } else {
+        setPhase({ kind: "offline", message: e instanceof Error ? e.message : String(e) });
+      }
     }
   }, []);
 
@@ -56,22 +76,37 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   // Any protected call that comes back 401 (session expired, revoked, server
   // reset) drops us back to the sign-in screen.
   useEffect(() => {
-    const onUnauthorized = () => {
+    const onUnauthorized = async () => {
       setPhase((p) => (p.kind === "ready" ? { kind: "loading" } : p));
-      void resolve();
+      await desktopRef.current?.onSignedOut();
+      await resolve();
     };
-    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    const handler = () => void onUnauthorized();
+    window.addEventListener(UNAUTHORIZED_EVENT, handler);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler);
   }, [resolve]);
 
   const logout = useCallback(async () => {
     await api.logout().catch(() => {});
+    await desktopRef.current?.onSignedOut();
     await resolve();
   }, [resolve]);
 
+  const signedIn = (info: ServerInfo) => async (username: string, token: string | undefined) => {
+    if (token) await desktopRef.current?.onToken(token);
+    setPhase({ kind: "ready", info, username });
+  };
+
+  const addr = desktop?.address ?? window.location.host;
+  const common = {
+    addr,
+    returnToken: !!desktop,
+    onChange: desktop?.onChangeServer,
+  };
+
   switch (phase.kind) {
     case "loading":
-      return <AuthShell label="" crumb="Connecting" />;
+      return <AuthShell label={addr} crumb="Connecting" />;
     case "offline":
       return (
         <AuthShell label="Not connected" crumb="Connection">
@@ -82,14 +117,26 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               <button type="button" className="auth__btn auth__btn--pri" onClick={() => void resolve()}>
                 Try again
               </button>
+              {desktop?.onChangeServer && (
+                <button type="button" className="auth__btn" onClick={desktop.onChangeServer}>
+                  Switch server
+                </button>
+              )}
             </div>
           </div>
         </AuthShell>
       );
     case "setup":
-      return <SetupView info={phase.info} onDone={(username) => setPhase({ kind: "ready", info: phase.info, username })} />;
+      return (
+        <SetupView
+          info={phase.info}
+          {...common}
+          prefillCode={desktop?.setupCode}
+          onDone={(u, t) => void signedIn(phase.info)(u, t)}
+        />
+      );
     case "login":
-      return <LoginView info={phase.info} onDone={(username) => setPhase({ kind: "ready", info: phase.info, username })} />;
+      return <LoginView info={phase.info} {...common} onDone={(u, t) => void signedIn(phase.info)(u, t)} />;
     case "ready":
       return (
         <AuthContext.Provider value={{ username: phase.username, logout }}>{children}</AuthContext.Provider>

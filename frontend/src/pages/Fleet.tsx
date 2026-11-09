@@ -461,9 +461,7 @@ function PrinterCard({
   const jobName = status?.filename ?? (state === "offline" ? "Not reachable" : "Ready for next job");
   const sub = jobSubLine(status);
   const isOffline = state === "offline";
-  const snapshotUrl = isOffline
-    ? null
-    : `${api.snapshotUrl(printer.id)}${snapshotTs ? `?t=${snapshotTs}` : ""}`;
+  const snapshotUrl = isOffline ? null : api.snapshotUrl(printer.id, snapshotTs);
 
   return (
     <article

@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ConnectionState } from "../hooks/useEventStream";
+import { useRoute } from "../desktop/route";
 
 /** True only when running inside the Tauri shell. */
 export const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -59,10 +60,17 @@ interface TopBarProps {
 
 export default function TopBar({ connectionState: _connectionState, attentionCount }: TopBarProps) {
   const win = IS_TAURI ? getCurrentWindow() : null;
+  const route = useRoute();
 
   return (
     <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
       <div id={TOPBAR_SLOT_ID} className="topbar__page" />
+
+      {route?.via && (
+        <span className="topbar__via" title={`${route.serverName} via ${route.address}`}>
+          via {route.via}
+        </span>
+      )}
 
       {/* Search field */}
       <label className="topbar__search" aria-label="Search or run a command">
