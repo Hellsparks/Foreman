@@ -21,6 +21,8 @@ use foreman_core::{repo, ssh_client};
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::json;
+use std::time::Duration;
+use tokio::time::Instant;
 use tracing::{info, warn};
 
 use crate::{api::ssh, state::AppState};
@@ -181,11 +183,25 @@ async fn handle_terminal(
 
     let mut lines = LineAudit::default();
 
+    // Any input or output counts as activity; 0 = never auto-close.
+    let idle_limit = match session.cfg.idle_timeout_secs {
+        t if t > 0 => Duration::from_secs(t as u64),
+        _ => Duration::from_secs(60 * 60 * 24 * 365),
+    };
+    let idle = tokio::time::sleep(idle_limit);
+    tokio::pin!(idle);
+
     loop {
         tokio::select! {
+            _ = &mut idle => {
+                send_json(&mut ws_tx, json!({ "type": "exit", "reason": "idle" })).await;
+                info!(printer_id, "terminal closed after idle timeout");
+                break;
+            }
             msg = ch_rx.wait() => match msg {
                 Some(russh::ChannelMsg::Data { data })
                 | Some(russh::ChannelMsg::ExtendedData { data, .. }) => {
+                    idle.as_mut().reset(Instant::now() + idle_limit);
                     if ws_tx.send(Message::Binary(data.to_vec().into())).await.is_err() {
                         break;
                     }
@@ -202,6 +218,7 @@ async fn handle_terminal(
             msg = ws_rx.next() => match msg {
                 Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Input { data }) => {
+                        idle.as_mut().reset(Instant::now() + idle_limit);
                         for line in lines.feed(&data) {
                             audit(&state, printer_id, &user, &format!("terminal: {line}")).await;
                         }

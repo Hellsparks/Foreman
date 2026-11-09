@@ -11,4 +11,8 @@ auth_type: string | null,
 /**
  * Only used when auth_type = "password"; encrypted at rest. `None` keeps the stored one.
  */
-password: string | null, };
+password: string | null, 
+/**
+ * Idle auto-close in seconds (0 = never). `None` keeps the stored value (default 900).
+ */
+idle_timeout_secs: number | null, };

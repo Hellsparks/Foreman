@@ -53,37 +53,58 @@ function cssVar(name: string): string {
 // Files tab
 // ---------------------------------------------------------------------------
 
-export function FilesTab(props: { printerId: number; firmware: string; isPrinting: boolean }) {
-  return <SshTab {...props} mode="files" />;
+export function TerminalTab({ printerId, firmware }: { printerId: number; firmware: string }) {
+  if (firmware === "bambu") {
+    return (
+      <div className="pf" role="tabpanel" aria-label="Terminal">
+        <div className="pf-note">Bambu printers have no SSH, so there is no terminal.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="pf" role="tabpanel" aria-label="Terminal">
+      <SshTerminal printerId={printerId} />
+      <span className="pf-hint">
+        A real terminal (xterm.js, SSH from the Foreman server). It stays open while you switch tabs; commands you type
+        and macros you run are recorded in the printer's audit log. Idle auto-close is set in Config → SSH.
+      </span>
+    </div>
+  );
 }
 
-export function TerminalTab(props: { printerId: number; firmware: string }) {
-  return <SshTab {...props} isPrinting={false} mode="terminal" />;
-}
-
-function SshTab({
+export function FilesTab({
   printerId,
   firmware,
   isPrinting,
-  mode,
 }: {
   printerId: number;
   firmware: string;
   isPrinting: boolean;
-  mode: "files" | "terminal";
 }) {
-  const label = mode === "files" ? "Files" : "Terminal";
+  const label = "Files";
   const [info, setInfo] = useState<FilesInfo | null>(null);
+  const [closed, setClosed] = useState(false);
   const [connErr, setConnErr] = useState<{ msg: string; code: string | null } | null>(null);
   const { toasts, addToast, removeToast } = useToasts();
 
   const connect = useCallback(() => {
     setConnErr(null);
+    setClosed(false);
     api
       .filesInfo(printerId)
       .then(setInfo)
       .catch((e) => setConnErr({ msg: errText(e), code: errCode(e) }));
   }, [printerId]);
+
+  const disconnect = async () => {
+    try {
+      await api.closeSshSession(printerId);
+    } catch {
+      /* already closed */
+    }
+    setInfo(null);
+    setClosed(true);
+  };
 
   useEffect(() => {
     if (firmware !== "bambu") connect();
@@ -93,9 +114,7 @@ function SshTab({
     return (
       <div className="pf" role="tabpanel" aria-label={label}>
         <div className="pf-note">
-          {mode === "files"
-            ? "Bambu printers have no SSH. Files are browsed over the printer's built-in FTPS (SD card, LAN mode)."
-            : "Bambu printers have no SSH, so there is no terminal."}
+          Bambu printers have no SSH. Files are browsed over the printer's built-in FTPS (SD card, LAN mode).
         </div>
       </div>
     );
@@ -111,14 +130,28 @@ function SshTab({
     }
   };
 
-  const conn = info ? `${info.user}@${info.host}:${info.port}` : "connecting…";
+  const conn = info ? `${info.user}@${info.host}:${info.port}` : closed ? "disconnected" : "connecting…";
 
   return (
     <div className="pf" role="tabpanel" aria-label={label}>
       <div className="pf-topbar">
         <span className="pf-conn">{conn}</span>
-        {info && <span className="pf-proto">● {mode === "files" ? "SFTP over SSH" : "SSH"}</span>}
+        {info && <span className="pf-proto">● SFTP over SSH</span>}
+        {info && (
+          <button type="button" className="pf-btn pf-btn--sm" onClick={() => void disconnect()}>
+            Close connection
+          </button>
+        )}
       </div>
+
+      {closed && !connErr && (
+        <div className="pf-note">
+          <span style={{ flex: "1 1 260px" }}>Connection closed.</span>
+          <button type="button" className="pf-btn" onClick={connect}>
+            Connect
+          </button>
+        </div>
+      )}
 
       {connErr && (
         <div className={`pf-note ${connErr.code === "host_key_changed" ? "pf-note--bad" : "pf-note--warn"}`}>
@@ -138,16 +171,7 @@ function SshTab({
         </div>
       )}
 
-      {info && mode === "files" && (
-        <FileBrowser printerId={printerId} info={info} isPrinting={isPrinting} toast={addToast} />
-      )}
-      {info && mode === "terminal" && <SshTerminal printerId={printerId} info={info} />}
-      {info && mode === "terminal" && (
-        <span className="pf-hint">
-          A real terminal (xterm.js, SSH from the Foreman server). Runs as {info.user}; commands you type and macros you
-          run are recorded in the printer's audit log.
-        </span>
-      )}
+      {info && <FileBrowser printerId={printerId} info={info} isPrinting={isPrinting} toast={addToast} />}
 
       <ToastStack toasts={toasts} onDismiss={removeToast} />
     </div>
@@ -581,12 +605,14 @@ function xtermTheme() {
   };
 }
 
-function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }) {
+function SshTerminal({ printerId }: { printerId: number }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState<"connecting" | "ready" | "closed" | "error">("connecting");
   const [statusMsg, setStatusMsg] = useState("");
+  const [errCodeState, setErrCodeState] = useState<string | null>(null);
+  const [conn, setConn] = useState<{ user: string; host: string; port: number } | null>(null);
   const [size, setSize] = useState({ cols: 120, rows: 32 });
   const [paste, setPaste] = useState<string[] | null>(null);
   const [macros, setMacros] = useState<ShellMacro[]>([]);
@@ -627,19 +653,37 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
     wsRef.current = ws;
     setStatus("connecting");
     setStatusMsg("");
+    setErrCodeState(null);
+    // StrictMode/reconnects can leave an older socket closing; ignore its events.
+    const current = () => wsRef.current === ws;
     ws.onmessage = (ev) => {
+      if (!current()) return;
       if (typeof ev.data === "string") {
         try {
-          const m = JSON.parse(ev.data) as { type: string; message?: string };
+          const m = JSON.parse(ev.data) as {
+            type: string;
+            message?: string;
+            code?: string | null;
+            reason?: string;
+            user?: string;
+            host?: string;
+            port?: number;
+          };
           if (m.type === "ready") {
             setStatus("ready");
+            setConn({ user: m.user ?? "", host: m.host ?? "", port: m.port ?? 22 });
             term.focus();
           } else if (m.type === "error") {
             setStatus("error");
             setStatusMsg(m.message ?? "error");
+            setErrCodeState(m.code ?? null);
             term.writeln(`\r\n[foreman] ${m.message ?? "error"}`);
           } else if (m.type === "exit") {
             setStatus("closed");
+            if (m.reason === "idle") {
+              setStatusMsg("closed after idle timeout");
+              term.writeln("\r\n[foreman] connection closed after idle timeout");
+            }
           }
         } catch {
           /* ignore malformed control frame */
@@ -648,7 +692,9 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
         term.write(new Uint8Array(ev.data as ArrayBuffer));
       }
     };
-    ws.onclose = () => setStatus((s) => (s === "error" ? s : "closed"));
+    ws.onclose = () => {
+      if (current()) setStatus((s) => (s === "error" ? s : "closed"));
+    };
 
     const onData = term.onData((d) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
@@ -666,6 +712,8 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
     host.addEventListener("paste", onPaste, true);
 
     const ro = new ResizeObserver(() => {
+      // Hidden tab (display: none) reports 0×0; keep the last size.
+      if (host.clientWidth === 0 || host.clientHeight === 0) return;
       fit.fit();
       setSize({ cols: term.cols, rows: term.rows });
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
@@ -736,19 +784,55 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
   };
 
   const statusText =
-    status === "ready" ? "" : status === "connecting" ? " · connecting…" : status === "error" ? ` · ${statusMsg}` : " · disconnected";
+    status === "ready"
+      ? ""
+      : status === "connecting"
+        ? " · connecting…"
+        : statusMsg
+          ? ` · ${statusMsg}`
+          : " · disconnected";
+
+  const closeConnection = () => {
+    setStatusMsg("closed");
+    wsRef.current?.close();
+    setStatus("closed");
+    termRef.current?.writeln("\r\n[foreman] connection closed");
+  };
+
+  const trust = async () => {
+    try {
+      await api.trustHostKey(printerId);
+      setSession((n) => n + 1);
+    } catch (e) {
+      setStatusMsg(`trust failed: ${errText(e)}`);
+    }
+  };
 
   return (
     <section aria-label="SSH terminal" className="pf-term">
       <div className="pf-term__bar">
         <span className="pf-term__label">
-          {info.user}@{info.host}:{info.port} · xterm {size.cols}×{size.rows}
+          {conn ? `${conn.user}@${conn.host}:${conn.port}` : "SSH"} · xterm {size.cols}×{size.rows}
           {statusText}
         </span>
+        {status === "ready" && (
+          <span className="pf-snip">
+            <button type="button" onClick={closeConnection}>
+              Close connection
+            </button>
+          </span>
+        )}
+        {errCodeState === "host_key_changed" && (
+          <span className="pf-snip pf-snip--armed">
+            <button type="button" onClick={() => void trust()}>
+              Trust new host key
+            </button>
+          </span>
+        )}
         {(status === "closed" || status === "error") && (
           <span className="pf-snip">
             <button type="button" onClick={() => setSession((n) => n + 1)}>
-              Reconnect
+              {status === "closed" ? "Connect" : "Reconnect"}
             </button>
           </span>
         )}
@@ -906,6 +990,14 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
 // SSH settings (Config tab)
 // ---------------------------------------------------------------------------
 
+const IDLE_OPTIONS = [
+  { label: "5 minutes", value: 300 },
+  { label: "15 minutes", value: 900 },
+  { label: "1 hour", value: 3600 },
+  { label: "4 hours", value: 14400 },
+  { label: "Never (close manually)", value: 0 },
+];
+
 export interface SshSettingsHandle {
   /** Persist SSH settings if the user changed anything. Throws on failure. */
   save(): Promise<void>;
@@ -929,6 +1021,7 @@ export function SshSettings({
   const [port, setPort] = useState(22);
   const [auth, setAuth] = useState<"key" | "password">("key");
   const [password, setPassword] = useState("");
+  const [idle, setIdle] = useState(900);
   const [pubKey, setPubKey] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -938,6 +1031,7 @@ export function SshSettings({
     setUser(c.ssh_user);
     setPort(c.ssh_port);
     setAuth(c.auth_type === "password" ? "password" : "key");
+    setIdle(c.idle_timeout_secs);
   };
 
   useEffect(() => {
@@ -964,6 +1058,7 @@ export function SshSettings({
           ssh_port: port,
           auth_type: auth,
           password: auth === "password" && password ? password : null,
+          idle_timeout_secs: idle,
         });
         apply(c);
         setPassword("");
@@ -971,7 +1066,7 @@ export function SshSettings({
         setMsg(null);
       },
     }),
-    [touched, firmware, user, port, auth, password, printerId],
+    [touched, firmware, user, port, auth, password, idle, printerId],
   );
 
   if (firmware === "bambu") return null;
@@ -1061,6 +1156,20 @@ export function SshSettings({
             value={port}
             onChange={(e) => change(setPort)(Number(e.target.value))}
           />
+        </label>
+        <label>
+          Close idle connections after
+          <select
+            className="pf-ssh__field"
+            value={idle}
+            onChange={(e) => change(setIdle)(Number(e.target.value))}
+          >
+            {IDLE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

@@ -195,6 +195,8 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 **Upload:** raw request body streamed to SFTP (`POST /files/upload?path=`), not multipart; overwriting an existing file keeps a `.bak` like Save.
 
+**Connection lifetime (owner request):** SFTP calls reuse one pooled SSH session per printer (first call ~3 s on HellV0, then ~30 ms). The terminal and Files tabs stay mounted after first open, so switching tabs no longer drops the shell. Both have a "Close connection" button; idle auto-close is per printer (`printer_ssh.idle_timeout_secs`, migration 0005, default 15 min, 0 = never), enforced server-side for pooled sessions (30 s reaper) and terminals (no input/output). Changing SSH settings, trusting a new key or removing the printer closes the pooled session.
+
 **HellV0 verification:** handshake + TOFU pin verified on the real printer (fingerprint matches ssh-keyscan). `test-printers.local.toml` has no HellV0 SSH credentials, so listing/reading `printer.cfg` and running `uptime` in the terminal are still to be verified — boxes marked `[~]` until then.
 
 ### Session 18 — 2026-11-09 (2.4 connection paths + Config tab)

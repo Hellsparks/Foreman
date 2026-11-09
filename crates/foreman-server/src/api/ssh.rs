@@ -27,7 +27,7 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt as _;
 use tracing::{info, warn};
 
-use crate::state::AppState;
+use crate::{ssh_pool::PooledSftp, state::AppState};
 
 pub(crate) const HOST_KEY_ATTENTION_KIND: &str = "ssh_host_key";
 
@@ -209,7 +209,15 @@ pub(crate) async fn open_session(state: &AppState, printer_id: i64) -> ApiResult
     Ok(Session { conn, cfg, host })
 }
 
-async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<(Session, SftpFs, Roots)> {
+/// The printer's pooled SFTP session, opening (and pinning/authenticating) one if needed.
+async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<Arc<PooledSftp>> {
+    if let Some(s) = state.ssh_pool.get(printer_id).await {
+        return Ok(s);
+    }
+    let _guard = state.ssh_pool.open_lock.lock().await;
+    if let Some(s) = state.ssh_pool.get(printer_id).await {
+        return Ok(s);
+    }
     let session = open_session(state, printer_id).await?;
     let fs = match ssh_client::open_sftp(&session.conn).await {
         Ok(s) => SftpFs::new(s),
@@ -218,8 +226,23 @@ async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<(Session, SftpF
             return Err(e.into());
         }
     };
-    let roots = Roots::discover(&fs).await?;
-    Ok((session, fs, roots))
+    let roots = match Roots::discover(&fs).await {
+        Ok(r) => r,
+        Err(e) => {
+            session.conn.disconnect().await;
+            return Err(e.into());
+        }
+    };
+    info!(printer_id, host = %session.host, "SSH session opened");
+    let pooled = PooledSftp::new(
+        session.conn,
+        fs,
+        roots,
+        session.cfg.ssh_user,
+        session.host,
+        session.cfg.ssh_port,
+    );
+    Ok(state.ssh_pool.insert(printer_id, pooled).await)
 }
 
 async fn audit(state: &AppState, printer_id: i64, user: &str, command: &str) {
@@ -272,9 +295,9 @@ pub async fn upsert_ssh(
         Some(pw) if !pw.is_empty() => Some(state.secrets.seal(pw)?),
         _ => None,
     };
-    Ok(Json(
-        repo::printer_ssh::upsert(pool, id, body, sealed).await?,
-    ))
+    let cfg = repo::printer_ssh::upsert(pool, id, body, sealed).await?;
+    state.ssh_pool.close(id).await;
+    Ok(Json(cfg))
 }
 
 /// `DELETE /api/printers/{id}/ssh`
@@ -283,6 +306,7 @@ pub async fn delete_ssh(
     Path(id): Path<i64>,
 ) -> ApiResult<StatusCode> {
     repo::printer_ssh::delete(&state.foreman_db.pool, id).await?;
+    state.ssh_pool.close(id).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -293,6 +317,7 @@ pub async fn trust_host_key(
 ) -> ApiResult<Json<PrinterSsh>> {
     let pool = &state.foreman_db.pool;
     let fp = repo::printer_ssh::trust_pending_host_key(pool, id).await?;
+    state.ssh_pool.close(id).await;
     info!(printer_id = id, %fp, "user trusted new SSH host key");
     if let Ok(Some(item)) =
         repo::attention::get_active_by_printer_kind(pool, id, HOST_KEY_ATTENTION_KIND).await
@@ -306,23 +331,39 @@ pub async fn trust_host_key(
     Ok(Json(repo::printer_ssh::get(pool, id).await?))
 }
 
-/// `POST /api/printers/{id}/ssh/test` — connect + authenticate + resolve home. Runs no command.
+/// `POST /api/printers/{id}/ssh/test` — fresh connect + authenticate + resolve home. Runs no command.
 pub async fn test_ssh(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, _fs, roots) = open_fs(&state, id).await?;
-    let fp = session.conn.received_fingerprint();
-    let user = session.cfg.ssh_user.clone();
-    let host = session.host.clone();
-    session.conn.disconnect().await;
+    state.ssh_pool.close(id).await;
+    let s = open_fs(&state, id).await?;
     Ok(Json(json!({
         "ok": true,
-        "user": user,
-        "host": host,
-        "home": roots.home,
-        "host_key_fingerprint": fp,
+        "user": s.user,
+        "host": s.host,
+        "home": s.roots.home,
+        "host_key_fingerprint": s.fingerprint,
     })))
+}
+
+/// `GET /api/printers/{id}/ssh/session` — is a pooled session open, and for how long.
+pub async fn session_status(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Json<serde_json::Value> {
+    match state.ssh_pool.info(id).await {
+        Some(i) => {
+            Json(json!({ "open": true, "open_secs": i.open_secs, "idle_secs": i.idle_secs }))
+        }
+        None => Json(json!({ "open": false })),
+    }
+}
+
+/// `DELETE /api/printers/{id}/ssh/session` — close the pooled SFTP session now.
+pub async fn close_session(State(state): State<AppState>, Path(id): Path<i64>) -> StatusCode {
+    state.ssh_pool.close(id).await;
+    StatusCode::NO_CONTENT
 }
 
 // ---------------------------------------------------------------------------
@@ -356,15 +397,13 @@ pub async fn roots(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, _fs, roots) = open_fs(&state, id).await?;
-    let body = json!({
-        "user": session.cfg.ssh_user,
-        "host": session.host,
-        "port": session.cfg.ssh_port,
-        "roots": roots,
-    });
-    session.conn.disconnect().await;
-    Ok(Json(body))
+    let s = open_fs(&state, id).await?;
+    Ok(Json(json!({
+        "user": s.user,
+        "host": s.host,
+        "port": s.port,
+        "roots": s.roots,
+    })))
 }
 
 /// `GET /api/printers/{id}/files?path=`
@@ -373,10 +412,8 @@ pub async fn list_files(
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<Response> {
-    let (session, fs, _) = open_fs(&state, id).await?;
-    let res = remote_fs::list(&fs, &q.path).await;
-    session.conn.disconnect().await;
-    Ok(Json(res?).into_response())
+    let s = open_fs(&state, id).await?;
+    Ok(Json(remote_fs::list(&s.fs, &q.path).await?).into_response())
 }
 
 /// `GET /api/printers/{id}/files/read?path=` — UTF-8 text (tail if large).
@@ -385,10 +422,8 @@ pub async fn read_file(
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<Response> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    let res = remote_fs::read_text(&fs, &roots, &q.path).await;
-    session.conn.disconnect().await;
-    Ok(Json(res?).into_response())
+    let s = open_fs(&state, id).await?;
+    Ok(Json(remote_fs::read_text(&s.fs, &s.roots, &q.path).await?).into_response())
 }
 
 /// `GET /api/printers/{id}/files/download?path=` — streamed raw bytes.
@@ -397,15 +432,13 @@ pub async fn download_file(
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<Response> {
-    let (session, fs, _) = open_fs(&state, id).await?;
+    let s = open_fs(&state, id).await?;
     let path = remote_fs::normalize(&q.path)?;
-    let file = match fs.session().open(path.clone()).await {
-        Ok(f) => f,
-        Err(e) => {
-            session.conn.disconnect().await;
-            return Err(AppError::Driver(format!("sftp open '{path}': {e}")).into());
-        }
-    };
+    let file =
+        s.fs.session()
+            .open(path.clone())
+            .await
+            .map_err(|e| AppError::Driver(format!("sftp open '{path}': {e}")))?;
     let name: String = path
         .rsplit('/')
         .next()
@@ -413,8 +446,8 @@ pub async fn download_file(
         .chars()
         .filter(|c| !c.is_control() && *c != '"' && *c != '\\')
         .collect();
-    // The stream owns the session so it stays open until the body is fully sent.
-    let keep = (session, fs);
+    // The stream holds the pooled session so it can't be dropped mid-download.
+    let keep = s;
     let stream = tokio_util::io::ReaderStream::new(file).map(move |chunk| {
         let _ = &keep;
         chunk
@@ -438,14 +471,13 @@ pub async fn write_file(
     Path(id): Path<i64>,
     Json(body): Json<WriteBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    let res = remote_fs::write_with_backup(&fs, &roots, &body.path, body.content.as_bytes()).await;
-    session.conn.disconnect().await;
-    let backup = res?;
+    let s = open_fs(&state, id).await?;
+    let backup =
+        remote_fs::write_with_backup(&s.fs, &s.roots, &body.path, body.content.as_bytes()).await?;
     audit(
         &state,
         id,
-        &session.cfg.ssh_user,
+        &s.user,
         &format!(
             "sftp write {}{}",
             body.path,
@@ -483,18 +515,16 @@ pub async fn save_and_restart(
         ..ApiError::from(e)
     })?;
 
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    if !remote_fs::is_klipper_cfg(&roots, &body.path) {
-        session.conn.disconnect().await;
+    let s = open_fs(&state, id).await?;
+    if !remote_fs::is_klipper_cfg(&s.roots, &body.path) {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "only .cfg files under printer_data/config can be saved with FIRMWARE_RESTART",
         ));
     }
-    let res = remote_fs::write_with_backup(&fs, &roots, &body.path, body.content.as_bytes()).await;
-    session.conn.disconnect().await;
-    let backup = res?;
-    let user = session.cfg.ssh_user;
+    let backup =
+        remote_fs::write_with_backup(&s.fs, &s.roots, &body.path, body.content.as_bytes()).await?;
+    let user = s.user.clone();
     audit(
         &state,
         id,
@@ -527,9 +557,10 @@ pub async fn upload_file(
     Query(q): Query<PathQuery>,
     body: Body,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
+    let s = open_fs(&state, id).await?;
+    let (fs, roots) = (&s.fs, &s.roots);
     let result: Result<(String, u64), ApiError> = async {
-        let path = remote_fs::prepare_upload(&fs, &roots, &q.path).await?;
+        let path = remote_fs::prepare_upload(fs, roots, &q.path).await?;
         let mut file = fs
             .session()
             .create(path.clone())
@@ -550,12 +581,11 @@ pub async fn upload_file(
         Ok((path, total))
     }
     .await;
-    session.conn.disconnect().await;
     let (path, total) = result?;
     audit(
         &state,
         id,
-        &session.cfg.ssh_user,
+        &s.user,
         &format!("sftp upload {path} ({total} bytes)"),
     )
     .await;
@@ -568,17 +598,9 @@ pub async fn mkdir(
     Path(id): Path<i64>,
     Json(body): Json<MkdirBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    let res = remote_fs::mkdir(&fs, &roots, &body.path).await;
-    session.conn.disconnect().await;
-    let path = res?;
-    audit(
-        &state,
-        id,
-        &session.cfg.ssh_user,
-        &format!("sftp mkdir {path}"),
-    )
-    .await;
+    let s = open_fs(&state, id).await?;
+    let path = remote_fs::mkdir(&s.fs, &s.roots, &body.path).await?;
+    audit(&state, id, &s.user, &format!("sftp mkdir {path}")).await;
     Ok(Json(json!({ "ok": true, "path": path })))
 }
 
@@ -588,17 +610,9 @@ pub async fn rename_file(
     Path(id): Path<i64>,
     Json(body): Json<RenameBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    let res = remote_fs::rename(&fs, &roots, &body.from, &body.to).await;
-    session.conn.disconnect().await;
-    let (from, to) = res?;
-    audit(
-        &state,
-        id,
-        &session.cfg.ssh_user,
-        &format!("sftp rename {from} -> {to}"),
-    )
-    .await;
+    let s = open_fs(&state, id).await?;
+    let (from, to) = remote_fs::rename(&s.fs, &s.roots, &body.from, &body.to).await?;
+    audit(&state, id, &s.user, &format!("sftp rename {from} -> {to}")).await;
     Ok(Json(json!({ "ok": true, "path": to })))
 }
 
@@ -608,17 +622,9 @@ pub async fn delete_file(
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<StatusCode> {
-    let (session, fs, roots) = open_fs(&state, id).await?;
-    let res = remote_fs::delete(&fs, &roots, &q.path).await;
-    session.conn.disconnect().await;
-    let path = res?;
-    audit(
-        &state,
-        id,
-        &session.cfg.ssh_user,
-        &format!("sftp delete {path}"),
-    )
-    .await;
+    let s = open_fs(&state, id).await?;
+    let path = remote_fs::delete(&s.fs, &s.roots, &q.path).await?;
+    audit(&state, id, &s.user, &format!("sftp delete {path}")).await;
     Ok(StatusCode::NO_CONTENT)
 }
 

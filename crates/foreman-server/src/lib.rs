@@ -1,6 +1,7 @@
 mod api;
 pub mod config;
 mod driver_manager;
+mod ssh_pool;
 mod state;
 
 use axum::{
@@ -87,6 +88,19 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     info!(pub_key = %ssh_pub, "SSH identity ready");
     let ssh_identity = Arc::new((ssh_key, ssh_pub));
 
+    let ssh_pool = Arc::new(ssh_pool::SshPool::default());
+    {
+        let ssh_pool = Arc::clone(&ssh_pool);
+        let db = foreman_db.pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                ssh_pool.reap(&db).await;
+            }
+        });
+    }
+
     let app_state = AppState {
         foreman_db,
         bus_tx: Arc::clone(&tx),
@@ -94,6 +108,7 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         http_client,
         ssh_identity,
         secrets,
+        ssh_pool,
     };
 
     // Static file serving for the frontend.
@@ -204,6 +219,10 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
             post(api::ssh::trust_host_key),
         )
         .route("/api/printers/{id}/ssh/test", post(api::ssh::test_ssh))
+        .route(
+            "/api/printers/{id}/ssh/session",
+            get(api::ssh::session_status).delete(api::ssh::close_session),
+        )
         .route("/api/printers/{id}/files/roots", get(api::ssh::roots))
         .route(
             "/api/printers/{id}/files",

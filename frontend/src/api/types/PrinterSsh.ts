@@ -19,4 +19,8 @@ pending_host_key_fingerprint: string | null,
 /**
  * A password is stored (never returned).
  */
-has_password: boolean, created_at: string, updated_at: string, };
+has_password: boolean, 
+/**
+ * Close idle SSH/SFTP/terminal connections after this many seconds; 0 = never.
+ */
+idle_timeout_secs: number, created_at: string, updated_at: string, };

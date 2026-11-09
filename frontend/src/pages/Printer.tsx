@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
@@ -79,54 +79,37 @@ function usePersistentFlag(key: string): [boolean, (f: (v: boolean) => boolean) 
   return [value, update];
 }
 
-/** A vertical side column that collapses to a narrow strip with a rotated label. */
-function LiveColumn({
+const OVERLAY_ALPHA_KEY = "foreman.live.overlayOpacity";
+
+function loadOverlayAlpha(): number {
+  const v = Number(localStorage.getItem(OVERLAY_ALPHA_KEY));
+  return Number.isFinite(v) && v >= 0.2 && v <= 1 ? v : 0.85;
+}
+
+/** A panel that slides in from the right edge over the webcam feed. */
+function CamOverlay({
   label,
-  collapsed,
-  onToggle,
+  onClose,
   width,
   actions,
   children,
 }: {
   label: string;
-  collapsed: boolean;
-  onToggle: () => void;
+  onClose: () => void;
   width: number;
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  if (collapsed) {
-    return (
-      <button
-        type="button"
-        className="live-col live-col--collapsed"
-        onClick={onToggle}
-        aria-expanded={false}
-        aria-label={`Show ${label}`}
-        title={`Show ${label}`}
-      >
-        <span className="live-col__chev" aria-hidden="true">‹</span>
-        <span className="live-col__vlabel">{label}</span>
-      </button>
-    );
-  }
   return (
-    <section className="live-col live-panel" aria-label={label} style={{ flexBasis: width, width }}>
-      <div className="live-col__head">
+    <section className="cam-ov" aria-label={label} style={{ width }}>
+      <div className="cam-ov__head">
         <SectionLabel as="h2" style={{ flex: 1 }}>{label}</SectionLabel>
         {actions}
-        <button
-          type="button"
-          className="live-col__toggle"
-          onClick={onToggle}
-          aria-expanded={true}
-          aria-label={`Hide ${label}`}
-          title={`Hide ${label}`}
-        >
+        <button type="button" className="cam-ov__close" onClick={onClose} aria-label={`Hide ${label}`} title={`Hide ${label}`}>
           ›
         </button>
       </div>
-      <div className="live-col__body">{children}</div>
+      <div className="cam-ov__body">{children}</div>
     </section>
   );
 }
@@ -144,6 +127,10 @@ export default function Printer() {
 
   // Tab
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Live");
+  const [visited, setVisited] = useState<Set<string>>(() => new Set(["Live"]));
+  useEffect(() => {
+    setVisited((v) => (v.has(activeTab) ? v : new Set(v).add(activeTab)));
+  }, [activeTab]);
 
   const [topbarSlot, setTopbarSlot] = useState<HTMLElement | null>(null);
   useEffect(() => setTopbarSlot(document.getElementById(TOPBAR_SLOT_ID)), []);
@@ -183,8 +170,10 @@ export default function Printer() {
   const [showAllMacros, setShowAllMacros] = useState(false);
 
   // Live tab side columns (remembered per browser)
-  const [consoleCollapsed, setConsoleCollapsed] = usePersistentFlag("foreman.live.consoleCollapsed");
-  const [macrosCollapsed, setMacrosCollapsed] = usePersistentFlag("foreman.live.macrosCollapsed");
+  const [consoleOpen, setConsoleOpen] = usePersistentFlag("foreman.live.consoleOpen");
+  const [macrosOpen, setMacrosOpen] = usePersistentFlag("foreman.live.macrosOpen");
+  const [overlayAlpha, setOverlayAlpha] = useState(loadOverlayAlpha);
+  useEffect(() => localStorage.setItem(OVERLAY_ALPHA_KEY, String(overlayAlpha)), [overlayAlpha]);
 
   // ---------------------------------------------------------------------------
   // Load printer data on mount
@@ -397,6 +386,37 @@ export default function Printer() {
                     </span>
                   )}
                 </div>
+                <div className="webcam-bar__spacer" />
+                <div className="webcam-bar__tools">
+                  <label className="webcam-bar__opacity" title="Overlay opacity">
+                    <span>Opacity</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={1}
+                      step={0.05}
+                      value={overlayAlpha}
+                      onChange={(e) => setOverlayAlpha(Number(e.target.value))}
+                      aria-label="Overlay opacity"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="webcam-bar__toggle"
+                    aria-pressed={consoleOpen}
+                    onClick={() => setConsoleOpen((v) => !v)}
+                  >
+                    Console
+                  </button>
+                  <button
+                    type="button"
+                    className="webcam-bar__toggle"
+                    aria-pressed={macrosOpen}
+                    onClick={() => setMacrosOpen((v) => !v)}
+                  >
+                    Macros
+                  </button>
+                </div>
               </div>
               <div className="webcam-view">
                 {webcams.length > 0 ? (
@@ -407,12 +427,10 @@ export default function Printer() {
                 ) : (
                   <span style={{ color: "var(--fw-muted)" }}>No camera configured</span>
                 )}
-              </div>
-            </section>
-          </div>
 
-          {/* Console column (collapsible) */}
-          <LiveColumn label="Console" collapsed={consoleCollapsed} onToggle={() => setConsoleCollapsed((v) => !v)} width={320}>
+                <div className="cam-ov-stack" style={{ "--cam-ov-alpha": `${Math.round(overlayAlpha * 100)}%` } as CSSProperties}>
+          {consoleOpen && (
+          <CamOverlay label="Console" onClose={() => setConsoleOpen(() => false)} width={340}>
               <div className="console-output" ref={consoleRef}>
                 {consoleLines.length === 0
                   ? "Ready — type a G-code command below."
@@ -452,14 +470,14 @@ export default function Printer() {
                 />
                 <button type="button" onClick={sendGcode}>Send</button>
               </div>
-          </LiveColumn>
+          </CamOverlay>
+          )}
 
-          {/* Macros column (collapsible) */}
-          <LiveColumn
+          {macrosOpen && (
+          <CamOverlay
             label={`Macros${showAllMacros ? "" : " · favourites"}`}
-            collapsed={macrosCollapsed}
-            onToggle={() => setMacrosCollapsed((v) => !v)}
-            width={260}
+            onClose={() => setMacrosOpen(() => false)}
+            width={280}
             actions={
               <Button variant="small" onClick={() => setShowAllMacros((v) => !v)}>
                 {showAllMacros ? "Favourites" : `All ${macros.length}`}
@@ -482,7 +500,12 @@ export default function Printer() {
                   </span>
                 )}
               </div>
-          </LiveColumn>
+          </CamOverlay>
+          )}
+                </div>
+              </div>
+            </section>
+          </div>
 
           {/* RIGHT COLUMN: temps, toolhead, extruder */}
           <div className="printer-live__right">
@@ -731,16 +754,24 @@ export default function Printer() {
             </section>
           </div>
         </div>
-      ) : activeTab === "Files" ? (
-        <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
-      ) : activeTab === "Terminal" ? (
-        <TerminalTab printerId={printerId} firmware={printer.firmware} />
-      ) : activeTab === "Config" ? (
+      ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Config" ? (
         <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
       ) : (
         <div className="printer-placeholder" role="tabpanel" aria-label={activeTab}>
           <p>{activeTab} — coming soon</p>
           <p style={{ fontSize: 13 }}>This tab will be implemented in a future phase.</p>
+        </div>
+      )}
+
+      {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
+      {visited.has("Files") && (
+        <div hidden={activeTab !== "Files"}>
+          <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
+        </div>
+      )}
+      {visited.has("Terminal") && (
+        <div hidden={activeTab !== "Terminal"}>
+          <TerminalTab printerId={printerId} firmware={printer.firmware} />
         </div>
       )}
 
@@ -1397,46 +1428,6 @@ function PrinterConfigTab({
         </label>
       </section>
       </div>
-
-      {/* ── Remove printer ───────────────────────────────────────── */}
-      <section
-        style={{
-          border: "1px solid var(--fw-danger)",
-          background: "var(--fw-raised)",
-          padding: 20,
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <div style={{ flex: "1 1 260px" }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Remove printer</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--fw-muted)" }}>
-            Removes it from Foreman. Job history is kept.
-          </p>
-        </div>
-        <button
-          type="button"
-          style={{
-            minHeight: 44,
-            padding: "0 16px",
-            border: "1px solid var(--fw-danger)",
-            color: "var(--fw-danger)",
-            background: "transparent",
-            borderRadius: 2,
-            cursor: "pointer",
-          }}
-          onClick={() => {
-            if (confirm(`Remove "${printer.name}" from Foreman?`)) {
-              api.deletePrinter(printerId).catch(() => {});
-              window.history.back();
-            }
-          }}
-        >
-          Remove printer…
-        </button>
-      </section>
     </div>
   );
 }

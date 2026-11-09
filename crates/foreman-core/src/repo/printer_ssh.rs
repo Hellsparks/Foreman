@@ -27,6 +27,7 @@ struct SshRow {
     host_key_fingerprint: Option<String>,
     pending_host_key_fingerprint: Option<String>,
     has_password: i64,
+    idle_timeout_secs: i64,
     created_at: String,
     updated_at: String,
 }
@@ -46,6 +47,7 @@ impl SshRow {
             host_key_fingerprint: self.host_key_fingerprint,
             pending_host_key_fingerprint: self.pending_host_key_fingerprint,
             has_password: self.has_password != 0,
+            idle_timeout_secs: self.idle_timeout_secs,
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         }
@@ -59,7 +61,7 @@ impl SshRow {
 const SQL_GET: &str =
     "SELECT id, printer_id, ssh_user, ssh_port, auth_type, host_key_fingerprint, \
      pending_host_key_fingerprint, (password IS NOT NULL) AS has_password, \
-     created_at, updated_at \
+     idle_timeout_secs, created_at, updated_at \
      FROM printer_ssh WHERE printer_id = ?";
 
 /// Fetch SSH settings for a printer.  Returns `NotFound` if none are configured.
@@ -112,17 +114,22 @@ pub async fn upsert(
     if req.ssh_user.trim().is_empty() {
         return Err(AppError::InvalidInput("SSH user is required".into()));
     }
+    if req.idle_timeout_secs.is_some_and(|t| t < 0) {
+        return Err(AppError::InvalidInput("idle timeout must be >= 0".into()));
+    }
     let now = Utc::now().to_rfc3339();
 
     sqlx::query(
         "INSERT INTO printer_ssh \
-           (printer_id, ssh_user, ssh_port, auth_type, password, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) \
+           (printer_id, ssh_user, ssh_port, auth_type, password, idle_timeout_secs, \
+            created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, COALESCE(?, 900), ?, ?) \
          ON CONFLICT(printer_id) DO UPDATE SET \
            ssh_user   = excluded.ssh_user, \
            ssh_port   = excluded.ssh_port, \
            auth_type  = excluded.auth_type, \
            password   = COALESCE(excluded.password, printer_ssh.password), \
+           idle_timeout_secs = COALESCE(?, printer_ssh.idle_timeout_secs), \
            updated_at = excluded.updated_at",
     )
     .bind(printer_id)
@@ -130,8 +137,10 @@ pub async fn upsert(
     .bind(port)
     .bind(&auth_type)
     .bind(sealed_password.as_deref())
+    .bind(req.idle_timeout_secs)
     .bind(&now)
     .bind(&now)
+    .bind(req.idle_timeout_secs)
     .execute(pool)
     .await
     .map_err(|e| AppError::Database(e.to_string()))?;
@@ -276,6 +285,7 @@ mod tests {
                 ssh_port: Some(22),
                 auth_type: Some("key".to_owned()),
                 password: None,
+                idle_timeout_secs: None,
             },
             None,
         )
@@ -285,6 +295,7 @@ mod tests {
         assert_eq!(cfg.ssh_user, "pi");
         assert_eq!(cfg.ssh_port, 22);
         assert_eq!(cfg.auth_type, "key");
+        assert_eq!(cfg.idle_timeout_secs, 900);
         assert!(cfg.host_key_fingerprint.is_none());
     }
 
@@ -301,6 +312,7 @@ mod tests {
                 ssh_port: None,
                 auth_type: None,
                 password: None,
+                idle_timeout_secs: Some(0),
             },
             None,
         )
@@ -315,6 +327,7 @@ mod tests {
                 ssh_port: Some(2222),
                 auth_type: None,
                 password: None,
+                idle_timeout_secs: None,
             },
             None,
         )
@@ -323,6 +336,10 @@ mod tests {
 
         assert_eq!(updated.ssh_user, "klipper");
         assert_eq!(updated.ssh_port, 2222);
+        assert_eq!(
+            updated.idle_timeout_secs, 0,
+            "omitted timeout keeps stored value"
+        );
     }
 
     #[tokio::test]
@@ -338,6 +355,7 @@ mod tests {
                 ssh_port: None,
                 auth_type: None,
                 password: None,
+                idle_timeout_secs: None,
             },
             None,
         )
@@ -388,6 +406,7 @@ mod tests {
             ssh_port: None,
             auth_type: Some("password".to_owned()),
             password: None,
+            idle_timeout_secs: None,
         };
         let cfg = upsert(&db.pool, pid, req(), Some("enc:v1:abc".into()))
             .await

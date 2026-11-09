@@ -166,6 +166,9 @@ pub struct PrinterSsh {
     pub pending_host_key_fingerprint: Option<String>,
     /// A password is stored (never returned).
     pub has_password: bool,
+    /// Close idle SSH/SFTP/terminal connections after this many seconds; 0 = never.
+    #[ts(type = "number")]
+    pub idle_timeout_secs: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -181,6 +184,9 @@ pub struct UpsertPrinterSsh {
     pub auth_type: Option<String>,
     /// Only used when auth_type = "password"; encrypted at rest. `None` keeps the stored one.
     pub password: Option<String>,
+    /// Idle auto-close in seconds (0 = never). `None` keeps the stored value (default 900).
+    #[ts(type = "number | null")]
+    pub idle_timeout_secs: Option<i64>,
 }
 
 // ---------------------------------------------------------------------------

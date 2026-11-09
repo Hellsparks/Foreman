@@ -78,7 +78,7 @@ impl SshConnection {
             .and_then(|s| s.received_fingerprint.clone())
     }
 
-    pub async fn disconnect(self) {
+    pub async fn disconnect(&self) {
         let _ = self
             .handle
             .disconnect(russh::Disconnect::ByApplication, "", "English")

@@ -323,6 +323,10 @@ export const api = {
       `/api/printers/${id}/ssh/test`,
     ),
   filesInfo: (id: number) => req<FilesInfo>("GET", `/api/printers/${id}/files/roots`),
+  /** Pooled SFTP session state on the server. */
+  sshSession: (id: number) =>
+    req<{ open: boolean; open_secs?: number; idle_secs?: number }>("GET", `/api/printers/${id}/ssh/session`),
+  closeSshSession: (id: number) => req<void>("DELETE", `/api/printers/${id}/ssh/session`),
   listFiles: (id: number, path: string) =>
     req<SftpEntry[]>("GET", `/api/printers/${id}/files?${q(path)}`),
   readFile: (id: number, path: string) =>
