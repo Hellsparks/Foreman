@@ -13,4 +13,6 @@ pub struct AppState {
     pub foreman_db: ForemanDb,
     pub bus_tx: Arc<broadcast::Sender<ServerEvent>>,
     pub driver_manager: Arc<DriverManager>,
+    /// Shared HTTP client for proxying snapshot URLs.
+    pub http_client: reqwest::Client,
 }

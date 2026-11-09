@@ -120,3 +120,20 @@ pub struct UpdatePrinterPath {
     pub url: Option<String>,
     pub priority: Option<i64>,
 }
+
+// ---------------------------------------------------------------------------
+// AttentionItem
+// ---------------------------------------------------------------------------
+
+/// A live attention item (cleared_at IS NULL in the DB).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AttentionItem {
+    pub id: i64,
+    pub printer_id: Option<i64>,
+    /// Kind tag: "offline" | "error" (auto-raised) + future manual kinds.
+    pub kind: String,
+    pub title: String,
+    pub body: Option<String>,
+    pub created_at: DateTime<Utc>,
+}

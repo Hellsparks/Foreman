@@ -7,7 +7,7 @@
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -96,6 +96,57 @@ pub async fn delete_printer(
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => (
             StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /api/printers/:id/snapshot`
+///
+/// Proxies the first webcam snapshot URL found in the printer's cached
+/// capabilities.  Returns 404 if no snapshot URL is available.
+/// Used by the UI to refresh camera thumbnails every 10 s without exposing
+/// the raw camera URL to the browser (avoids CORS issues).
+pub async fn snapshot(State(state): State<AppState>, Path(id): Path<i64>) -> impl IntoResponse {
+    let Some(snapshot_url) = state.driver_manager.get_snapshot_url(id).await else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "no snapshot URL for this printer" })),
+        )
+            .into_response();
+    };
+
+    match state
+        .http_client
+        .get(&snapshot_url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let content_type = resp
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("image/jpeg")
+                .to_owned();
+            match resp.bytes().await {
+                Ok(bytes) => (
+                    StatusCode::OK,
+                    [(header::CONTENT_TYPE, content_type)],
+                    bytes,
+                )
+                    .into_response(),
+                Err(e) => (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response(),
+            }
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
             Json(serde_json::json!({ "error": e.to_string() })),
         )
             .into_response(),

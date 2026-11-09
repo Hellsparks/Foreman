@@ -27,14 +27,14 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     throw new ApiError(res.status, `POST ${path} → ${res.status}`);
@@ -68,12 +68,29 @@ export interface PrinterWithStatus {
   status: PrinterStatus | null;
 }
 
+/** An active attention item. */
+export interface AttentionItem {
+  id: number;
+  printer_id: number | null;
+  kind: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+}
+
 export const api = {
   health: () => get<HealthResponse>("/api/health"),
   listPrinters: () => get<PrinterWithStatus[]>("/api/printers"),
   createPrinter: (req: CreatePrinter) =>
     post<Printer>("/api/printers", req),
   deletePrinter: (id: number) => del(`/api/printers/${id}`),
+  /** URL for the camera snapshot proxy — use as <img src>. */
+  snapshotUrl: (id: number) => `/api/printers/${id}/snapshot`,
+  /** List active (uncleared) attention items. */
+  listAttention: () => get<AttentionItem[]>("/api/attention"),
+  /** Dismiss a single attention item. */
+  dismissAttention: (id: number) =>
+    post<void>(`/api/attention/${id}/dismiss`),
 };
 
 export { ApiError };
