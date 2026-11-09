@@ -983,7 +983,12 @@ mod tests {
         install_drivers();
         let path = dir.join("test.db");
         std::fs::File::create(&path).unwrap();
-        let url = format!("sqlite://{}", path.display());
+        let path_str = path.to_string_lossy().replace('\\', "/");
+        let url = if path_str.starts_with('/') {
+            format!("sqlite://{path_str}")
+        } else {
+            format!("sqlite:///{path_str}")
+        };
         let pool = AnyPool::connect(&url).await.unwrap();
         // Create the tables needed by extra_field helpers.
         sqlx::query(
