@@ -5,7 +5,7 @@ import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPat
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
 import { BackButton, StatusChip, SectionLabel, Button } from "../ui";
-import { FilesTab, SshSettings } from "./PrinterFiles";
+import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import "./Printer.css";
 
@@ -49,7 +49,7 @@ const STEPS = [0.1, 1, 10, 25, 50, 100];
 const BABY_STEPS = [-0.05, -0.01, 0.01, 0.05];
 const EXT_LENGTHS = [10, 25, 50, 100];
 const EXT_SPEEDS = [2, 5, 10];
-const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Config"] as const;
+const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Terminal", "Config"] as const;
 const DEFAULT_PRESETS = [
   { label: "PLA",  nozzle: 215, bed: 60 },
   { label: "PETG", nozzle: 245, bed: 85 },
@@ -272,7 +272,7 @@ export default function Printer() {
 
         {/* Tab bar */}
         <div className="printer-tabs" role="tablist" aria-label="Printer sections">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
             <button
               key={t}
               role="tab"
@@ -660,6 +660,8 @@ export default function Printer() {
         </div>
       ) : activeTab === "Files" ? (
         <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
+      ) : activeTab === "Terminal" ? (
+        <TerminalTab printerId={printerId} firmware={printer.firmware} />
       ) : activeTab === "Config" ? (
         <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
       ) : (

@@ -52,16 +52,26 @@ function cssVar(name: string): string {
 // Files tab
 // ---------------------------------------------------------------------------
 
-export function FilesTab({
+export function FilesTab(props: { printerId: number; firmware: string; isPrinting: boolean }) {
+  return <SshTab {...props} mode="files" />;
+}
+
+export function TerminalTab(props: { printerId: number; firmware: string }) {
+  return <SshTab {...props} isPrinting={false} mode="terminal" />;
+}
+
+function SshTab({
   printerId,
   firmware,
   isPrinting,
+  mode,
 }: {
   printerId: number;
   firmware: string;
   isPrinting: boolean;
+  mode: "files" | "terminal";
 }) {
-  const [sub, setSub] = useState<"browse" | "term">("browse");
+  const label = mode === "files" ? "Files" : "Terminal";
   const [info, setInfo] = useState<FilesInfo | null>(null);
   const [connErr, setConnErr] = useState<{ msg: string; code: string | null } | null>(null);
   const { toasts, addToast, removeToast } = useToasts();
@@ -80,10 +90,11 @@ export function FilesTab({
 
   if (firmware === "bambu") {
     return (
-      <div className="pf" role="tabpanel" aria-label="Files">
+      <div className="pf" role="tabpanel" aria-label={label}>
         <div className="pf-note">
-          Bambu printers have no SSH. Files are browsed over the printer's built-in FTPS (SD card, LAN mode). No
-          terminal.
+          {mode === "files"
+            ? "Bambu printers have no SSH. Files are browsed over the printer's built-in FTPS (SD card, LAN mode)."
+            : "Bambu printers have no SSH, so there is no terminal."}
         </div>
       </div>
     );
@@ -102,24 +113,10 @@ export function FilesTab({
   const conn = info ? `${info.user}@${info.host}:${info.port}` : "connecting…";
 
   return (
-    <div className="pf" role="tabpanel" aria-label="Files">
+    <div className="pf" role="tabpanel" aria-label={label}>
       <div className="pf-topbar">
-        <div role="tablist" aria-label="Files or terminal" className="pf-seg">
-          <button type="button" role="tab" aria-selected={sub === "browse"} onClick={() => setSub("browse")}>
-            Files
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={sub === "term"}
-            onClick={() => setSub("term")}
-            disabled={!info}
-          >
-            Terminal
-          </button>
-        </div>
         <span className="pf-conn">{conn}</span>
-        {info && <span className="pf-proto">● SFTP over SSH</span>}
+        {info && <span className="pf-proto">● {mode === "files" ? "SFTP over SSH" : "SSH"}</span>}
       </div>
 
       {connErr && (
@@ -140,11 +137,11 @@ export function FilesTab({
         </div>
       )}
 
-      {info && sub === "browse" && (
+      {info && mode === "files" && (
         <FileBrowser printerId={printerId} info={info} isPrinting={isPrinting} toast={addToast} />
       )}
-      {info && sub === "term" && <SshTerminal printerId={printerId} info={info} />}
-      {info && sub === "term" && (
+      {info && mode === "terminal" && <SshTerminal printerId={printerId} info={info} />}
+      {info && mode === "terminal" && (
         <span className="pf-hint">
           A real terminal (xterm.js, SSH from the Foreman server). Runs as {info.user}; commands you type and macros you
           run are recorded in the printer's audit log.

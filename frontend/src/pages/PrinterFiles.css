@@ -19,27 +19,6 @@
   gap: 8px;
 }
 
-.pf-seg {
-  display: flex;
-}
-
-.pf-seg button {
-  min-height: 40px;
-  padding: 0 14px;
-  margin-left: -1px;
-  border: 1px solid var(--fw-muted);
-  background: var(--fw-raised);
-  color: var(--fw-text);
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.pf-seg button[aria-selected="true"] {
-  border-color: var(--fw-accent-hover);
-  background: var(--fw-accent-hover);
-  color: var(--fw-on-accent);
-}
-
 .pf-conn {
   flex: 1;
   font-family: var(--fw-mono);
