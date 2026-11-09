@@ -69,32 +69,24 @@ body {
 .rail__header {
   display: flex;
   align-items: center;
-  gap: var(--fw-space-3);
-  padding: var(--fw-space-4);
-  min-height: 56px;
+  gap: 10px;
+  padding: 0 16px 16px;
+  min-height: 44px;
+  margin-top: 16px;
   border-bottom: 1px solid var(--fw-border);
+  margin-bottom: 8px;
   overflow: hidden;
   flex-shrink: 0;
 }
 
-.rail__logo {
+.rail__logo-icon {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  background: var(--fw-accent-hover);
-  color: var(--fw-on-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 11px var(--fw-mono);
-  letter-spacing: 0;
-  border-radius: var(--fw-radius-control);
+  color: var(--fw-accent);
 }
 
 .rail__app-name {
-  font: 600 var(--fw-type-ui) / 1 var(--fw-mono);
-  letter-spacing: var(--fw-tracking-label);
-  text-transform: uppercase;
+  font: 700 13px / 1 var(--fw-mono);
+  letter-spacing: 0.12em;
   color: var(--fw-text);
   white-space: nowrap;
   opacity: 1;
@@ -125,19 +117,19 @@ body {
 .rail__link {
   display: flex;
   align-items: center;
-  gap: var(--fw-space-3);
-  padding: 0 var(--fw-space-4);
+  gap: 12px;
+  padding: 0 16px;
   min-height: 44px;
-  color: var(--fw-muted);
+  color: var(--fw-text);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
+  border-left: 3px solid transparent;
   transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
 }
 
 .rail__link:hover {
   background: var(--fw-background);
-  color: var(--fw-text);
 }
 
 .rail__link:focus-visible {
@@ -145,22 +137,11 @@ body {
   outline-offset: -2px;
 }
 
-/* Active marker: left accent bar + tinted background */
+/* Active marker: 3 px accent bar + raised background */
 .rail__link[aria-current="page"] {
-  color: var(--fw-text);
-  background: var(--fw-background);
-}
-
-.rail__link[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
-  background: var(--fw-accent-hover);
-  border-radius: 0 var(--fw-radius-control) var(--fw-radius-control) 0;
+  background: var(--fw-raised);
+  border-left-color: var(--fw-accent);
+  font-weight: bold;
 }
 
 .rail__icon {
@@ -193,14 +174,16 @@ body {
 .rail__toggle {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
   width: 100%;
   min-height: 44px;
-  padding: 0 var(--fw-space-4);
+  padding: 0 18px;
   background: transparent;
   border: none;
   color: var(--fw-muted);
   cursor: pointer;
+  text-align: left;
+  font: 13px/1 var(--fw-sans);
   transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
 }
 
@@ -216,22 +199,16 @@ body {
 
 .rail__toggle-icon {
   flex-shrink: 0;
-  transition: transform var(--fw-duration-normal) cubic-bezier(0.2, 0, 0, 1);
-}
-
-.rail[data-collapsed="true"] .rail__toggle-icon {
-  transform: rotate(180deg);
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
 .topbar {
   display: flex;
   align-items: center;
-  gap: var(--fw-space-3);
-  padding: 0 var(--fw-space-6);
-  min-height: 56px;
+  gap: 12px;
+  padding: 12px 32px;
   flex-shrink: 0;
-  background: var(--fw-surface);
+  background: var(--fw-background);
   border-bottom: 1px solid var(--fw-border);
   /* Prevent text/element selection and HTML drag-and-drop from hijacking
      the Wayland window-drag initiated via startDragging(). */
@@ -249,67 +226,82 @@ body {
   user-select: none;
 }
 
-/* Fake search field — will become command palette trigger */
+/* Search field — real input wrapped in a label */
 .topbar__search {
-  flex: 1;
-  max-width: 320px;
+  flex: 1 1 320px;
+  max-width: 560px;
   display: flex;
   align-items: center;
-  gap: var(--fw-space-2);
-  height: 32px;
-  padding: 0 var(--fw-space-3);
-  background: var(--fw-background);
-  border: 1px solid var(--fw-border);
-  border-radius: var(--fw-radius-control);
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--fw-raised);
+  border: 1px solid var(--fw-muted);
+  box-sizing: border-box;
+  border-radius: 2px;
+  cursor: text;
   color: var(--fw-muted);
-  font: var(--fw-type-ui) / 1 var(--fw-sans);
-  cursor: pointer;
-  transition: border-color var(--fw-duration-fast), color var(--fw-duration-fast);
+  transition: border-color var(--fw-duration-fast);
 }
 
-.topbar__search:hover {
-  border-color: var(--fw-muted);
-  color: var(--fw-text);
-}
-
-.topbar__search:focus-visible {
+.topbar__search:focus-within {
   outline: 2px solid var(--fw-focus);
   outline-offset: 2px;
+  border-color: var(--fw-focus);
+}
+
+.topbar__search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fw-text);
+  font: 14px / 1 var(--fw-sans);
+  outline: none;
+  /* Cancel browser search-field styling on WebKit */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.topbar__search-input::placeholder {
+  color: var(--fw-muted);
+}
+
+/* Remove the default clear button added by some browsers */
+.topbar__search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .topbar__kbd {
-  margin-left: auto;
-  font: 11px / 1 var(--fw-mono);
-  color: var(--fw-border);
-  background: var(--fw-surface);
+  flex-shrink: 0;
+  font: 12px / 1 var(--fw-mono);
+  color: var(--fw-muted);
+  background: transparent;
   border: 1px solid var(--fw-border);
-  border-radius: 2px;
-  padding: 1px 4px;
+  padding: 2px 6px;
 }
 
-/* Icon buttons in topbar */
+/* Base topbar action button */
 .topbar__btn {
   display: flex;
   align-items: center;
-  gap: var(--fw-space-1);
+  gap: 8px;
   min-height: 44px;
-  min-width: 44px;
-  padding: 0 var(--fw-space-2);
+  padding: 0 16px;
   background: transparent;
-  border: none;
-  border-radius: var(--fw-radius-control);
-  color: var(--fw-muted);
-  font: 600 var(--fw-type-label) / 1 var(--fw-mono);
-  letter-spacing: var(--fw-tracking-label);
-  text-transform: uppercase;
+  border: 1px solid var(--fw-muted);
+  border-radius: 2px;
+  color: var(--fw-text);
+  font: 14px / 1 var(--fw-sans);
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
 }
 
 .topbar__btn:hover {
-  background: var(--fw-background);
-  color: var(--fw-text);
+  background: var(--fw-surface);
 }
 
 .topbar__btn:focus-visible {
@@ -317,18 +309,28 @@ body {
   outline-offset: 2px;
 }
 
-/* Attention button with count badge */
-.topbar__attention-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
+/* Primary variant: Send */
+.topbar__btn--primary {
+  border-color: transparent;
   background: var(--fw-accent-hover);
   color: var(--fw-on-accent);
-  font: 600 10px / 1 var(--fw-mono);
-  border-radius: var(--fw-radius-pill);
+  font-family: var(--fw-mono);
+  font-weight: 700;
+}
+
+.topbar__btn--primary:hover {
+  background: var(--fw-button-hover);
+}
+
+/* Attention variant: accent border */
+.topbar__btn--attention {
+  border-color: var(--fw-accent);
+}
+
+/* Attention count — mono bold number inside the attention button */
+.topbar__attention-count {
+  font-family: var(--fw-mono);
+  font-weight: 700;
 }
 
 /* Connection indicator */
@@ -389,30 +391,48 @@ body {
   }
 }
 
-/* ── Appearance switcher in topbar ───────────────────────────────────────── */
-.topbar__appearance {
+/* ── Appearance swatch (Settings page) ───────────────────────────────────── */
+.appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.appearance-swatch {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-}
-
-.topbar__swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: var(--fw-radius-control);
+  gap: 6px;
+  padding: 8px;
   border: 1px solid var(--fw-border);
+  border-radius: 2px;
+  background: transparent;
   cursor: pointer;
-  transition: outline-offset var(--fw-duration-fast);
+  color: var(--fw-muted);
+  font: 11px / 1.4 var(--fw-mono);
+  transition: background var(--fw-duration-fast), border-color var(--fw-duration-fast);
 }
 
-.topbar__swatch:focus-visible {
+.appearance-swatch:hover {
+  background: var(--fw-surface);
+}
+
+.appearance-swatch:focus-visible {
   outline: 2px solid var(--fw-focus);
   outline-offset: 2px;
 }
 
-.topbar__swatch[aria-pressed="true"] {
-  outline: 2px solid var(--fw-focus);
-  outline-offset: 1px;
+.appearance-swatch[aria-pressed="true"] {
+  border-color: var(--fw-focus);
+  color: var(--fw-text);
+}
+
+.appearance-swatch__dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--fw-border);
+  flex-shrink: 0;
 }
 
 /* ── Inspector ───────────────────────────────────────────────────────────── */

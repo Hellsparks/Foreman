@@ -1223,6 +1223,7 @@ dependencies = [
  "futures-util",
  "hex",
  "native-tls",
+ "reqwest 0.12.28",
  "rumqttc",
  "serde",
  "serde_json",
@@ -1258,16 +1259,19 @@ name = "foreman-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "chrono",
  "config",
  "dirs 5.0.1",
  "foreman-core",
  "futures-util",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "spoolman-rs",
  "sqlx",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tower",
@@ -1275,6 +1279,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ts-rs",
+ "uuid",
 ]
 
 [[package]]
@@ -1880,6 +1885,22 @@ dependencies = [
  "tokio-rustls 0.26.6",
  "tower-service",
  "webpki-roots",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
 ]
 
 [[package]]
@@ -3480,9 +3501,11 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-rustls",
+ "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
+ "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -3493,6 +3516,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.26.6",
  "tower",
  "tower-http",

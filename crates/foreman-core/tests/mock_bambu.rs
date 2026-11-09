@@ -40,12 +40,25 @@ impl TestCachedStatus {
     }
 
     fn merge_report(&mut self, print: &Value) {
+        // HMS — parse before gcode_state so FAILED can check hms_codes.
+        if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
+            self.hms_codes = hms
+                .iter()
+                .filter_map(|entry| {
+                    let attr = entry.get("attr").and_then(|v| v.as_u64())? as u32;
+                    let code = entry.get("code").and_then(|v| v.as_u64())? as u32;
+                    Some(foreman_core::events::HmsCode { attr, code })
+                })
+                .collect();
+        }
+
         // State.
         if let Some(s) = print.get("gcode_state").and_then(|v| v.as_str()) {
             self.state = match s {
                 "RUNNING" | "PREPARE" => PrinterState::Printing,
                 "PAUSE" => PrinterState::Paused,
                 "FINISH" | "IDLE" | "CREATED" | "SLICING" => PrinterState::Idle,
+                "FAILED" if self.hms_codes.is_empty() => PrinterState::Idle,
                 "FAILED" => PrinterState::Error,
                 _ => self.state.clone(),
             };
@@ -120,17 +133,7 @@ impl TestCachedStatus {
             self.push_vt_tray(vt);
         }
 
-        // HMS.
-        if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
-            self.hms_codes = hms
-                .iter()
-                .filter_map(|entry| {
-                    let attr = entry.get("attr").and_then(|v| v.as_u64())? as u32;
-                    let code = entry.get("code").and_then(|v| v.as_u64())? as u32;
-                    Some(foreman_core::events::HmsCode { attr, code })
-                })
-                .collect();
-        }
+        // (HMS is parsed at the top of merge_report.)
     }
 
     fn merge_ams(&mut self, ams: &Value) {
@@ -289,8 +292,8 @@ fn replay_real_a1_fixture() {
     cached.merge_report(reports[0].get("print").unwrap());
     let s = cached.to_status();
 
-    // State: FAILED (printer has a leftover error).
-    assert_eq!(s.state, PrinterState::Error);
+    // State: FAILED with empty hms → Idle (stale post-print state, not a fault).
+    assert_eq!(s.state, PrinterState::Idle);
 
     // Temperatures: idle, targets at 0.
     assert!((s.nozzle.as_ref().unwrap().actual - 25.09375).abs() < 0.01);
@@ -351,8 +354,8 @@ fn replay_real_a1_fixture() {
     let last = reports.last().unwrap();
     cached.merge_report(last.get("print").unwrap());
     let s = cached.to_status();
-    // State should still be FAILED.
-    assert_eq!(s.state, PrinterState::Error);
+    // State should still be Idle (FAILED + empty hms).
+    assert_eq!(s.state, PrinterState::Idle);
     // AMS still has 5 trays.
     assert_eq!(s.ams_trays.len(), 5);
 }

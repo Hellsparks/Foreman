@@ -34,6 +34,9 @@ hex = { workspace = true }
 suppaftp = { workspace = true }
 native-tls = { workspace = true }
 
+# HTTP client (Moonraker command dispatch)
+reqwest = { workspace = true }
+
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 

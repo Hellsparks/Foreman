@@ -41,6 +41,7 @@ use crate::events::{
 struct JsonRpcRequest {
     jsonrpc: &'static str,
     method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<Value>,
     id: u64,
 }
@@ -258,6 +259,8 @@ pub struct MoonrakerDriver {
     bus_tx: Arc<broadcast::Sender<ServerEvent>>,
     status: Arc<RwLock<CachedStatus>>,
     capabilities: Arc<RwLock<Option<PrinterCapabilities>>>,
+    /// HTTP client for sending commands to Moonraker.
+    http: reqwest::Client,
     /// Signals the background loop to stop.
     shutdown_tx: watch::Sender<bool>,
     /// Handle to the background task.
@@ -267,11 +270,16 @@ pub struct MoonrakerDriver {
 impl MoonrakerDriver {
     pub fn new(config: MoonrakerConfig, bus_tx: Arc<broadcast::Sender<ServerEvent>>) -> Self {
         let (shutdown_tx, _) = watch::channel(false);
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
         Self {
             config,
             bus_tx,
             status: Arc::new(RwLock::new(CachedStatus::default())),
             capabilities: Arc::new(RwLock::new(None)),
+            http,
             shutdown_tx,
             task: Mutex::new(None),
         }
@@ -304,6 +312,7 @@ impl MoonrakerDriver {
         };
         let printer_id = self.config.printer_id;
         let api_key = self.config.api_key.clone();
+        let http_base = self.config.url.clone();
         let bus_tx = Arc::clone(&self.bus_tx);
         let status = Arc::clone(&self.status);
         let capabilities = Arc::clone(&self.capabilities);
@@ -324,6 +333,7 @@ impl MoonrakerDriver {
                 match Self::run_connection(
                     printer_id,
                     &ws_url,
+                    &http_base,
                     api_key.as_deref(),
                     &bus_tx,
                     &status,
@@ -379,9 +389,11 @@ impl MoonrakerDriver {
 
     /// Run a single WebSocket connection session. Returns Ok(()) on clean
     /// shutdown, Err on connection loss.
+    #[allow(clippy::too_many_arguments)]
     async fn run_connection(
         printer_id: i64,
         ws_url: &str,
+        http_base: &str,
         api_key: Option<&str>,
         bus_tx: &broadcast::Sender<ServerEvent>,
         status: &RwLock<CachedStatus>,
@@ -574,7 +586,7 @@ impl MoonrakerDriver {
                         Self::parse_config_capabilities(&result, capabilities).await;
                     } else if id == webcams_id {
                         // Parse webcam list.
-                        Self::parse_webcams(&result, capabilities).await;
+                        Self::parse_webcams(&result, capabilities, http_base).await;
                     } else if id == macros_id {
                         // Parse macro names from printer.objects.list.
                         Self::parse_macros(&result, capabilities).await;
@@ -635,10 +647,39 @@ impl MoonrakerDriver {
         }
     }
 
-    async fn parse_webcams(result: &Value, capabilities: &RwLock<Option<PrinterCapabilities>>) {
+    async fn parse_webcams(
+        result: &Value,
+        capabilities: &RwLock<Option<PrinterCapabilities>>,
+        http_base: &str,
+    ) {
         let webcams_arr = match result.get("webcams").and_then(|v| v.as_array()) {
             Some(a) => a,
             None => return,
+        };
+
+        // Derive an absolute base for resolving relative URLs (e.g. /webcam/...).
+        // Strip any path from http_base so we get just scheme://host[:port].
+        let origin = {
+            let s = http_base
+                .replace("ws://", "http://")
+                .replace("wss://", "https://");
+            if let Some(pos) = s.find("://") {
+                let after = &s[pos + 3..];
+                let end = after.find('/').map(|i| pos + 3 + i).unwrap_or(s.len());
+                s[..end].to_owned()
+            } else {
+                s
+            }
+        };
+
+        let resolve = |raw: &str| -> String {
+            if raw.starts_with("http://") || raw.starts_with("https://") {
+                raw.to_owned()
+            } else if raw.starts_with('/') {
+                format!("{origin}{raw}")
+            } else {
+                raw.to_owned()
+            }
         };
 
         let mut caps = capabilities.write().await;
@@ -651,20 +692,26 @@ impl MoonrakerDriver {
                 .and_then(|v| v.as_str())
                 .unwrap_or("default")
                 .to_owned();
-            let stream_url = wc
-                .get("stream_url")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_owned());
-            let snapshot_url = wc
-                .get("snapshot_url")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_owned());
+            let stream_url = wc.get("stream_url").and_then(|v| v.as_str()).map(resolve);
+            let snapshot_url = wc.get("snapshot_url").and_then(|v| v.as_str()).map(resolve);
             c.webcams.push(WebcamInfo {
                 name,
                 stream_url,
                 snapshot_url,
             });
         }
+    }
+
+    /// POST to a Moonraker endpoint (no body). Used for emergency_stop etc.
+    async fn moonraker_post(&self, url: &str) -> Result<(), AppError> {
+        self.http
+            .post(url)
+            .send()
+            .await
+            .map_err(|e| AppError::Driver(format!("http post: {e}")))?
+            .error_for_status()
+            .map_err(|e| AppError::Driver(format!("http rejected: {e}")))?;
+        Ok(())
     }
 
     async fn parse_macros(result: &Value, capabilities: &RwLock<Option<PrinterCapabilities>>) {
@@ -724,6 +771,13 @@ impl PrinterDriver for MoonrakerDriver {
     }
 
     async fn send_command(&self, cmd: PrinterCommand) -> Result<(), AppError> {
+        // Emergency stop uses its own Moonraker endpoint.
+        if matches!(cmd, PrinterCommand::EmergencyStop) {
+            let url = format!("{}/printer/emergency_stop", self.config.url);
+            self.moonraker_post(&url).await?;
+            return Ok(());
+        }
+
         let gcode = match cmd {
             PrinterCommand::Pause => "PAUSE".to_owned(),
             PrinterCommand::Resume => "RESUME".to_owned(),
@@ -754,25 +808,34 @@ impl PrinterDriver for MoonrakerDriver {
                 parts.push("\nG90".to_owned());
                 parts.join(" ")
             }
+            PrinterCommand::BabyStep { offset } => {
+                format!("SET_GCODE_OFFSET Z_ADJUST={offset:.3} MOVE=1")
+            }
+            PrinterCommand::MotorsOff => "M84".to_owned(),
+            PrinterCommand::Extrude { length, speed } => {
+                // Relative extrude: switch to relative E, extrude, switch back.
+                format!("M83\nG1 E{length:.1} F{speed:.0}\nM82")
+            }
+            PrinterCommand::SetLight { brightness } => {
+                let value = brightness.clamp(0.0, 1.0);
+                format!("SET_PIN PIN=light VALUE={value:.2}")
+            }
             PrinterCommand::Macro { name } => name,
             PrinterCommand::Gcode { command } => command,
-            PrinterCommand::EmergencyStop => "M112".to_owned(),
+            PrinterCommand::EmergencyStop => unreachable!(),
         };
 
-        // We send via the Moonraker HTTP API for commands, since the WS connection
-        // is used for subscriptions. This is simpler and matches Moonraker's recommended usage.
-        let url = format!(
-            "{}/printer/gcode/script?script={}",
-            self.config.url,
-            urlencoding::encode(&gcode)
-        );
+        let url = format!("{}/printer/gcode/script", self.config.url,);
+        self.http
+            .post(&url)
+            .query(&[("script", &gcode)])
+            .send()
+            .await
+            .map_err(|e| AppError::Driver(format!("command http: {e}")))?
+            .error_for_status()
+            .map_err(|e| AppError::Driver(format!("command rejected: {e}")))?;
 
-        // We don't have an HTTP client here — commands will be wired up via the
-        // driver manager's HTTP client in a future session. For now, return
-        // NotImplemented to stay read-only safe.
-        Err(AppError::NotImplemented(format!(
-            "command dispatch not wired (would POST to {url})"
-        )))
+        Ok(())
     }
 
     async fn list_files(&self, _path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
@@ -801,25 +864,5 @@ impl PrinterDriver for MoonrakerDriver {
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
         Ok(self.status.read().await.to_printer_status())
-    }
-}
-
-// We need urlencoding for the gcode script endpoint.
-// Since we're not actually using commands this session (read-only), this is a placeholder.
-mod urlencoding {
-    pub fn encode(input: &str) -> String {
-        let mut result = String::with_capacity(input.len() * 3);
-        for byte in input.bytes() {
-            match byte {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                    result.push(byte as char);
-                }
-                _ => {
-                    result.push('%');
-                    result.push_str(&format!("{byte:02X}"));
-                }
-            }
-        }
-        result
     }
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 interface InspectorProps {
   open: boolean;
+  /** If omitted, no shell-level header is rendered (page provides its own via portal). */
   title?: string;
   typeLabel?: string;
   onClose: () => void;
@@ -13,6 +14,9 @@ interface InspectorProps {
  *
  * Per doc 02/03: selected record opens here; main view stays usable.
  * On phone (≤430px) this expands to full page — handled via CSS.
+ *
+ * When `title` is omitted the shell header is suppressed and the page is
+ * expected to render its own header inside the body (via React portal).
  */
 export default function Inspector({
   open,
@@ -29,32 +33,36 @@ export default function Inspector({
       aria-hidden={!open}
       inert={!open ? true : undefined}
     >
-      <div className="inspector__header">
-        <div>
-          {typeLabel && <p className="inspector__type">{typeLabel}</p>}
-          <h2 className="inspector__title">{title ?? "Inspector"}</h2>
-        </div>
-        <button
-          type="button"
-          className="inspector__close"
-          aria-label="Close inspector"
-          onClick={onClose}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            aria-hidden="true"
+      {title !== undefined && (
+        <div className="inspector__header">
+          <div>
+            {typeLabel && <p className="inspector__type">{typeLabel}</p>}
+            <h2 className="inspector__title">{title}</h2>
+          </div>
+          <button
+            type="button"
+            className="inspector__close"
+            aria-label="Close inspector"
+            onClick={onClose}
           >
-            <line x1="3" y1="3" x2="13" y2="13" />
-            <line x1="13" y1="3" x2="3" y2="13" />
-          </svg>
-        </button>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <line x1="3" y1="3" x2="13" y2="13" />
+              <line x1="13" y1="3" x2="3" y2="13" />
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className="inspector__body" style={title === undefined ? { padding: 0 } : undefined}>
+        {children}
       </div>
-      <div className="inspector__body">{children}</div>
     </aside>
   );
 }

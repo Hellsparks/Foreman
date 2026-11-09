@@ -1,157 +1,50 @@
 import { NavLink } from "react-router-dom";
 
-// 20×20 SVG icons, 1.5px stroke, square aesthetic per DESIGN.md.
-// All use currentColor so they inherit the link's color state.
-const Icons = {
-  Fleet: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <rect x="2" y="2" width="7" height="7" rx="1" />
-      <rect x="11" y="2" width="7" height="7" rx="1" />
-      <rect x="2" y="11" width="7" height="7" rx="1" />
-      <rect x="11" y="11" width="7" height="7" rx="1" />
-    </svg>
-  ),
-  Jobs: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <line x1="3" y1="6" x2="17" y2="6" />
-      <line x1="3" y1="10" x2="17" y2="10" />
-      <line x1="3" y1="14" x2="11" y2="14" />
-    </svg>
-  ),
-  Library: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <path d="M2 7h16v9a1 1 0 01-1 1H3a1 1 0 01-1-1V7z" />
-      <path d="M2 7V5a1 1 0 011-1h4l2 2h8" />
-    </svg>
-  ),
-  Projects: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <polygon points="10,2 18,6 10,10 2,6" />
-      <polyline points="2,10 10,14 18,10" />
-    </svg>
-  ),
-  Filament: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="10" r="7" />
-      <circle cx="10" cy="10" r="3" />
-      <line x1="10" y1="3" x2="10" y2="7" />
-    </svg>
-  ),
-  Service: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <path d="M15 2a3 3 0 00-2.9 3.7L5.4 12.4a2 2 0 102.1 2.1l6.8-6.6A3 3 0 1015 2z" />
-    </svg>
-  ),
-  Tools: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <line x1="3" y1="5" x2="17" y2="5" />
-      <circle cx="8" cy="5" r="2" />
-      <line x1="3" y1="11" x2="17" y2="11" />
-      <circle cx="13" cy="11" r="2" />
-      <line x1="3" y1="17" x2="17" y2="17" />
-      <circle cx="7" cy="17" r="2" />
-    </svg>
-  ),
-  Settings: () => (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="10" r="3" />
-      <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" />
-    </svg>
-  ),
-  ChevronLeft: () => (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      aria-hidden="true"
-    >
-      <polyline points="10,3 5,8 10,13" />
-    </svg>
-  ),
+// SVG path data for each nav item, from the UI reference (Main.dc.html).
+// All use viewBox="0 0 24 24", stroke-width 1.8, round caps/joins.
+const NAV_PATHS: Record<string, string> = {
+  Fleet:    "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  Jobs:     "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
+  Library:  "M3 6h6l2 2h10v11H3z",
+  Projects: "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5",
+  Filament: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 9a3 3 0 100 6 3 3 0 000-6z",
+  Service:  "M14 7a4 4 0 00-5 5l-6 6 3 3 6-6a4 4 0 005-5l-3 3-3-3z",
+  Tools:    "M4 20l6-6M14 4l6 6-8 8-6-6zM9 9l6 6",
+  Settings: "M12 9a3 3 0 100 6 3 3 0 000-6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4",
 };
+
+function NavIcon({ name }: { name: string }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={NAV_PATHS[name]} />
+    </svg>
+  );
+}
 
 interface NavItem {
   to: string;
   label: string;
-  Icon: () => React.JSX.Element;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/fleet", label: "Fleet", Icon: Icons.Fleet },
-  { to: "/jobs", label: "Jobs", Icon: Icons.Jobs },
-  { to: "/library", label: "Library", Icon: Icons.Library },
-  { to: "/projects", label: "Projects", Icon: Icons.Projects },
-  { to: "/filament", label: "Filament", Icon: Icons.Filament },
-  { to: "/service", label: "Service", Icon: Icons.Service },
-  { to: "/tools", label: "Tools", Icon: Icons.Tools },
-  { to: "/settings", label: "Settings", Icon: Icons.Settings },
+  { to: "/fleet",    label: "Fleet" },
+  { to: "/jobs",     label: "Jobs" },
+  { to: "/library",  label: "Library" },
+  { to: "/projects", label: "Projects" },
+  { to: "/filament", label: "Filament" },
+  { to: "/service",  label: "Service" },
+  { to: "/tools",    label: "Tools" },
+  { to: "/settings", label: "Settings" },
 ];
 
 interface RailProps {
@@ -168,33 +61,37 @@ export default function Rail({ collapsed, onToggle }: RailProps) {
       data-collapsed={collapsed}
       aria-label="Main navigation"
     >
-      {/* App identity */}
-      <div className="rail__header" aria-hidden="true">
-        <div className="rail__logo">FM</div>
-        <span className="rail__app-name">Foreman</span>
+      {/* Brand block */}
+      <div className="rail__header">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+          className="rail__logo-icon"
+        >
+          <rect x="3" y="3" width="18" height="18" />
+          <path d="M3 9h18M9 9v12" />
+        </svg>
+        <span className="rail__app-name">FOREMAN</span>
       </div>
 
       {/* Nav items */}
       <ul className="rail__nav" id={navId} role="list">
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
+        {NAV_ITEMS.map(({ to, label }) => (
           <li key={to} className="rail__item">
             <NavLink
               to={to}
               className="rail__link"
               aria-label={collapsed ? label : undefined}
-              aria-current={undefined} /* react-router sets this */
             >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className="rail__icon"
-                    style={{ color: isActive ? "var(--fw-accent-hover)" : undefined }}
-                  >
-                    <Icon />
-                  </span>
-                  <span className="rail__label">{label}</span>
-                </>
-              )}
+              <span className="rail__icon">
+                <NavIcon name={label} />
+              </span>
+              <span className="rail__label">{label}</span>
             </NavLink>
           </li>
         ))}
@@ -210,9 +107,22 @@ export default function Rail({ collapsed, onToggle }: RailProps) {
           aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
           onClick={onToggle}
         >
-          <span className="rail__toggle-icon">
-            <Icons.ChevronLeft />
-          </span>
+          {/* chevron-left when expanded, chevron-right when collapsed */}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="rail__toggle-icon"
+          >
+            <path d={collapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} />
+          </svg>
+          <span className="rail__label">Collapse</span>
         </button>
       </div>
     </nav>

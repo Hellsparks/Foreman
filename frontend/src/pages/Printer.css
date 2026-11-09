@@ -1,0 +1,460 @@
+/* Printer page — header, tabs, live tab layout */
+
+.printer-header {
+  padding: 16px 32px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--fw-border);
+}
+
+.printer-header__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.printer-header__name {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.printer-header__fw {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  color: var(--fw-muted);
+  border: 1px solid var(--fw-border);
+  padding: 1px 6px;
+}
+
+.printer-header__spacer { flex: 1; }
+
+.printer-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Tab bar */
+.printer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: -1px;
+}
+
+.printer-tab {
+  min-height: 44px;
+  padding: 0 18px;
+  margin-right: -1px;
+  border: 1px solid var(--fw-border);
+  border-bottom-color: var(--fw-border);
+  background: transparent;
+  cursor: pointer;
+  font-weight: normal;
+  font-size: 14px;
+}
+
+.printer-tab--active {
+  background: var(--fw-raised);
+  border-bottom-color: var(--fw-raised);
+  font-weight: bold;
+}
+
+/* Live tab main area */
+.printer-live {
+  padding: 24px 32px 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.printer-live__left {
+  flex: 999 1 560px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.printer-live__right {
+  flex: 1 1 340px;
+  max-width: 400px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Webcam section */
+.webcam-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--fw-border);
+}
+
+.webcam-bar__spacer { flex: 1; }
+
+.webcam-tab {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid var(--fw-border);
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.webcam-tab--active {
+  border-bottom-color: var(--fw-accent);
+  background: var(--fw-raised);
+  font-weight: bold;
+}
+
+.webcam-view {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--fw-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.webcam-view img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Section panels (temps, toolhead, extruder, console, macros) */
+.live-panel {
+  border: 1px solid var(--fw-border);
+  background: var(--fw-raised);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.live-panel--gap { gap: 10px; }
+.live-panel--gap-sm { gap: 8px; }
+
+/* Heater row */
+.heater-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  border-top: 1px solid var(--fw-border);
+}
+
+.heater-row__name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.heater-row__now {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  width: 56px;
+  text-align: right;
+}
+
+.heater-row__arrow {
+  color: var(--fw-muted);
+}
+
+.heater-row__input {
+  width: 64px;
+  min-height: 40px;
+  border: 1px solid var(--fw-muted);
+  background: var(--fw-raised);
+  padding: 0 6px;
+  border-radius: 2px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+  color: var(--fw-text);
+}
+
+.heater-row__off {
+  min-height: 40px;
+  width: 40px;
+  border: 1px solid var(--fw-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 2px;
+}
+
+/* Preset buttons */
+.preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+
+.preset-btn {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--fw-border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 2px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+/* Toolhead: jog pad */
+.jog-layout {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.jog-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 3px;
+}
+
+.jog-z-col {
+  display: grid;
+  grid-template-rows: repeat(3, 44px);
+  gap: 3px;
+}
+
+.jog-home-col {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: repeat(3, 44px);
+  gap: 3px;
+}
+
+.jog-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.jog-btn--home {
+  background: var(--fw-surface);
+  font-weight: normal;
+}
+
+.jog-btn--primary {
+  border: 1px solid transparent;
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+}
+
+.home-xy-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+/* Step selector */
+.step-bar {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.step-btn {
+  min-height: 36px;
+  padding: 0;
+  margin-left: -1px;
+  border: 1px solid var(--fw-border);
+  background: transparent;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.step-btn--active {
+  border-color: var(--fw-accent);
+  background: var(--fw-accent);
+  color: var(--fw-on-accent);
+}
+
+/* Babystep row */
+.babystep-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.babystep-row__label {
+  width: 44px;
+  font-size: 12px;
+}
+
+.babystep-btn {
+  flex: 1;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* Extruder selectors */
+.ext-selector {
+  display: flex;
+  align-items: center;
+}
+
+.ext-selector__label {
+  width: 52px;
+  font-size: 12px;
+}
+
+.ext-btn {
+  flex: 1;
+  min-height: 36px;
+  margin-left: -1px;
+  border: 1px solid var(--fw-border);
+  background: transparent;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.ext-btn--active {
+  border-color: var(--fw-accent);
+  background: var(--fw-accent);
+  color: var(--fw-on-accent);
+}
+
+.ext-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ext-actions button {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* Console */
+.console-output {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  background: var(--fw-surface);
+  border: 1px solid var(--fw-border);
+  padding: 8px;
+  height: 120px;
+  overflow: auto;
+  white-space: pre-line;
+}
+
+.console-input {
+  display: flex;
+  gap: 8px;
+}
+
+.console-input input {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--fw-muted);
+  background: var(--fw-raised);
+  padding: 0 12px;
+  border-radius: 2px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.console-input button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* Macros */
+.macros-header {
+  display: flex;
+  align-items: center;
+}
+
+.macros-header__spacer { flex: 1; }
+
+.macro-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.macro-btn {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Placeholder tabs */
+.printer-placeholder {
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--fw-muted);
+}
+
+/* Cancel dialog */
+.cancel-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--fw-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.cancel-dialog {
+  background: var(--fw-raised);
+  border: 1px solid var(--fw-border);
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cancel-dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.cancel-dialog__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

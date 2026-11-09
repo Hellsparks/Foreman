@@ -1,22 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ConnectionState } from "../hooks/useEventStream";
-import { THEMES, type Mode, type Theme } from "../hooks/useAppearance";
-
-// Accent colors for the 4×2 theme swatches (purely decorative preview chips).
-// These are the accent-hover values from tokens.css — not used for styling,
-// only for the visual swatch squares.
-const THEME_ACCENTS: Record<Theme, Record<Mode, string>> = {
-  fieldwork: { light: "#BF3D1C", dark: "#F57951" },
-  vector: { light: "#455900", dark: "#D5FA39" },
-  foundry: { light: "#3D3D3D", dark: "#D5D5D5" },
-  olive: { light: "#5D622D", dark: "#C2C78D" },
-};
-
-const CONN_LABEL: Record<ConnectionState, string> = {
-  connecting: "Connecting",
-  connected: "Live",
-  disconnected: "Offline",
-};
 
 /** True only when running inside the Tauri shell. */
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -68,50 +51,37 @@ function WindowControls() {
 
 interface TopBarProps {
   connectionState: ConnectionState;
-  theme: Theme;
-  mode: Mode;
-  onThemeChange: (t: Theme) => void;
-  onModeChange: (m: Mode) => void;
   attentionCount: number;
 }
 
-export default function TopBar({
-  connectionState,
-  theme,
-  mode,
-  onThemeChange,
-  onModeChange,
-  attentionCount,
-}: TopBarProps) {
+export default function TopBar({ connectionState: _connectionState, attentionCount }: TopBarProps) {
   const win = IS_TAURI ? getCurrentWindow() : null;
 
   return (
     <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
-      {/* Command palette trigger */}
-      <button
-        type="button"
-        className="topbar__search"
-        aria-label="Open command palette"
-        aria-keyshortcuts="Control+k"
-        onClick={() => {
-          /* command palette — session 7 */
-        }}
-      >
+      {/* Search field */}
+      <label className="topbar__search" aria-label="Search or run a command">
         <svg
-          width="14"
-          height="14"
-          viewBox="0 0 16 16"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           aria-hidden="true"
+          style={{ flexShrink: 0 }}
         >
-          <circle cx="7" cy="7" r="4.5" />
-          <line x1="10.5" y1="10.5" x2="14" y2="14" />
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-4-4" />
         </svg>
-        <span>Search or run a command</span>
+        <input
+          type="search"
+          className="topbar__search-input"
+          placeholder="Search printers, files, spools… or type a command"
+          aria-keyshortcuts="Control+k"
+        />
         <kbd className="topbar__kbd">Ctrl K</kbd>
-      </button>
+      </label>
 
       {/* Spacer — drag region when inside Tauri.
           data-tauri-drag-region works on Windows/X11; on Wayland we need
@@ -132,143 +102,65 @@ export default function TopBar({
         onDoubleClick={win ? () => win.toggleMaximize() : undefined}
       />
 
-      {/* Scan button */}
-      <button type="button" className="topbar__btn" aria-label="Scan QR or NFC tag">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <rect x="1" y="1" width="5" height="5" />
-          <rect x="10" y="1" width="5" height="5" />
-          <rect x="1" y="10" width="5" height="5" />
-          <rect x="10" y="10" width="2" height="2" />
-          <rect x="13" y="10" width="2" height="2" />
-          <rect x="10" y="13" width="2" height="2" />
-          <rect x="13" y="13" width="2" height="2" />
-        </svg>
-        <span>Scan</span>
-      </button>
-
-      {/* Send (upload) button */}
-      <button type="button" className="topbar__btn" aria-label="Upload a file to send to a printer">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          aria-hidden="true"
-        >
-          <path d="M8 10V3M5 6l3-3 3 3" />
-          <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" />
-        </svg>
-        <span>Send</span>
-      </button>
-
-      {/* Attention count */}
+      {/* Scan — secondary */}
       <button
         type="button"
         className="topbar__btn"
+        aria-label="Scan for printers on the network"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10" />
+        </svg>
+        Scan
+      </button>
+
+      {/* Send — primary */}
+      <button
+        type="button"
+        className="topbar__btn topbar__btn--primary"
+        aria-label="Upload a file to send to a printer"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+        </svg>
+        Send
+      </button>
+
+      {/* Attention — accent border with count */}
+      <button
+        type="button"
+        className="topbar__btn topbar__btn--attention"
         aria-label={`Attention — ${attentionCount} item${attentionCount === 1 ? "" : "s"} need action`}
       >
         <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           aria-hidden="true"
         >
-          <path d="M8 1.5L1.5 12.5h13L8 1.5z" />
-          <line x1="8" y1="6" x2="8" y2="9" />
-          <circle cx="8" cy="11" r="0.5" fill="currentColor" />
+          <path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2zM10 21h4" />
         </svg>
-        {attentionCount > 0 && (
-          <span className="topbar__attention-count" aria-hidden="true">
-            {attentionCount}
-          </span>
-        )}
+        <span className="topbar__attention-count">{attentionCount}</span>
       </button>
-
-      {/* Appearance: 4 theme swatches then mode toggle */}
-      <div
-        className="topbar__appearance"
-        role="group"
-        aria-label="Appearance"
-      >
-        {THEMES.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className="topbar__swatch"
-            style={{ background: THEME_ACCENTS[t][mode] }}
-            aria-label={`${t} theme`}
-            aria-pressed={theme === t}
-            onClick={() => onThemeChange(t)}
-          />
-        ))}
-        <button
-          type="button"
-          className="topbar__btn"
-          aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          aria-pressed={mode === "dark"}
-          onClick={() => onModeChange(mode === "dark" ? "light" : "dark")}
-          style={{ minWidth: 44 }}
-        >
-          {mode === "dark" ? (
-            /* sun icon */
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <circle cx="8" cy="8" r="3" />
-              <line x1="8" y1="1" x2="8" y2="2.5" />
-              <line x1="8" y1="13.5" x2="8" y2="15" />
-              <line x1="1" y1="8" x2="2.5" y2="8" />
-              <line x1="13.5" y1="8" x2="15" y2="8" />
-              <line x1="3.1" y1="3.1" x2="4.1" y2="4.1" />
-              <line x1="11.9" y1="11.9" x2="12.9" y2="12.9" />
-              <line x1="3.1" y1="12.9" x2="4.1" y2="11.9" />
-              <line x1="11.9" y1="4.1" x2="12.9" y2="3.1" />
-            </svg>
-          ) : (
-            /* moon icon */
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <path d="M12 10A6 6 0 016 4a6 6 0 100 8 6 6 0 006-2z" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      {/* Connection state */}
-      <div
-        className={`topbar__conn topbar__conn--${connectionState}`}
-        aria-live="polite"
-        aria-label={`Server connection: ${CONN_LABEL[connectionState]}`}
-      >
-        <span className="topbar__conn-dot" />
-        <span className="topbar__conn-label">{CONN_LABEL[connectionState]}</span>
-      </div>
 
       {/* Window controls — Tauri only */}
       {IS_TAURI && <WindowControls />}

@@ -72,10 +72,16 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
     driver_manager.start_all(&foreman_db.pool).await;
 
+    let http_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .unwrap_or_default();
+
     let app_state = AppState {
         foreman_db,
         bus_tx: Arc::clone(&tx),
         driver_manager,
+        http_client,
     };
 
     // Static file serving for the frontend.
@@ -98,9 +104,51 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         .route("/api/printers", get(api::printers::list_printers))
         .route("/api/printers", post(api::printers::create_printer))
         .route("/api/printers/{id}", delete(api::printers::delete_printer))
+        .route("/api/printers/{id}/snapshot", get(api::printers::snapshot))
         .route(
             "/api/printers/{id}/trust-new-cert",
             post(api::printers::trust_new_cert),
+        )
+        // Printer commands + status + capabilities
+        .route(
+            "/api/printers/{id}/commands/{kind}",
+            post(api::printer_commands::send_command),
+        )
+        .route(
+            "/api/printers/{id}/confirm-cancel",
+            post(api::printer_commands::confirm_cancel),
+        )
+        .route(
+            "/api/printers/{id}/capabilities",
+            get(api::printer_commands::get_capabilities),
+        )
+        .route(
+            "/api/printers/{id}/status",
+            get(api::printer_commands::get_status),
+        )
+        // Temp presets
+        .route(
+            "/api/printers/{id}/presets",
+            get(api::printer_commands::list_presets).post(api::printer_commands::create_preset),
+        )
+        .route(
+            "/api/printers/{id}/presets/{pid}",
+            delete(api::printer_commands::delete_preset),
+        )
+        // Macro favourites
+        .route(
+            "/api/printers/{id}/macro-favourites",
+            get(api::printer_commands::list_favourites).post(api::printer_commands::add_favourite),
+        )
+        .route(
+            "/api/printers/{id}/macro-favourites/{fid}",
+            delete(api::printer_commands::remove_favourite),
+        )
+        .route("/api/attention", get(api::attention::list_attention))
+        .route("/api/attention/count", get(api::attention::attention_count))
+        .route(
+            "/api/attention/{id}/dismiss",
+            post(api::attention::dismiss_attention),
         )
         .route("/ws/events", get(api::ws::ws_handler))
         .fallback_service(static_service)
