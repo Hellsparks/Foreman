@@ -37,6 +37,15 @@ native-tls = { workspace = true }
 # HTTP client (Moonraker command dispatch)
 reqwest = { workspace = true }
 
+# SSH / SFTP (task 2.5)
+russh = { workspace = true }
+russh-sftp = { workspace = true }
+base64 = { workspace = true }
+rand_core = { workspace = true }
+getrandom = { workspace = true }
+ssh-key = { workspace = true }
+aes-gcm = { workspace = true }
+
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 

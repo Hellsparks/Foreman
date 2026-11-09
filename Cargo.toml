@@ -57,6 +57,17 @@ suppaftp = { version = "6", features = ["native-tls", "deprecated"] }
 native-tls = "0.2"
 reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }
 
+# SSH / SFTP (task 2.5)
+russh = "0.65"
+russh-sftp = "2"
+base64 = "0.22"
+# rand_core 0.10 + rand_core feature on ssh-key enables PrivateKey::random for ed25519 keygen
+rand_core = "0.10"
+getrandom = "0.4"
+ssh-key = { version = "=0.7.0-rc.11", features = ["rand_core", "ed25519"] }
+# At-rest encryption of the SSH private key + passwords (already in the tree via russh)
+aes-gcm = "0.11"
+
 [profile.release]
 opt-level = 3
 lto = true

@@ -80,17 +80,19 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 ### 2.4 Tiered connection paths (W2)
 - [x] Each printer has an ordered list of paths (name + URL). Health check on the active path; after N failed checks (default 3, ≈6 s) switch to the next; move back up when a higher path is healthy for a set time (default 60 s, or manual). Running jobs are never touched.
 - [x] A switch emits `printer.connection` and raises an Attention item ("Using backup path: <label>").
-- [ ] SSH, webcam proxy and uploads use the active path's host. (SSH deferred to 2.5; webcam/uploads deferred to later phase)
+- [ ] SSH, webcam proxy and uploads use the active path's host. (SSH done in 2.5; webcam/uploads deferred to later phase)
 - [x] API: CRUD + reorder + test-all for paths.
 
 ### 2.5 SSH / SFTP / terminal (W2)
-- [ ] Per-printer SSH settings: user, port, auth = Foreman ed25519 key (generated once, public key shown for copy) or password (stored encrypted). Host key pinned on first connect (TOFU); refuse on change until approved in the UI.
-- [ ] SFTP API (pick the crate — `russh` + `russh-sftp` were the plan; justify in the corrections log): list, read, write (writes a `.bak` first), upload, mkdir, rename, delete. Logs read-only.
-- [ ] "Save + FIRMWARE_RESTART" for Klipper `.cfg`: deferred while printing.
-- [ ] Terminal: WebSocket bridge to an SSH PTY (frontend uses xterm.js). Multi-line paste is confirmed in the UI before it is sent.
-- [ ] Shell macros: name, multi-line command, scope (this printer / all SSH printers), ask-before-run (auto on for `sudo|rm|reboot|shutdown|dd|mkfs`). Stored in Foreman.
-- [ ] Every terminal command and macro run goes to `audit_log` (printer, user, command, time).
-- [ ] Bambu: none of this (no SSH). Its files go through FTPS (2.3b).
+
+(`[~]` = implemented + tested against a local SSH server / mocks; HellV0 read-only check pending SSH credentials — see session 19 log.)
+- [~] Per-printer SSH settings: user, port, auth = Foreman ed25519 key (generated once, public key shown for copy) or password (stored encrypted). Host key pinned on first connect (TOFU); refuse on change until approved in the UI.
+- [~] SFTP API (pick the crate — `russh` + `russh-sftp` were the plan; justify in the corrections log): list, read, write (writes a `.bak` first), upload, mkdir, rename, delete. Logs read-only.
+- [~] "Save + FIRMWARE_RESTART" for Klipper `.cfg`: deferred while printing.
+- [~] Terminal: WebSocket bridge to an SSH PTY (frontend uses xterm.js). Multi-line paste is confirmed in the UI before it is sent.
+- [~] Shell macros: name, multi-line command, scope (this printer / all SSH printers), ask-before-run (auto on for `sudo|rm|reboot|shutdown|dd|mkfs`). Stored in Foreman.
+- [~] Every terminal command and macro run goes to `audit_log` (printer, user, command, time).
+- [x] Bambu: none of this (no SSH). Its files go through FTPS (2.3b).
 
 ### 2.6 Printer page API (W6)
 - [ ] Status (state, job, progress, ETA, layer), temperatures with **editable targets** + presets per printer, fan, light.
@@ -174,6 +176,26 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 19 — 2026-11-09 (2.5 SSH / SFTP / terminal / shell macros)
+
+**Crate choice:** `russh` 0.65 + `russh-sftp` 2.4 (as planned). Pure Rust, tokio-native, no libssh2/OpenSSL system dependency (`ssh2` would need libssh2 + OpenSSL on Windows CI). Gives client PTY/shell/exec/subsystem channels, and its server side lets the TOFU test run against a real in-process SSH server (`crates/foreman-core/tests/ssh_pinning.rs`). `ssh-key` is pinned to `=0.7.0-rc.11` (the version russh 0.65 uses) with the `rand_core` feature for ed25519 keygen.
+
+**Encryption at rest:** brief said "stored encrypted" without a key source. A random 256-bit master key is created once in `<data_dir>/secret.key` (0600 on Unix), outside the DB; the Foreman private key (`setting.ssh.private_key`) and SSH passwords (`printer_ssh.password`) are AES-256-GCM sealed (`enc:v1:` prefix). A copied DB alone reveals nothing; DB + `secret.key` together do (no OS keychain yet — same machine trust model as the DB). Losing `secret.key` means re-entering passwords and re-installing a new Foreman public key.
+
+**Host-key change flow:** a changed key is refused, stored in a new column `printer_ssh.pending_host_key_fingerprint` (migration 0004), and raises Attention kind `ssh_host_key`. "Trust new host key" (`POST /ssh/trust`) pins exactly the pending fingerprint the server observed — the client can't submit an arbitrary fingerprint. Fingerprint format = OpenSSH `SHA256:…`; verified identical to `ssh-keyscan | ssh-keygen -lf -` on HellV0.
+
+**Quick roots:** resolved per connection from SFTP `realpath(".")` (the SSH user's home) + `printer_data/{config,gcodes,logs}`. Read-only logs is enforced server-side on the normalised path *and* the realpath of the parent (so a symlink into logs can't be written through). Large files (>2 MB) are read as a read-only tail; Download streams the full file.
+
+**Save + FIRMWARE_RESTART:** the brief says "deferred while printing"; owner's session brief says "refused while printing (server-side)". Implemented as refuse: while printing/paused (or state unknown/offline) the request is rejected with 400 and nothing is written — plain Save still works. The state is re-checked after saving and before sending `FIRMWARE_RESTART` (as G-code via the Moonraker driver). Only `.cfg` under `printer_data/config` qualifies.
+
+**Terminal / macros:** PTY shell over one SSH session per WebSocket (`/ws/printers/{id}/terminal`), xterm.js + fit addon in the UI. Macros run *in the terminal* (`{"type":"macro","id":N}`), so output is visible and the server (not the client) types the stored lines; the old exec-per-command REST runner and the server-side command deny-list from the earlier WIP were dropped (the brief asks for ask-before-run, not blocking). Ask-before-run is forced on server-side when the body matches `\b(sudo|rm|reboot|shutdown|dd|mkfs)\b`. Audit of typed commands is best effort: lines are rebuilt from keystrokes (backspace, Ctrl-C/U, escape sequences handled; tab-completion / history recall can't be seen). SFTP write/upload/mkdir/rename/delete are also audited; `audit_log.user` = SSH user (no Foreman accounts yet).
+
+**UI colours:** the reference terminal/editor uses fixed dark hex colours. Implemented with Fieldwork tokens only (`--fw-surface` / `--fw-text` / `--fw-accent`, read at runtime into the xterm theme and updated on theme/mode change). Built-in quick buttons from the reference (uptime, df -h /, klipper status, tail klippy.log) are kept as non-editable; `systemctl status` gets `--no-pager` for a PTY.
+
+**Upload:** raw request body streamed to SFTP (`POST /files/upload?path=`), not multipart; overwriting an existing file keeps a `.bak` like Save.
+
+**HellV0 verification:** handshake + TOFU pin verified on the real printer (fingerprint matches ssh-keyscan). `test-printers.local.toml` has no HellV0 SSH credentials, so listing/reading `printer.cfg` and running `uptime` in the terminal are still to be verified — boxes marked `[~]` until then.
 
 ### Session 18 — 2026-11-09 (2.4 connection paths + Config tab)
 

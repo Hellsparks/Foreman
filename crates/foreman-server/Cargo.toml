@@ -53,6 +53,11 @@ sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio"] }
 # HTTP client (snapshot proxy)
 reqwest = { workspace = true }
 
+# SSH / SFTP (task 2.5)
+russh = { workspace = true }
+russh-sftp = { workspace = true }
+tokio-util = { workspace = true }
+
 # URL parsing (path failover health checks)
 url = "2"
 

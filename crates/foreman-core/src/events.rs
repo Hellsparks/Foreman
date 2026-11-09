@@ -78,7 +78,7 @@ pub struct HmsCode {
 }
 
 /// A printer status snapshot with temps, progress, and job info.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct PrinterStatus {
     pub state: PrinterState,

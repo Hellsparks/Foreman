@@ -5,6 +5,7 @@ import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPat
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
 import { BackButton, StatusChip, SectionLabel, Button } from "../ui";
+import { FilesTab, SshSettings } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import "./Printer.css";
 
@@ -657,6 +658,8 @@ export default function Printer() {
             </section>
           </div>
         </div>
+      ) : activeTab === "Files" ? (
+        <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
       ) : activeTab === "Config" ? (
         <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
       ) : (
@@ -1251,6 +1254,8 @@ function PrinterConfigTab({
           <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>{authHelp}</span>
         </label>
       </section>
+
+      <SshSettings printerId={printerId} firmware={printer.firmware} />
 
       {/* ── Capabilities section ─────────────────────────────────── */}
       <section
