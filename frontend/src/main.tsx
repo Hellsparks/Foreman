@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./design/tokens.css";
+import "./ui/ui.css";
 import App from "./App";
 
 // Apply appearance from localStorage synchronously before React renders to

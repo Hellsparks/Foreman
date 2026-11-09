@@ -1,0 +1,304 @@
+/* ── Button ───────────────────────────────────────────────────────────────── */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 120px;
+  padding: 0 16px;
+  border: 1px solid var(--fw-muted);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--fw-text);
+  font: 14px/1 var(--fw-sans);
+  cursor: pointer;
+  transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
+  white-space: nowrap;
+}
+
+.ui-btn:hover {
+  background: var(--fw-surface);
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 3px;
+}
+
+.ui-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Primary */
+.ui-btn--primary {
+  border-color: transparent;
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+  font-family: var(--fw-mono);
+  font-weight: 700;
+}
+
+.ui-btn--primary:hover {
+  background: var(--fw-button-hover);
+}
+
+/* Secondary (default — base styles above) */
+.ui-btn--secondary {
+  /* inherits base */
+}
+
+/* Small */
+.ui-btn--small {
+  min-height: 36px;
+  min-width: 96px;
+  font-size: 13px;
+}
+
+/* Danger */
+.ui-btn--danger {
+  border-color: var(--fw-danger);
+  color: var(--fw-danger);
+  background: transparent;
+}
+
+.ui-btn--danger:hover {
+  background: var(--fw-danger-bg);
+}
+
+/* ── IconButton ───────────────────────────────────────────────────────────── */
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fw-border);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--fw-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
+}
+
+.ui-icon-btn:hover {
+  background: var(--fw-surface);
+  color: var(--fw-text);
+}
+
+.ui-icon-btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+/* ── BackButton ───────────────────────────────────────────────────────────── */
+.ui-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--fw-muted);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--fw-text);
+  font: 14px/1 var(--fw-sans);
+  cursor: pointer;
+  transition: background var(--fw-duration-fast);
+}
+
+.ui-back-btn:hover {
+  background: var(--fw-surface);
+}
+
+.ui-back-btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 3px;
+}
+
+/* ── Panel ────────────────────────────────────────────────────────────────── */
+.ui-panel {
+  background: var(--fw-raised);
+  border: 1px solid var(--fw-border);
+}
+
+.ui-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--fw-border);
+}
+
+.ui-panel__title {
+  flex: 1;
+  font-family: var(--fw-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fw-muted);
+  margin: 0;
+}
+
+.ui-panel__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ui-panel__body {
+  padding: 16px;
+}
+
+/* ── SectionLabel ─────────────────────────────────────────────────────────── */
+.ui-section-label {
+  display: block;
+  font-family: var(--fw-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+
+/* ── StatusChip ───────────────────────────────────────────────────────────── */
+.ui-status-chip {
+  display: inline-block;
+  font-family: var(--fw-mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  line-height: 1.4;
+}
+
+.ui-status-chip--ok   { color: var(--fw-success); background: var(--fw-success-bg); }
+.ui-status-chip--info { color: var(--fw-info);    background: var(--fw-info-bg); }
+.ui-status-chip--warn { color: var(--fw-warning); background: var(--fw-warning-bg); }
+.ui-status-chip--bad  { color: var(--fw-danger);  background: var(--fw-danger-bg); }
+.ui-status-chip--off  { color: var(--fw-muted);   background: var(--fw-surface); }
+
+/* ── Swatch ───────────────────────────────────────────────────────────────── */
+.ui-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid var(--fw-muted);
+  vertical-align: middle;
+}
+
+.ui-swatch--solid {
+  /* background set via inline style */
+}
+
+.ui-swatch--empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+.ui-swatch--coextruded {
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  flex-direction: row;
+  position: relative;
+}
+
+.ui-swatch__half {
+  display: block;
+  width: 50%;
+  height: 100%;
+}
+
+.ui-swatch--gradient {
+  /* background set via inline style */
+}
+
+/* ── ProgressBar ──────────────────────────────────────────────────────────── */
+.ui-progress {
+  background: var(--fw-surface);
+  border: 1px solid var(--fw-border);
+  overflow: hidden;
+}
+
+.ui-progress__fill {
+  height: 100%;
+  background: var(--fw-info);
+  transition: width var(--fw-duration-normal) ease;
+}
+
+/* ── ToastStack ───────────────────────────────────────────────────────────── */
+.ui-toast-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  pointer-events: none;
+}
+
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--fw-raised);
+  border: 1px solid var(--fw-info);
+  box-shadow: var(--fw-shadow-overlay);
+  pointer-events: all;
+}
+
+.ui-toast__text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--fw-text);
+}
+
+.ui-toast__undo {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--fw-muted);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--fw-text);
+  font: 700 13px/1 var(--fw-sans);
+  cursor: pointer;
+  transition: background var(--fw-duration-fast);
+}
+
+.ui-toast__undo:hover {
+  background: var(--fw-surface);
+}
+
+.ui-toast__undo:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}
+
+.ui-toast__dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: none;
+  color: var(--fw-muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: color var(--fw-duration-fast);
+}
+
+.ui-toast__dismiss:hover {
+  color: var(--fw-text);
+}
+
+.ui-toast__dismiss:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: 2px;
+}

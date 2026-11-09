@@ -8,6 +8,7 @@ import Filament from "./pages/Filament";
 import Service from "./pages/Service";
 import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
+import DevComponents from "./pages/DevComponents";
 
 export default function App() {
   return (
@@ -24,6 +25,8 @@ export default function App() {
           <Route path="service/*" element={<Service />} />
           <Route path="tools/*" element={<Tools />} />
           <Route path="settings/*" element={<Settings />} />
+          {/* Dev-only: not in the rail, reachable by URL */}
+          <Route path="dev/components" element={<DevComponents />} />
           {/* 404 fallback within the shell */}
           <Route path="*" element={<NotFound />} />
         </Route>

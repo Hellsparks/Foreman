@@ -3,7 +3,6 @@ import { Outlet, NavLink } from "react-router-dom";
 import Rail from "./Rail";
 import TopBar from "./TopBar";
 import Inspector from "./Inspector";
-import { useAppearance } from "../hooks/useAppearance";
 import { useEventStream } from "../hooks/useEventStream";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import "./Shell.css";
@@ -16,7 +15,6 @@ export type ConnectionMap = Record<number, string>;
 export default function Shell() {
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const { theme, mode, setTheme, setMode } = useAppearance();
 
   // Live printer data from the event bus.
   const [statuses, setStatuses] = useState<StatusMap>({});
@@ -49,10 +47,6 @@ export default function Shell() {
       <div className="shell__body">
         <TopBar
           connectionState={connectionState}
-          theme={theme}
-          mode={mode}
-          onThemeChange={setTheme}
-          onModeChange={setMode}
           attentionCount={0}
         />
 
