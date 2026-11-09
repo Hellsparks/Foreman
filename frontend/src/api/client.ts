@@ -8,6 +8,7 @@ import type { SftpEntry } from "./types/SftpEntry";
 import type { ShellMacro } from "./types/ShellMacro";
 import type { CreateShellMacro } from "./types/CreateShellMacro";
 import type { UpdateShellMacro } from "./types/UpdateShellMacro";
+import type { ApiKey } from "./types/ApiKey";
 
 export type { PrinterSsh, UpsertPrinterSsh, SftpEntry, ShellMacro, CreateShellMacro, UpdateShellMacro };
 
@@ -26,8 +27,17 @@ class ApiError extends Error {
   }
 }
 
+/** Fired when a protected call gets 401 so the app can show the sign-in screen. */
+export const UNAUTHORIZED_EVENT = "foreman:unauthorized";
+
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  return res;
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     headers: { Accept: "application/json" },
   });
   if (!res.ok) {
@@ -37,7 +47,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -52,7 +62,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function put<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -67,7 +77,7 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
 }
 
 async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method: "DELETE",
   });
   if (!res.ok) {
@@ -160,7 +170,7 @@ export interface PrinterCapabilities {
 
 /** POST body that doesn't return JSON (204 No Content). */
 async function postNoContent(path: string, body?: unknown): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -175,14 +185,21 @@ async function postNoContent(path: string, body?: unknown): Promise<void> {
 }
 
 /** Fetch that surfaces the server's `{ error, code }` body in the thrown ApiError. */
-async function req<T>(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<T> {
+async function req<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  raw?: BodyInit,
+  signalUnauthorized = true,
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${BASE}${path}`, {
+  const init: RequestInit = {
     method,
     headers,
     body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined),
-  });
+  };
+  const res = signalUnauthorized ? await apiFetch(`${BASE}${path}`, init) : await fetch(`${BASE}${path}`, init);
   if (!res.ok) {
     let msg = `${method} ${path} → ${res.status}`;
     let code: string | null = null;
@@ -371,6 +388,39 @@ export const api = {
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${window.location.host}/ws/printers/${id}/terminal?cols=${cols}&rows=${rows}`;
   },
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  serverInfo: () => req<ServerInfo>("GET", "/api/info", undefined, undefined, false),
+  me: () => req<{ username: string; kind: string }>("GET", "/api/auth/me", undefined, undefined, false),
+  setupAdmin: (body: { code: string; username: string; password: string; remember: boolean }) =>
+    req<{ username: string }>("POST", "/api/auth/setup", body, undefined, false),
+  login: (body: { username: string; password: string; remember: boolean }) =>
+    req<{ username: string }>("POST", "/api/auth/login", body, undefined, false),
+  logout: () => req<void>("POST", "/api/auth/logout", undefined, undefined, false),
+  listApiKeys: () => req<ApiKey[]>("GET", "/api/auth/api-keys"),
+  /** `secret` is only returned here, once. */
+  createApiKey: (name: string) =>
+    req<{ key: ApiKey; secret: string }>("POST", "/api/auth/api-keys", { name }),
+  revokeApiKey: (id: number) => req<void>("DELETE", `/api/auth/api-keys/${id}`),
+  getNetwork: () => req<NetworkSettings>("GET", "/api/settings/network"),
+  setNetwork: (allow_lan: boolean) =>
+    req<NetworkSettings>("PUT", "/api/settings/network", { allow_lan }),
 };
+
+export interface ServerInfo {
+  server_id: string;
+  name: string;
+  version: string;
+  needs_setup: boolean;
+}
+
+export interface NetworkSettings {
+  desktop_mode: boolean;
+  allow_lan: boolean;
+  configured_host: string;
+  bound_host: string;
+  restart_required: boolean;
+}
+
+export type { ApiKey };
 
 export { ApiError };

@@ -911,11 +911,24 @@ impl DriverManager {
     /// Send a command to a printer with safety checks and audit logging.
     ///
     /// `confirm_token` is required for Cancel commands. Pass `None` for all others.
+    #[cfg(test)]
     pub async fn send_command(
         &self,
         printer_id: i64,
         cmd: PrinterCommand,
         confirm_token: Option<&str>,
+    ) -> Result<(), AppError> {
+        self.send_command_as(printer_id, cmd, confirm_token, None)
+            .await
+    }
+
+    /// [`send_command`](Self::send_command) recording `user` in the audit log.
+    pub async fn send_command_as(
+        &self,
+        printer_id: i64,
+        cmd: PrinterCommand,
+        confirm_token: Option<&str>,
+        user: Option<&str>,
     ) -> Result<(), AppError> {
         // Look up the driver.
         let driver = {
@@ -953,7 +966,7 @@ impl DriverManager {
         // Audit log.
         let cmd_desc = format!("{cmd:?}");
         if let Err(e) =
-            foreman_core::repo::audit_log::insert(&self.pool, Some(printer_id), None, &cmd_desc)
+            foreman_core::repo::audit_log::insert(&self.pool, Some(printer_id), user, &cmd_desc)
                 .await
         {
             warn!(printer_id, "audit_log insert failed: {e}");

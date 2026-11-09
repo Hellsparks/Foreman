@@ -2,12 +2,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ConnectionState } from "../hooks/useEventStream";
 
 /** True only when running inside the Tauri shell. */
-const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Pages portal their title/status into this element. */
 export const TOPBAR_SLOT_ID = "topbar-page-slot";
 
-function WindowControls() {
+export function WindowControls() {
   const win = getCurrentWindow();
 
   return (

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppearance, THEMES, MODES, type Theme, type Mode } from "../hooks/useAppearance";
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
+import SecuritySettings from "../auth/SecuritySettings";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
 // Used only for the swatch dots; never hardcoded in component logic.
@@ -198,6 +199,8 @@ export default function Settings() {
           </div>
         )}
       </section>
+
+      <SecuritySettings />
 
       <p className="page-placeholder" style={{ marginTop: 32 }}>
         Server config, backup, notifications — coming in phase 7.

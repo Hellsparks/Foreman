@@ -5,7 +5,11 @@ use std::sync::Arc;
 use foreman_core::{db::ForemanDb, events::ServerEvent, secrets::SecretBox};
 use tokio::sync::broadcast;
 
-use crate::{driver_manager::DriverManager, ssh_pool::SshPool};
+use crate::{
+    auth::{AuthState, ServerInfo},
+    driver_manager::DriverManager,
+    ssh_pool::SshPool,
+};
 
 /// Shared state available to all route handlers via `State<AppState>`.
 #[derive(Clone)]
@@ -21,4 +25,8 @@ pub struct AppState {
     pub secrets: Arc<SecretBox>,
     /// Pooled SSH/SFTP sessions, one per printer.
     pub ssh_pool: Arc<SshPool>,
+    /// Setup code + login rate limiting.
+    pub auth: Arc<AuthState>,
+    /// Server identity and bind facts.
+    pub info: Arc<ServerInfo>,
 }
