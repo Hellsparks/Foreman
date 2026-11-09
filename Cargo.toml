@@ -42,7 +42,7 @@ config = "0.14"
 ts-rs = { version = "10", features = ["serde-compat", "chrono-impl"] }
 
 # Utilities
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tokio-util = { version = "0.7", features = ["io"] }
 dirs = "5"
