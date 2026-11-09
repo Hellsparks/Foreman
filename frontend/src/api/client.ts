@@ -332,6 +332,9 @@ export const api = {
   readFile: (id: number, path: string) =>
     req<TextFile>("GET", `/api/printers/${id}/files/read?${q(path)}`),
   downloadUrl: (id: number, path: string) => `${BASE}/api/printers/${id}/files/download?${q(path)}`,
+  /** Inline image URL for previews (raster formats only). */
+  previewUrl: (id: number, path: string) =>
+    `${BASE}/api/printers/${id}/files/download?${q(path)}&inline=true`,
   /** Whole-file write; the server keeps `<file>.bak`. */
   writeFile: (id: number, path: string, content: string) =>
     req<{ ok: boolean; backup: boolean }>("PUT", `/api/printers/${id}/files/write`, { path, content }),

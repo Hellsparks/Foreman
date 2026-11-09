@@ -13,6 +13,7 @@ import "./PrinterFiles.css";
 // ---------------------------------------------------------------------------
 
 const TEXT_RE = /\.(cfg|conf|log|sh|md|txt|json|ini|toml|ya?ml|py|service)$|^\.[^.]/i;
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 const DANGER_RE = /\b(sudo|rm|reboot|shutdown|dd|mkfs)\b/;
 
 function errText(e: unknown): string {
@@ -562,6 +563,12 @@ function FileBrowser({
                   )}
                 </div>
               </>
+            ) : IMAGE_RE.test(sel.name) ? (
+              <div className="pf-image">
+                <a href={api.previewUrl(printerId, sel.path)} target="_blank" rel="noopener noreferrer" title="Open full size">
+                  <img src={api.previewUrl(printerId, sel.path)} alt={sel.name} />
+                </a>
+              </div>
             ) : (
               <div className="pf-empty">
                 {/\.(gcode|3mf)$/i.test(sel.name)

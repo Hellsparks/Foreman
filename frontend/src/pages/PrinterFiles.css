@@ -262,6 +262,23 @@
   color: var(--fw-muted);
 }
 
+.pf-image {
+  flex: 1;
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: var(--fw-surface);
+}
+
+.pf-image img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 260px);
+  object-fit: contain;
+}
+
 /* ── Terminal ─────────────────────────────────────────────────────────── */
 
 .pf-term {

@@ -376,6 +376,27 @@ pub struct PathQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DownloadQuery {
+    path: String,
+    /// Serve raster images inline (for previews) instead of as an attachment.
+    #[serde(default)]
+    inline: bool,
+}
+
+/// MIME type for raster images we allow inline. SVG is excluded: it can carry script.
+pub(crate) fn inline_image_mime(path: &str) -> Option<&'static str> {
+    let ext = path.rsplit_once('.')?.1.to_ascii_lowercase();
+    Some(match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => return None,
+    })
+}
+
+#[derive(Debug, Deserialize)]
 pub struct WriteBody {
     path: String,
     content: String,
@@ -426,11 +447,11 @@ pub async fn read_file(
     Ok(Json(remote_fs::read_text(&s.fs, &s.roots, &q.path).await?).into_response())
 }
 
-/// `GET /api/printers/{id}/files/download?path=` — streamed raw bytes.
+/// `GET /api/printers/{id}/files/download?path=[&inline=true]` — streamed raw bytes.
 pub async fn download_file(
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Query(q): Query<PathQuery>,
+    Query(q): Query<DownloadQuery>,
 ) -> ApiResult<Response> {
     let s = open_fs(&state, id).await?;
     let path = remote_fs::normalize(&q.path)?;
@@ -452,13 +473,18 @@ pub async fn download_file(
         let _ = &keep;
         chunk
     });
+    let (content_type, disposition) = match inline_image_mime(&path).filter(|_| q.inline) {
+        Some(mime) => (mime, format!("inline; filename=\"{name}\"")),
+        None => (
+            "application/octet-stream",
+            format!("attachment; filename=\"{name}\""),
+        ),
+    };
     Ok((
         [
-            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
-            (
-                header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{name}\""),
-            ),
+            (header::CONTENT_TYPE, content_type.to_owned()),
+            (header::CONTENT_DISPOSITION, disposition),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_owned()),
         ],
         Body::from_stream(stream),
     )
@@ -707,6 +733,18 @@ mod tests {
             state,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn inline_preview_only_for_raster_images() {
+        assert_eq!(
+            inline_image_mime("/x/shaper_calibrate_x.png"),
+            Some("image/png")
+        );
+        assert_eq!(inline_image_mime("/x/a.JPG"), Some("image/jpeg"));
+        assert_eq!(inline_image_mime("/x/a.svg"), None);
+        assert_eq!(inline_image_mime("/x/a.html"), None);
+        assert_eq!(inline_image_mime("/x/noext"), None);
     }
 
     #[test]
