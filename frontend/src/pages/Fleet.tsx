@@ -21,6 +21,11 @@ function fwLabel(fw: string): string {
   return fw.toUpperCase();
 }
 
+/** Ensure a URL has a protocol prefix (bare IPs become http://). */
+function ensureProtocol(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `http://${url}`;
+}
+
 interface ChipData {
   hex: string | undefined;
   label: string;
@@ -200,8 +205,8 @@ export default function Fleet() {
   useEffect(() => {
     if (menuFor === null) return;
     const handler = () => setMenuFor(null);
-    window.addEventListener("pointerdown", handler);
-    return () => window.removeEventListener("pointerdown", handler);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
   }, [menuFor]);
 
   // Live status merged with REST snapshot.
@@ -400,7 +405,7 @@ export default function Fleet() {
                   e.stopPropagation();
                   setMenuFor((prev) => (prev === p.id ? null : p.id));
                 }}
-                onOpenInspector={() => selectPrinter(p.id)}
+                onOpenPage={() => navigate(`/printer/${p.id}`)}
               />
             );
           })}
@@ -434,7 +439,7 @@ function PrinterCard({
   snapshotTs,
   onSelect,
   onMenuToggle,
-  onOpenInspector,
+  onOpenPage,
 }: {
   printer: PrinterWithStatus;
   status: PrinterStatus | null;
@@ -444,7 +449,7 @@ function PrinterCard({
   snapshotTs: number;
   onSelect: () => void;
   onMenuToggle: (e: React.MouseEvent) => void;
-  onOpenInspector: () => void;
+  onOpenPage: () => void;
 }) {
   const tone = statusTone(state);
   const pct =
@@ -533,18 +538,16 @@ function PrinterCard({
           <button
             type="button"
             className="fleet-card__dropdown-item"
-            onClick={onOpenInspector}
+            onClick={onOpenPage}
           >
-            Open printer
+            Open printer page
           </button>
           {printer.primary_url && (
             <button
               type="button"
               className="fleet-card__dropdown-item"
               onClick={() => {
-                const url = printer.primary_url!;
-                // Open in native browser / system default
-                window.open(url, "_blank", "noopener,noreferrer");
+                window.open(ensureProtocol(printer.primary_url!), "_blank", "noopener,noreferrer");
               }}
             >
               Open native UI
@@ -684,8 +687,7 @@ function PrinterInspector({
             type="button"
             className="fleet-insp__btn"
             onClick={() => {
-              const url = printer.primary_url!;
-              window.open(url, "_blank", "noopener,noreferrer");
+              window.open(ensureProtocol(printer.primary_url!), "_blank", "noopener,noreferrer");
             }}
           >
             Native UI

@@ -79,6 +79,12 @@ export default function Printer() {
   const state = liveStatus?.state ?? "offline";
   const isPrinting = state === "printing" || state === "paused";
 
+  // Temp input draft state (avoids WS overwriting while typing)
+  const [nozzleDraft, setNozzleDraft] = useState("");
+  const [bedDraft, setBedDraft] = useState("");
+  const [nozzleFocused, setNozzleFocused] = useState(false);
+  const [bedFocused, setBedFocused] = useState(false);
+
   // Toolhead state
   const [step, setStep] = useState(10);
   const [extLen, setExtLen] = useState(10);
@@ -187,6 +193,19 @@ export default function Printer() {
 
   const fwTag = caps?.firmware_version ?? printer?.firmware ?? "";
 
+  // Sync temp drafts from WS when the input is not focused
+  useEffect(() => {
+    if (!nozzleFocused) setNozzleDraft(String(nozzleTarget));
+  }, [nozzleTarget, nozzleFocused]);
+
+  useEffect(() => {
+    if (!bedFocused) setBedDraft(String(bedTarget));
+  }, [bedTarget, bedFocused]);
+
+  /** Ensure a URL has a protocol prefix (bare IPs become http://). */
+  const ensureProtocol = (url: string) =>
+    /^https?:\/\//i.test(url) ? url : `http://${url}`;
+
   if (!printer) {
     return <div className="printer-placeholder">Loading...</div>;
   }
@@ -230,7 +249,7 @@ export default function Printer() {
             )}
             {printer.primary_url && (
               <a
-                href={printer.primary_url}
+                href={ensureProtocol(printer.primary_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ui-btn ui-btn--secondary"
@@ -293,7 +312,7 @@ export default function Printer() {
               <div className="webcam-view">
                 {webcams.length > 0 ? (
                   <img
-                    src={`${api.snapshotUrl(printerId)}?t=${camTs}&cam=${activeCam}`}
+                    src={`${api.snapshotUrl(printerId)}?t=${camTs}`}
                     alt={`${webcams[activeCam]?.name ?? "Webcam"} live view`}
                   />
                 ) : (
@@ -416,8 +435,25 @@ export default function Printer() {
                   min={0}
                   max={300}
                   step={1}
-                  value={nozzleTarget}
-                  onChange={(e) => cmd("set_nozzle_temp", { target: Number(e.target.value) })}
+                  value={nozzleDraft}
+                  onChange={(e) => setNozzleDraft(e.target.value)}
+                  onFocus={() => setNozzleFocused(true)}
+                  onBlur={() => {
+                    setNozzleFocused(false);
+                    const val = Number(nozzleDraft);
+                    if (!isNaN(val) && val >= 0 && val <= 300) {
+                      cmd("set_nozzle_temp", { target: val });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = Number(nozzleDraft);
+                      if (!isNaN(val) && val >= 0 && val <= 300) {
+                        cmd("set_nozzle_temp", { target: val });
+                      }
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   aria-label="Nozzle target, max 300 °C"
                 />
                 <button
@@ -445,8 +481,25 @@ export default function Printer() {
                   min={0}
                   max={120}
                   step={1}
-                  value={bedTarget}
-                  onChange={(e) => cmd("set_bed_temp", { target: Number(e.target.value) })}
+                  value={bedDraft}
+                  onChange={(e) => setBedDraft(e.target.value)}
+                  onFocus={() => setBedFocused(true)}
+                  onBlur={() => {
+                    setBedFocused(false);
+                    const val = Number(bedDraft);
+                    if (!isNaN(val) && val >= 0 && val <= 120) {
+                      cmd("set_bed_temp", { target: val });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = Number(bedDraft);
+                      if (!isNaN(val) && val >= 0 && val <= 120) {
+                        cmd("set_bed_temp", { target: val });
+                      }
+                      (e.target as HTMLInputElement).blur();
+                    }
+                  }}
                   aria-label="Bed target, max 120 °C"
                 />
                 <button
