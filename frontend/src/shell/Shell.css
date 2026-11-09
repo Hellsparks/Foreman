@@ -49,7 +49,7 @@ body {
 .shell__work {
   flex: 1;
   min-width: 0;
-  padding: var(--fw-space-8);
+  padding: var(--fw-space-4) var(--fw-space-8) var(--fw-space-8);
 }
 
 /* ── Navigation rail ─────────────────────────────────────────────────────── */

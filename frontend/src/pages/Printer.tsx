@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { ReactNode } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
@@ -64,6 +65,72 @@ const DEFAULT_PRESETS = [
 // Main component
 // ---------------------------------------------------------------------------
 
+function usePersistentFlag(key: string): [boolean, (f: (v: boolean) => boolean) => void] {
+  const [value, setValue] = useState(() => localStorage.getItem(key) === "1");
+  const update = useCallback(
+    (f: (v: boolean) => boolean) =>
+      setValue((v) => {
+        const next = f(v);
+        localStorage.setItem(key, next ? "1" : "0");
+        return next;
+      }),
+    [key],
+  );
+  return [value, update];
+}
+
+/** A vertical side column that collapses to a narrow strip with a rotated label. */
+function LiveColumn({
+  label,
+  collapsed,
+  onToggle,
+  width,
+  actions,
+  children,
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  width: number;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className="live-col live-col--collapsed"
+        onClick={onToggle}
+        aria-expanded={false}
+        aria-label={`Show ${label}`}
+        title={`Show ${label}`}
+      >
+        <span className="live-col__chev" aria-hidden="true">‹</span>
+        <span className="live-col__vlabel">{label}</span>
+      </button>
+    );
+  }
+  return (
+    <section className="live-col live-panel" aria-label={label} style={{ flexBasis: width, width }}>
+      <div className="live-col__head">
+        <SectionLabel as="h2" style={{ flex: 1 }}>{label}</SectionLabel>
+        {actions}
+        <button
+          type="button"
+          className="live-col__toggle"
+          onClick={onToggle}
+          aria-expanded={true}
+          aria-label={`Hide ${label}`}
+          title={`Hide ${label}`}
+        >
+          ›
+        </button>
+      </div>
+      <div className="live-col__body">{children}</div>
+    </section>
+  );
+}
+
 export default function Printer() {
   const { id } = useParams<{ id: string }>();
   const printerId = Number(id);
@@ -114,6 +181,10 @@ export default function Printer() {
 
   // All macros vs favourites
   const [showAllMacros, setShowAllMacros] = useState(false);
+
+  // Live tab side columns (remembered per browser)
+  const [consoleCollapsed, setConsoleCollapsed] = usePersistentFlag("foreman.live.consoleCollapsed");
+  const [macrosCollapsed, setMacrosCollapsed] = usePersistentFlag("foreman.live.macrosCollapsed");
 
   // ---------------------------------------------------------------------------
   // Load printer data on mount
@@ -304,10 +375,8 @@ export default function Printer() {
       {activeTab === "Live" ? (
         <div className="printer-live" role="tabpanel" aria-label="Live">
 
-          {/* LEFT COLUMN: webcams, console, macros */}
-          <div className="printer-live__left">
-
-            {/* Webcam section */}
+          {/* Webcam: scales to fit the viewport */}
+          <div className="printer-live__cam">
             <section aria-label="Webcams" style={{ border: "1px solid var(--fw-border)", background: "var(--fw-raised)" }}>
               <div className="webcam-bar">
                 <div role="tablist" aria-label="Choose webcam" style={{ display: "flex", flexWrap: "wrap" }}>
@@ -323,7 +392,7 @@ export default function Printer() {
                     </button>
                   ))}
                   {webcams.length === 0 && (
-                    <span style={{ padding: "0 14px", lineHeight: "44px", color: "var(--fw-muted)", fontSize: 13 }}>
+                    <span style={{ padding: "0 14px", lineHeight: "40px", color: "var(--fw-muted)", fontSize: 13 }}>
                       No webcams
                     </span>
                   )}
@@ -340,10 +409,10 @@ export default function Printer() {
                 )}
               </div>
             </section>
+          </div>
 
-            {/* Console */}
-            <section className="live-panel live-panel--gap-sm" aria-label="Console" style={{ padding: "12px 16px" }}>
-              <SectionLabel as="h2">Console</SectionLabel>
+          {/* Console column (collapsible) */}
+          <LiveColumn label="Console" collapsed={consoleCollapsed} onToggle={() => setConsoleCollapsed((v) => !v)} width={320}>
               <div className="console-output" ref={consoleRef}>
                 {consoleLines.length === 0
                   ? "Ready — type a G-code command below."
@@ -383,21 +452,20 @@ export default function Printer() {
                 />
                 <button type="button" onClick={sendGcode}>Send</button>
               </div>
-            </section>
+          </LiveColumn>
 
-            {/* Macros */}
-            <section className="live-panel live-panel--gap" aria-label="Macros" style={{ padding: "12px 16px" }}>
-              <div className="macros-header">
-                <SectionLabel as="h2" style={{ flex: 1 }}>
-                  Macros {showAllMacros ? "" : "· favourites"}
-                </SectionLabel>
-                <Button
-                  variant="small"
-                  onClick={() => setShowAllMacros((v) => !v)}
-                >
-                  {showAllMacros ? "Favourites" : `All ${macros.length}`}
-                </Button>
-              </div>
+          {/* Macros column (collapsible) */}
+          <LiveColumn
+            label={`Macros${showAllMacros ? "" : " · favourites"}`}
+            collapsed={macrosCollapsed}
+            onToggle={() => setMacrosCollapsed((v) => !v)}
+            width={260}
+            actions={
+              <Button variant="small" onClick={() => setShowAllMacros((v) => !v)}>
+                {showAllMacros ? "Favourites" : `All ${macros.length}`}
+              </Button>
+            }
+          >
               <div className="macro-grid">
                 {displayMacros.map((m) => (
                   <button
@@ -414,8 +482,7 @@ export default function Printer() {
                   </span>
                 )}
               </div>
-            </section>
-          </div>
+          </LiveColumn>
 
           {/* RIGHT COLUMN: temps, toolhead, extruder */}
           <div className="printer-live__right">
@@ -461,16 +528,12 @@ export default function Printer() {
                   onBlur={() => {
                     setNozzleFocused(false);
                     const val = Number(nozzleDraft);
-                    if (!isNaN(val) && val >= 0 && val <= 300) {
+                    if (!isNaN(val) && val >= 0 && val <= 300 && val !== nozzleTarget) {
                       cmd("set_nozzle_temp", { target: val });
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      const val = Number(nozzleDraft);
-                      if (!isNaN(val) && val >= 0 && val <= 300) {
-                        cmd("set_nozzle_temp", { target: val });
-                      }
                       (e.target as HTMLInputElement).blur();
                     }
                   }}
@@ -507,16 +570,12 @@ export default function Printer() {
                   onBlur={() => {
                     setBedFocused(false);
                     const val = Number(bedDraft);
-                    if (!isNaN(val) && val >= 0 && val <= 120) {
+                    if (!isNaN(val) && val >= 0 && val <= 120 && val !== bedTarget) {
                       cmd("set_bed_temp", { target: val });
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      const val = Number(bedDraft);
-                      if (!isNaN(val) && val >= 0 && val <= 120) {
-                        cmd("set_bed_temp", { target: val });
-                      }
                       (e.target as HTMLInputElement).blur();
                     }
                   }}

@@ -657,16 +657,20 @@ impl MoonrakerDriver {
             None => return,
         };
 
-        // Derive an absolute base for resolving relative URLs (e.g. /webcam/...).
-        // Strip any path from http_base so we get just scheme://host[:port].
+        // Relative webcam URLs (e.g. /webcam/...) are served by the web frontend (nginx),
+        // not Moonraker, so resolve them against scheme://host without Moonraker's port.
         let origin = {
             let s = http_base
                 .replace("ws://", "http://")
                 .replace("wss://", "https://");
             if let Some(pos) = s.find("://") {
                 let after = &s[pos + 3..];
-                let end = after.find('/').map(|i| pos + 3 + i).unwrap_or(s.len());
-                s[..end].to_owned()
+                let authority = after.split('/').next().unwrap_or(after);
+                let host = match authority.rfind(':') {
+                    Some(i) if !authority[i..].contains(']') => &authority[..i],
+                    _ => authority,
+                };
+                format!("{}{}", &s[..pos + 3], host)
             } else {
                 s
             }
@@ -864,5 +868,35 @@ impl PrinterDriver for MoonrakerDriver {
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
         Ok(self.status.read().await.to_printer_status())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn relative_webcam_urls_use_frontend_origin() {
+        let caps = RwLock::new(None);
+        let result = serde_json::json!({ "webcams": [
+            { "name": "cam", "stream_url": "/webcam/?action=stream",
+              "snapshot_url": "/webcam/?action=snapshot" },
+            { "name": "abs", "snapshot_url": "http://cam.local:8080/snap" }
+        ]});
+        MoonrakerDriver::parse_webcams(&result, &caps, "http://10.0.0.177:7125").await;
+        let c = caps.read().await;
+        let w = &c.as_ref().expect("caps").webcams;
+        assert_eq!(
+            w[0].snapshot_url.as_deref(),
+            Some("http://10.0.0.177/webcam/?action=snapshot")
+        );
+        assert_eq!(
+            w[0].stream_url.as_deref(),
+            Some("http://10.0.0.177/webcam/?action=stream")
+        );
+        assert_eq!(
+            w[1].snapshot_url.as_deref(),
+            Some("http://cam.local:8080/snap")
+        );
     }
 }
