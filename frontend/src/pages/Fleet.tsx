@@ -13,6 +13,7 @@ import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { StatusChip, ProgressBar, Swatch } from "../ui";
 import type { Tone } from "../ui";
+import { useSignedUrl } from "../hooks/useSignedUrl";
 import "./Fleet.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -461,7 +462,7 @@ function PrinterCard({
   const jobName = status?.filename ?? (state === "offline" ? "Not reachable" : "Ready for next job");
   const sub = jobSubLine(status);
   const isOffline = state === "offline";
-  const snapshotUrl = isOffline ? null : api.snapshotUrl(printer.id, snapshotTs);
+  const snapshotUrl = useSignedUrl(isOffline ? null : api.snapshotPath(printer.id, snapshotTs));
 
   return (
     <article

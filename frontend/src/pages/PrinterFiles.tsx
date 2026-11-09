@@ -6,6 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import { api, ApiError } from "../api/client";
 import type { FilesInfo, PrinterSsh, SftpEntry, ShellMacro, TextFile } from "../api/client";
 import { ToastStack, useToasts } from "../ui";
+import { useSignedUrl } from "../hooks/useSignedUrl";
 import "./PrinterFiles.css";
 
 // ---------------------------------------------------------------------------
@@ -328,6 +329,8 @@ function FileBrowser({
   ];
 
   const isText = !!sel && TEXT_RE.test(sel.name);
+  const downloadHref = useSignedUrl(sel ? api.downloadPath(printerId, sel.path) : null);
+  const previewSrc = useSignedUrl(sel && IMAGE_RE.test(sel.name) ? api.previewPath(printerId, sel.path) : null);
   const original = file?.content ?? "";
   const text = edit ?? original;
   const dirty = edit !== null && edit !== original;
@@ -572,7 +575,7 @@ function FileBrowser({
               {isText && file && (
                 <span className={`pf-state${dirty ? " pf-state--dirty" : ""}`}>{stateLabel}</span>
               )}
-              <a className="pf-btn" href={api.downloadUrl(printerId, sel.path)} download={sel.name}>
+              <a className="pf-btn" href={downloadHref ?? undefined} download={sel.name}>
                 Download
               </a>
               {renaming === null ? (
@@ -632,8 +635,8 @@ function FileBrowser({
               </>
             ) : IMAGE_RE.test(sel.name) ? (
               <div className="pf-image">
-                <a href={api.previewUrl(printerId, sel.path)} target="_blank" rel="noopener noreferrer" title="Open full size">
-                  <img src={api.previewUrl(printerId, sel.path)} alt={sel.name} />
+                <a href={previewSrc ?? undefined} target="_blank" rel="noopener noreferrer" title="Open full size">
+                  {previewSrc && <img src={previewSrc} alt={sel.name} />}
                 </a>
               </div>
             ) : (
@@ -722,56 +725,72 @@ function SshTerminal({ printerId }: { printerId: number }) {
     termRef.current = term;
     setSize({ cols: term.cols, rows: term.rows });
 
-    const ws = new WebSocket(api.terminalWsUrl(printerId, term.cols, term.rows));
-    ws.binaryType = "arraybuffer";
-    wsRef.current = ws;
+    let ws: WebSocket | null = null;
+    let disposed = false;
     setStatus("connecting");
     setStatusMsg("");
     setErrCodeState(null);
-    // StrictMode/reconnects can leave an older socket closing; ignore its events.
-    const current = () => wsRef.current === ws;
-    ws.onmessage = (ev) => {
-      if (!current()) return;
-      if (typeof ev.data === "string") {
-        try {
-          const m = JSON.parse(ev.data) as {
-            type: string;
-            message?: string;
-            code?: string | null;
-            reason?: string;
-            user?: string;
-            host?: string;
-            port?: number;
-          };
-          if (m.type === "ready") {
-            setStatus("ready");
-            setConn({ user: m.user ?? "", host: m.host ?? "", port: m.port ?? 22 });
-            term.focus();
-          } else if (m.type === "error") {
-            setStatus("error");
-            setStatusMsg(m.message ?? "error");
-            setErrCodeState(m.code ?? null);
-            term.writeln(`\r\n[foreman] ${m.message ?? "error"}`);
-          } else if (m.type === "exit") {
-            setStatus("closed");
-            if (m.reason === "idle") {
-              setStatusMsg("closed after idle timeout");
-              term.writeln("\r\n[foreman] connection closed after idle timeout");
+
+    const attach = (sock: WebSocket) => {
+      sock.binaryType = "arraybuffer";
+      ws = sock;
+      wsRef.current = sock;
+      // StrictMode/reconnects can leave an older socket closing; ignore its events.
+      const current = () => wsRef.current === sock;
+      sock.onmessage = (ev) => {
+        if (!current()) return;
+        if (typeof ev.data === "string") {
+          try {
+            const m = JSON.parse(ev.data) as {
+              type: string;
+              message?: string;
+              code?: string | null;
+              reason?: string;
+              user?: string;
+              host?: string;
+              port?: number;
+            };
+            if (m.type === "ready") {
+              setStatus("ready");
+              setConn({ user: m.user ?? "", host: m.host ?? "", port: m.port ?? 22 });
+              term.focus();
+            } else if (m.type === "error") {
+              setStatus("error");
+              setStatusMsg(m.message ?? "error");
+              setErrCodeState(m.code ?? null);
+              term.writeln(`\r\n[foreman] ${m.message ?? "error"}`);
+            } else if (m.type === "exit") {
+              setStatus("closed");
+              if (m.reason === "idle") {
+                setStatusMsg("closed after idle timeout");
+                term.writeln("\r\n[foreman] connection closed after idle timeout");
+              }
             }
+          } catch {
+            /* ignore malformed control frame */
           }
-        } catch {
-          /* ignore malformed control frame */
+        } else {
+          term.write(new Uint8Array(ev.data as ArrayBuffer));
         }
-      } else {
-        term.write(new Uint8Array(ev.data as ArrayBuffer));
-      }
-    };
-    ws.onclose = () => {
-      if (current()) setStatus((s) => (s === "error" ? s : "closed"));
+      };
+      sock.onclose = () => {
+        if (current()) setStatus((s) => (s === "error" ? s : "closed"));
+      };
     };
 
+    api
+      .terminalWsUrl(printerId, term.cols, term.rows)
+      .then((url) => {
+        if (!disposed) attach(new WebSocket(url));
+      })
+      .catch((e: unknown) => {
+        if (disposed) return;
+        setStatus("error");
+        setStatusMsg(errText(e));
+      });
+
     const onData = term.onData((d) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
     });
 
     // Multi-line paste needs confirmation; intercept before xterm's own handler.
@@ -790,7 +809,7 @@ function SshTerminal({ printerId }: { printerId: number }) {
       if (host.clientWidth === 0 || host.clientHeight === 0) return;
       fit.fit();
       setSize({ cols: term.cols, rows: term.rows });
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     });
     ro.observe(host);
 
@@ -805,7 +824,8 @@ function SshTerminal({ printerId }: { printerId: number }) {
       mo.disconnect();
       host.removeEventListener("paste", onPaste, true);
       onData.dispose();
-      ws.close();
+      disposed = true;
+      ws?.close();
       term.dispose();
       wsRef.current = null;
       termRef.current = null;

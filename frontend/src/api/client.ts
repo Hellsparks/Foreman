@@ -9,7 +9,7 @@ import type { ShellMacro } from "./types/ShellMacro";
 import type { CreateShellMacro } from "./types/CreateShellMacro";
 import type { UpdateShellMacro } from "./types/UpdateShellMacro";
 import type { ApiKey } from "./types/ApiKey";
-import { apiUrl, authHeaders, mediaUrl, wsUrl } from "./conn";
+import { apiUrl, authHeaders, wsUrl } from "./conn";
 
 export type { PrinterSsh, UpsertPrinterSsh, SftpEntry, ShellMacro, CreateShellMacro, UpdateShellMacro };
 
@@ -266,9 +266,8 @@ export const api = {
       api_key: string | null;
     }>,
   ) => put<PrinterWithStatus>(`/api/printers/${id}`, body),
-  /** URL for the camera snapshot proxy — use as <img src>; `t` busts the cache. */
-  snapshotUrl: (id: number, t?: number) =>
-    mediaUrl(`/api/printers/${id}/snapshot${t ? `?t=${t}` : ""}`),
+  /** Camera snapshot path — turn into an <img src> with `useSignedUrl`; `t` busts the cache. */
+  snapshotPath: (id: number, t?: number) => `/api/printers/${id}/snapshot${t ? `?t=${t}` : ""}`,
   /** List active (uncleared) attention items. */
   listAttention: () => get<AttentionItem[]>("/api/attention"),
   /** Dismiss a single attention item. */
@@ -354,10 +353,10 @@ export const api = {
     req<SftpEntry[]>("GET", `/api/printers/${id}/files?${q(path)}`),
   readFile: (id: number, path: string) =>
     req<TextFile>("GET", `/api/printers/${id}/files/read?${q(path)}`),
-  downloadUrl: (id: number, path: string) => mediaUrl(`/api/printers/${id}/files/download?${q(path)}`),
-  /** Inline image URL for previews (raster formats only). */
-  previewUrl: (id: number, path: string) =>
-    mediaUrl(`/api/printers/${id}/files/download?${q(path)}&inline=true`),
+  downloadPath: (id: number, path: string) => `/api/printers/${id}/files/download?${q(path)}`,
+  /** Inline image path for previews (raster formats only). */
+  previewPath: (id: number, path: string) =>
+    `/api/printers/${id}/files/download?${q(path)}&inline=true`,
   /** Whole-file write; the server keeps `<file>.bak`. */
   writeFile: (id: number, path: string, content: string) =>
     req<{ ok: boolean; backup: boolean }>("PUT", `/api/printers/${id}/files/write`, { path, content }),
@@ -390,7 +389,7 @@ export const api = {
   deleteShellMacro: (id: number, mid: number) =>
     req<void>("DELETE", `/api/printers/${id}/shell-macros/${mid}`),
   /** WebSocket URL for the SSH terminal. */
-  terminalWsUrl: (id: number, cols: number, rows: number) =>
+  terminalWsUrl: (id: number, cols: number, rows: number): Promise<string> =>
     wsUrl(`/ws/printers/${id}/terminal?cols=${cols}&rows=${rows}`),
   // ── Auth ─────────────────────────────────────────────────────────────────
   serverInfo: () => req<ServerInfo>("GET", "/api/info", undefined, undefined, false),

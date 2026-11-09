@@ -17,6 +17,8 @@ pub struct Found {
     pub name: String,
     pub version: String,
     pub host: String,
+    /// From TXT `needs_setup=1`: no admin yet (shown as "Not set up").
+    pub needs_setup: bool,
     /// `ip:port`, LAN addresses first.
     pub addresses: Vec<String>,
 }
@@ -74,6 +76,7 @@ pub fn discover(timeout: Duration) -> Result<Vec<Found>, String> {
                             .to_owned(),
                         version: s.get_property_val_str("version").unwrap_or("").to_owned(),
                         host: s.get_hostname().trim_end_matches('.').to_owned(),
+                        needs_setup: s.get_property_val_str("needs_setup") == Some("1"),
                         addresses: ips.iter().map(|ip| format!("{ip}:{port}")).collect(),
                     },
                 );

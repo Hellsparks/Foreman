@@ -110,7 +110,8 @@ pub async fn serve_with(
         let code = foreman_core::auth::generate_setup_code()?;
         info!(
             "No admin account yet. Setup code: {code} (single use, valid 24 h). \
-             Open http://127.0.0.1:{} and enter it to create the admin.",
+             Open the app or http://<this machine>:{} and enter it to create the admin. \
+             Until then only /api/health, /api/info and /api/auth/setup answer.",
             cfg.port
         );
         if let Ok(mut slot) = auth_state.setup_code.lock() {
@@ -120,11 +121,7 @@ pub async fn serve_with(
     let allow_lan = repo::setting::get(&foreman_db.pool, api::auth::SETTING_ALLOW_LAN)
         .await?
         .is_some_and(|v| v == "true");
-    let (bind_host, bind_reason) =
-        auth::effective_bind_host(&cfg.host, has_admin, cfg.desktop_mode, allow_lan);
-    if let Some(reason) = bind_reason {
-        warn!(configured = %cfg.host, "{reason}");
-    }
+    let bind_host = auth::effective_bind_host(&cfg.host, has_admin, cfg.desktop_mode, allow_lan);
     let hostname = net::hostname();
     let has_tailscale = net::interface_ips()
         .iter()
@@ -253,13 +250,16 @@ pub async fn serve_with(
                 std::net::IpAddr::V4(v4) if !v4.is_unspecified() => vec![v4],
                 _ => net::interface_ips().into_iter().map(|(_, ip)| ip).collect(),
             };
-            let name = api::auth::server_name(&app_state.foreman_db.pool, &app_state.info.hostname)
+            let pool = &app_state.foreman_db.pool;
+            let name = api::auth::server_name(pool, &app_state.info.hostname)
                 .await
                 .unwrap_or_else(|_| "Foreman".to_owned());
+            let needs_setup = !foreman_core::auth::has_admin(pool).await.unwrap_or(true);
             net::announce(
                 &app_state.info.server_id,
                 &name,
                 app_state.info.version,
+                needs_setup,
                 &app_state.info.hostname,
                 cfg.port,
                 &ips,
@@ -420,6 +420,7 @@ fn build_router(app_state: AppState) -> Router {
         .route("/api/auth/login", post(api::auth::login))
         .route("/api/auth/logout", post(api::auth::logout))
         .route("/api/auth/me", get(api::auth::me))
+        .route("/api/auth/url-token", post(api::auth::url_token))
         .route(
             "/api/auth/api-keys",
             get(api::auth::list_keys).post(api::auth::create_key),
@@ -572,7 +573,16 @@ fn build_router(app_state: AppState) -> Router {
             auth::require_auth,
         ))
         .with_state(app_state)
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            // URIs may carry scoped `?token=`s; never log them.
+            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
+                tracing::debug_span!(
+                    "request",
+                    method = %req.method(),
+                    uri = %auth::redact_token(&req.uri().to_string()),
+                )
+            }),
+        )
         .layer(CorsLayer::permissive())
 }
 

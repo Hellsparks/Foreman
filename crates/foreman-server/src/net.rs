@@ -151,11 +151,12 @@ impl Drop for Announcer {
     }
 }
 
-/// Announce this server on the LAN (TXT: id, name, version).
+/// Announce this server on the LAN (TXT: id, name, version, needs_setup).
 pub fn announce(
     server_id: &str,
     name: &str,
     version: &str,
+    needs_setup: bool,
     hostname: &str,
     port: u16,
     ips: &[Ipv4Addr],
@@ -174,7 +175,12 @@ pub fn announce(
         .map(|ip| ip.to_string())
         .collect::<Vec<_>>()
         .join(",");
-    let props = [("id", server_id), ("name", name), ("version", version)];
+    let props = [
+        ("id", server_id),
+        ("name", name),
+        ("version", version),
+        ("needs_setup", if needs_setup { "1" } else { "0" }),
+    ];
     let result = ServiceDaemon::new().and_then(|daemon| {
         let svc = MdnsService::new(
             MDNS_SERVICE,
@@ -190,7 +196,7 @@ pub fn announce(
     });
     match result {
         Ok(a) => {
-            info!(service = MDNS_SERVICE, %name, "announced on the LAN via mDNS");
+            info!(service = MDNS_SERVICE, %name, needs_setup, "announced on the LAN via mDNS");
             Some(a)
         }
         Err(e) => {

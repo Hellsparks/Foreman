@@ -194,6 +194,11 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
 
+### Session 20c — 2026-11-10 (Phase 2 finish: unclaimed servers on the LAN, scoped URL tokens)
+
+- **Decision — unclaimed servers listen on the LAN** (replaces the 2.9a "no admin → 127.0.0.1 only" rule): a headless server binds its configured host before setup, but answers only `GET /api/health`, `GET /api/info` and `POST /api/auth/setup`; every other `/api/*` and `/ws/*` route returns **403 `{code: "setup_required", error: "server not set up"}`** (login included). Setup shares the per-IP limiter: 5 wrong codes → 60 s pause (429 + `Retry-After`). mDNS TXT gains `needs_setup=1|0` and is re-announced right after setup, so the Connect list shows "Not set up" for a fresh Pi. The static frontend is still served (it holds no data) so a browser can reach the setup page. Exceptions: desktop Mode A stays loopback-only until an admin exists and "Let other devices connect" is on, and its in-process app session still works before setup (it can't be obtained over the network). Bind-rule unit test and router tests updated.
+- **Decision — scoped URL tokens replace session tokens in URLs** (replaces the 20b `?token=<session>` note): `POST /api/auth/url-token {path}` (any authenticated caller) returns a `fmu_…` token valid **60 s for that exact path only**, allowed for `/api/printers/{id}/snapshot`, `/api/printers/{id}/files/download`, `/ws/events` and `/ws/printers/{id}/terminal`. Grants live in memory, stored hashed, purged on issue. Session tokens in a URL are refused everywhere. The desktop app fetches URL tokens on demand (reused for 45 s, refreshed every 40 s for open download links); the browser keeps using its cookie. Request spans log the URI with `token=REDACTED` (verified with `RUST_LOG=foreman_server=debug,tower_http=debug`).
+
 ### Session 20b — 2026-11-09 (2.9b connect screen + Mode B)
 
 - **Branch base:** `phase2-connect` is stacked on `phase2-auth` (PR #3 not merged yet); its PR shows the auth commits until #3 lands.

@@ -29,7 +29,7 @@ export type EventCallback = (event: {
 const MIN_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
 
-function wsUrl(): string {
+function wsUrl(): Promise<string> {
   return serverWsUrl("/ws/events");
 }
 
@@ -54,13 +54,32 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
   const reconnectDelayRef = useRef(MIN_RECONNECT_MS);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const genRef = useRef(0);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (!mountedRef.current) return;
-
-    const ws = new WebSocket(wsUrl());
-    wsRef.current = ws;
+    const gen = ++genRef.current;
     setState((s) => ({ ...s, connectionState: "connecting" }));
+
+    const retry = () => {
+      setState((s) => ({ ...s, connectionState: "disconnected" }));
+      const delay = reconnectDelayRef.current;
+      reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_MS);
+      timerRef.current = setTimeout(() => void connect(), delay);
+    };
+
+    let url: string;
+    try {
+      url = await wsUrl();
+    } catch {
+      if (mountedRef.current && gen === genRef.current) retry();
+      return;
+    }
+    // A newer connect() (failover, unmount) superseded this one.
+    if (!mountedRef.current || gen !== genRef.current) return;
+
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
 
     ws.onopen = () => {
       if (!mountedRef.current) return;
@@ -95,10 +114,7 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
 
     ws.onclose = () => {
       if (!mountedRef.current) return;
-      setState((s) => ({ ...s, connectionState: "disconnected" }));
-      const delay = reconnectDelayRef.current;
-      reconnectDelayRef.current = Math.min(delay * 2, MAX_RECONNECT_MS);
-      timerRef.current = setTimeout(connect, delay);
+      retry();
     };
 
     ws.onerror = () => {
@@ -108,7 +124,7 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
 
   useEffect(() => {
     mountedRef.current = true;
-    connect();
+    void connect();
     // Failover moved to another address: drop the old socket and reconnect at once.
     const off = onConnectionChange(() => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
@@ -118,7 +134,7 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
         old.onclose = null;
         old.close();
       }
-      connect();
+      void connect();
     });
     return () => {
       off();

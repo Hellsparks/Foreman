@@ -61,7 +61,8 @@ export default function AuthGate({ children, desktop }: { children: ReactNode; d
       const me = await api.me();
       setPhase({ kind: "ready", info, username: me.username });
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
+      // 403 = unclaimed server (only health, info and setup answer).
+      if (e instanceof ApiError && (e.status === 401 || (e.status === 403 && info.needs_setup))) {
         setPhase(info.needs_setup ? { kind: "setup", info } : { kind: "login", info });
       } else {
         setPhase({ kind: "offline", message: e instanceof Error ? e.message : String(e) });

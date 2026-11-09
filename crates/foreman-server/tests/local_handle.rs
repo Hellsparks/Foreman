@@ -52,7 +52,10 @@ async fn local_handle_mints_app_sessions_before_setup() {
     );
 
     let (s, _) = get(&client, &format!("{base}/api/printers"), None).await;
-    assert_eq!(s, 401);
+    assert_eq!(
+        s, 403,
+        "unclaimed server: everything but health/info/setup is refused"
+    );
     let token = handle.app_token().await.expect("token");
     let (s, _) = get(&client, &format!("{base}/api/printers"), Some(&token)).await;
     assert_eq!(s, 200);

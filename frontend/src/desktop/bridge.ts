@@ -7,6 +7,7 @@ export interface Found {
   name: string;
   version: string;
   host: string;
+  needs_setup: boolean;
   addresses: string[];
 }
 

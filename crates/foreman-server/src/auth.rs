@@ -2,8 +2,8 @@
 //!
 //! Credentials, checked in order: `X-Api-Key` header (API key), `Authorization: Bearer`
 //! (session token, Tauri/other clients), the `foreman_session` HttpOnly cookie (browser),
-//! and for WebSocket upgrades only a `?token=` query parameter (browsers can't set headers
-//! on WebSockets from non-cookie clients).
+//! and on snapshot/download/WebSocket routes a scoped `?token=` from
+//! `POST /api/auth/url-token` (session tokens are never accepted in URLs).
 
 use std::{
     collections::HashMap,
@@ -19,7 +19,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use foreman_core::auth;
+use foreman_core::{auth, error::AppError};
 use serde_json::json;
 use tracing::warn;
 
@@ -39,6 +39,13 @@ const OPEN_ROUTES: &[&str] = &[
     "/api/auth/setup",
     "/api/auth/login",
 ];
+
+/// The only API routes an unclaimed server (no admin yet) answers.
+const UNCLAIMED_ROUTES: &[&str] = &["/api/health", "/api/info", "/api/auth/setup"];
+
+/// Lifetime of a scoped URL token (`POST /api/auth/url-token`).
+pub const URL_TOKEN_TTL: Duration = Duration::from_secs(60);
+const URL_TOKEN_PREFIX: &str = "fmu_";
 
 // ---------------------------------------------------------------------------
 // Setup code
@@ -154,6 +161,73 @@ impl RateLimiter {
 pub struct AuthState {
     pub setup_code: Mutex<Option<SetupCode>>,
     pub limiter: Mutex<RateLimiter>,
+    pub url_grants: Mutex<UrlGrants>,
+}
+
+// ---------------------------------------------------------------------------
+// Scoped URL tokens (for <img src>, <a href>, WebSockets)
+// ---------------------------------------------------------------------------
+
+struct UrlGrant {
+    path: String,
+    ctx: AuthCtx,
+    expires: Instant,
+}
+
+/// Short-lived tokens bound to one path; stored hashed, in memory only.
+#[derive(Default)]
+pub struct UrlGrants {
+    by_hash: HashMap<String, UrlGrant>,
+}
+
+/// Paths a URL token can be issued for: camera snapshots, file downloads, WebSockets.
+pub fn url_token_path_allowed(path: &str) -> bool {
+    let printer_tail = |prefix: &str, tail: &str| {
+        path.strip_prefix(prefix)
+            .and_then(|rest| rest.strip_suffix(tail))
+            .is_some_and(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
+    };
+    path == "/ws/events"
+        || printer_tail("/api/printers/", "/snapshot")
+        || printer_tail("/api/printers/", "/files/download")
+        || printer_tail("/ws/printers/", "/terminal")
+}
+
+impl UrlGrants {
+    pub fn issue(&mut self, path: &str, ctx: AuthCtx, now: Instant) -> Result<String, AppError> {
+        self.by_hash.retain(|_, g| g.expires > now);
+        let token = auth::random_token(URL_TOKEN_PREFIX)?;
+        self.by_hash.insert(
+            auth::token_hash(&token),
+            UrlGrant {
+                path: path.to_owned(),
+                ctx,
+                expires: now + URL_TOKEN_TTL,
+            },
+        );
+        Ok(token)
+    }
+
+    /// The grant's identity if `token` is valid for exactly `path` at `now`.
+    pub fn check(&self, token: &str, path: &str, now: Instant) -> Option<AuthCtx> {
+        let g = self.by_hash.get(&auth::token_hash(token))?;
+        (g.path == path && now < g.expires).then(|| g.ctx.clone())
+    }
+}
+
+/// `token=…` query values replaced, so URLs can be logged safely.
+pub fn redact_token(uri: &str) -> String {
+    let Some((base, query)) = uri.split_once('?') else {
+        return uri.to_owned();
+    };
+    let query: Vec<String> = query
+        .split('&')
+        .map(|kv| match kv.split_once('=') {
+            Some(("token", _)) => "token=REDACTED".to_owned(),
+            _ => kv.to_owned(),
+        })
+        .collect();
+    format!("{base}?{}", query.join("&"))
 }
 
 /// Facts about this server (for `/api/info`, the network setting and mDNS).
@@ -217,31 +291,26 @@ pub fn is_loopback(host: &str) -> bool {
             .unwrap_or(false)
 }
 
-/// Address to listen on, plus why it differs from the configured one (if it does).
+/// Address to listen on.
 ///
-/// - No admin yet → loopback only, so nobody on the LAN can claim the server first.
-/// - Desktop Mode A → loopback unless "Let other devices connect" is on.
-/// - Otherwise the configured address.
+/// - Server: the configured address, even before setup (an unclaimed server only
+///   answers health, info and setup until the admin exists).
+/// - Desktop Mode A: loopback unless an admin exists and "Let other devices connect" is on.
 pub fn effective_bind_host(
     configured: &str,
     has_admin: bool,
     desktop_mode: bool,
     allow_lan: bool,
-) -> (String, Option<&'static str>) {
-    if !has_admin {
-        let reason = (!is_loopback(configured))
-            .then_some("no admin account yet — listening on 127.0.0.1 only until setup is done");
-        return ("127.0.0.1".into(), reason);
-    }
+) -> String {
     if desktop_mode {
-        if !allow_lan {
-            return ("127.0.0.1".into(), None);
+        if !(has_admin && allow_lan) {
+            return "127.0.0.1".into();
         }
         if is_loopback(configured) {
-            return ("0.0.0.0".into(), None);
+            return "0.0.0.0".into();
         }
     }
-    (configured.to_owned(), None)
+    configured.to_owned()
 }
 
 // ---------------------------------------------------------------------------
@@ -302,32 +371,57 @@ fn unauthorized(code: &'static str, message: &str) -> Response {
         .into_response()
 }
 
-pub fn needs_auth(path: &str) -> bool {
-    (path.starts_with("/api/") || path.starts_with("/ws/")) && !OPEN_ROUTES.contains(&path)
+fn not_set_up() -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(json!({ "error": "server not set up", "code": "setup_required" })),
+    )
+        .into_response()
 }
 
-/// Routes where `?token=` is accepted: WebSockets and files/images opened via
-/// `<img src>` / `<a href>`, none of which can carry an `Authorization` header.
-fn query_token_allowed(method: &axum::http::Method, path: &str) -> bool {
-    path.starts_with("/ws/")
-        || (method == axum::http::Method::GET
-            && path.starts_with("/api/printers/")
-            && (path.ends_with("/snapshot") || path.ends_with("/files/download")))
+pub fn needs_auth(path: &str) -> bool {
+    (path.starts_with("/api/") || path.starts_with("/ws/")) && !OPEN_ROUTES.contains(&path)
 }
 
 /// Audit name for sessions minted in-process by the desktop app before an admin exists.
 pub const LOCAL_APP_USER: &str = "local";
 
+/// Credentials on the request: API key, bearer/cookie session, or a scoped URL token.
+/// Session tokens are never taken from the URL.
+async fn authenticate(state: &AppState, headers: &HeaderMap) -> Option<AuthKind> {
+    let pool = &state.foreman_db.pool;
+    if let Some(key) = headers.get("x-api-key").and_then(|v| v.to_str().ok()) {
+        return match auth::check_api_key(pool, key.trim()).await {
+            Ok(Some(id)) => Some(AuthKind::ApiKey { id }),
+            _ => None,
+        };
+    }
+    let t = session_token(headers)?;
+    match auth::session_valid(pool, &t, chrono::Utc::now().timestamp()).await {
+        Ok(true) => Some(AuthKind::Session { token: t }),
+        _ => None,
+    }
+}
+
+fn url_grant(state: &AppState, req: &Request, path: &str) -> Option<AuthCtx> {
+    if req.method() != axum::http::Method::GET || !url_token_path_allowed(path) {
+        return None;
+    }
+    let token = query_token(req)?;
+    let grants = state.auth.url_grants.lock().ok()?;
+    grants.check(&token, path, Instant::now())
+}
+
 /// Reject unauthenticated requests to protected routes; attach [`AuthCtx`] otherwise.
+///
+/// An unclaimed server (no admin) answers only health, info and setup; everything else
+/// is 403 — except in-process desktop sessions (Mode A, loopback-only until setup).
 pub async fn require_auth(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
     let path = req.uri().path().to_owned();
-    if !needs_auth(&path) {
+    if !(path.starts_with("/api/") || path.starts_with("/ws/")) {
         return next.run(req).await;
     }
-    let pool = &state.foreman_db.pool;
-
-    // No admin yet: only sessions minted in-process by the desktop app (Mode A) exist.
-    let admin = match auth::admin_username(pool).await {
+    let admin = match auth::admin_username(&state.foreman_db.pool).await {
         Ok(a) => a,
         Err(e) => {
             warn!("auth: admin lookup failed: {e}");
@@ -335,35 +429,38 @@ pub async fn require_auth(State(state): State<AppState>, mut req: Request, next:
         }
     };
 
-    let headers = req.headers();
-    let kind = if let Some(key) = headers.get("x-api-key").and_then(|v| v.to_str().ok()) {
-        match auth::check_api_key(pool, key.trim()).await {
-            Ok(Some(id)) => Some(AuthKind::ApiKey { id }),
-            _ => None,
+    let Some(admin) = admin else {
+        if UNCLAIMED_ROUTES.contains(&path.as_str()) {
+            return next.run(req).await;
         }
-    } else {
-        let token = session_token(headers).or_else(|| {
-            query_token_allowed(req.method(), &path)
-                .then(|| query_token(&req))
-                .flatten()
-        });
-        match token {
-            Some(t) => match auth::session_valid(pool, &t, chrono::Utc::now().timestamp()).await {
-                Ok(true) => Some(AuthKind::Session { token: t }),
-                _ => None,
-            },
-            None => None,
-        }
+        return match authenticate(&state, req.headers()).await {
+            Some(kind @ AuthKind::Session { .. }) => {
+                req.extensions_mut().insert(AuthCtx {
+                    username: LOCAL_APP_USER.to_owned(),
+                    kind,
+                });
+                next.run(req).await
+            }
+            _ => not_set_up(),
+        };
     };
 
-    match (kind, admin) {
-        (Some(kind), admin) => {
-            let username = admin.unwrap_or_else(|| LOCAL_APP_USER.to_owned());
-            req.extensions_mut().insert(AuthCtx { username, kind });
+    if !needs_auth(&path) {
+        return next.run(req).await;
+    }
+    let ctx = match authenticate(&state, req.headers()).await {
+        Some(kind) => Some(AuthCtx {
+            username: admin,
+            kind,
+        }),
+        None => url_grant(&state, &req, &path),
+    };
+    match ctx {
+        Some(ctx) => {
+            req.extensions_mut().insert(ctx);
             next.run(req).await
         }
-        (None, None) => unauthorized("setup_required", "this server has no admin account yet"),
-        (None, Some(_)) => unauthorized("unauthorized", "sign in required"),
+        None => unauthorized("unauthorized", "sign in required"),
     }
 }
 
@@ -424,39 +521,100 @@ mod tests {
 
     #[test]
     fn bind_rule() {
-        // No admin → loopback, with a reason only when that changes something.
+        // Server mode: the configured address, admin or not (unclaimed servers are gated).
         assert_eq!(
-            effective_bind_host("0.0.0.0", false, false, true).0,
-            "127.0.0.1"
-        );
-        assert!(effective_bind_host("0.0.0.0", false, false, true)
-            .1
-            .is_some());
-        assert!(effective_bind_host("127.0.0.1", false, false, false)
-            .1
-            .is_none());
-        // Admin, server mode → configured address.
-        assert_eq!(
-            effective_bind_host("0.0.0.0", true, false, false).0,
+            effective_bind_host("0.0.0.0", false, false, false),
             "0.0.0.0"
         );
         assert_eq!(
-            effective_bind_host("10.0.0.10", true, false, false).0,
+            effective_bind_host("0.0.0.0", true, false, false),
+            "0.0.0.0"
+        );
+        assert_eq!(
+            effective_bind_host("10.0.0.10", true, false, false),
             "10.0.0.10"
         );
-        // Desktop: loopback unless the LAN toggle is on.
         assert_eq!(
-            effective_bind_host("127.0.0.1", true, true, false).0,
+            effective_bind_host("127.0.0.1", false, false, true),
+            "127.0.0.1"
+        );
+        // Desktop: loopback unless an admin exists and the LAN toggle is on.
+        assert_eq!(
+            effective_bind_host("127.0.0.1", true, true, false),
             "127.0.0.1"
         );
         assert_eq!(
-            effective_bind_host("127.0.0.1", true, true, true).0,
+            effective_bind_host("127.0.0.1", false, true, true),
+            "127.0.0.1"
+        );
+        assert_eq!(
+            effective_bind_host("127.0.0.1", true, true, true),
             "0.0.0.0"
         );
         assert_eq!(
-            effective_bind_host("0.0.0.0", true, true, false).0,
+            effective_bind_host("0.0.0.0", true, true, false),
             "127.0.0.1"
         );
+    }
+
+    fn ctx() -> AuthCtx {
+        AuthCtx {
+            username: "admin".into(),
+            kind: AuthKind::ApiKey { id: 1 },
+        }
+    }
+
+    #[test]
+    fn url_tokens_are_scoped_and_short_lived() {
+        let t0 = Instant::now();
+        let mut g = UrlGrants::default();
+        let tok = g
+            .issue("/api/printers/1/snapshot", ctx(), t0)
+            .expect("issue");
+        assert!(tok.starts_with(URL_TOKEN_PREFIX));
+        assert!(g.check(&tok, "/api/printers/1/snapshot", t0).is_some());
+        assert!(
+            g.check(&tok, "/api/printers/2/snapshot", t0).is_none(),
+            "other path"
+        );
+        assert!(g.check(&tok, "/ws/events", t0).is_none(), "other path");
+        assert!(
+            g.check(&tok, "/api/printers/1/snapshot", t0 + URL_TOKEN_TTL)
+                .is_none(),
+            "expired"
+        );
+        assert!(g
+            .check("fmu_forged", "/api/printers/1/snapshot", t0)
+            .is_none());
+        // Expired grants are dropped on the next issue.
+        g.issue("/ws/events", ctx(), t0 + URL_TOKEN_TTL)
+            .expect("issue");
+        assert_eq!(g.by_hash.len(), 1);
+    }
+
+    #[test]
+    fn url_token_paths() {
+        assert!(url_token_path_allowed("/ws/events"));
+        assert!(url_token_path_allowed("/ws/printers/3/terminal"));
+        assert!(url_token_path_allowed("/api/printers/12/snapshot"));
+        assert!(url_token_path_allowed("/api/printers/12/files/download"));
+        assert!(!url_token_path_allowed("/api/printers"));
+        assert!(!url_token_path_allowed("/api/printers/x/snapshot"));
+        assert!(!url_token_path_allowed("/api/printers//snapshot"));
+        assert!(!url_token_path_allowed("/api/auth/api-keys"));
+    }
+
+    #[test]
+    fn token_redaction() {
+        assert_eq!(
+            redact_token("/ws/events?token=fmu_secret"),
+            "/ws/events?token=REDACTED"
+        );
+        assert_eq!(
+            redact_token("/api/printers/1/files/download?path=%2Fa&token=fmu_x&inline=true"),
+            "/api/printers/1/files/download?path=%2Fa&token=REDACTED&inline=true"
+        );
+        assert_eq!(redact_token("/api/printers"), "/api/printers");
     }
 
     #[test]

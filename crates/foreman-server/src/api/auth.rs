@@ -59,7 +59,7 @@ async fn allow_lan(pool: &sqlx::SqlitePool) -> Result<bool, AppError> {
 /// Re-evaluate the bind rule and move the listener if it changed (no restart needed).
 pub async fn apply_bind_rule(state: &AppState) -> Result<(), AppError> {
     let pool = &state.foreman_db.pool;
-    let (host, _) = crate::auth::effective_bind_host(
+    let host = crate::auth::effective_bind_host(
         &state.info.configured_host,
         auth::has_admin(pool).await?,
         state.info.desktop_mode,
@@ -228,6 +228,8 @@ pub async fn setup(
     if let Err(e) = apply_bind_rule(&state).await {
         warn!("bind rule after setup: {e}");
     }
+    // Re-announce so the LAN sees needs_setup=0.
+    state.info.bind.send_modify(|_| {});
     start_session(
         &state,
         &ip,
@@ -320,6 +322,41 @@ pub async fn me(Extension(ctx): Extension<AuthCtx>) -> Json<serde_json::Value> {
     }
 }
 
+#[derive(Deserialize)]
+pub struct UrlTokenBody {
+    path: String,
+}
+
+/// `POST /api/auth/url-token` — a token valid 60 s for one snapshot/download/WebSocket path,
+/// for places that can't send a header (`<img src>`, `<a href>`, `new WebSocket`).
+pub async fn url_token(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
+    Json(body): Json<UrlTokenBody>,
+) -> Response {
+    let path = body.path.split('?').next().unwrap_or_default();
+    if !crate::auth::url_token_path_allowed(path) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "invalid",
+            "URL tokens are only for snapshot, download and WebSocket paths",
+        );
+    }
+    let issued = match state.auth.url_grants.lock() {
+        Ok(mut g) => g.issue(path, ctx, Instant::now()),
+        Err(_) => return internal("url grant lock poisoned"),
+    };
+    match issued {
+        Ok(token) => Json(json!({
+            "token": token,
+            "path": path,
+            "expires_in": crate::auth::URL_TOKEN_TTL.as_secs(),
+        }))
+        .into_response(),
+        Err(e) => internal(e),
+    }
+}
+
 /// API keys may not manage keys or network exposure: `Some(403)` for them.
 fn forbid_api_key(ctx: &AuthCtx) -> Option<Response> {
     match ctx.kind {
@@ -390,7 +427,7 @@ pub async fn revoke_key(
 
 async fn network_body(state: &AppState) -> Result<serde_json::Value, AppError> {
     let allow_lan = allow_lan(&state.foreman_db.pool).await?;
-    let (wanted, _) = crate::auth::effective_bind_host(
+    let wanted = crate::auth::effective_bind_host(
         &state.info.configured_host,
         true,
         state.info.desktop_mode,

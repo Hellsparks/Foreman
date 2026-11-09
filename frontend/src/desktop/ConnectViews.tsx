@@ -281,7 +281,7 @@ export function ConnectView({
   onAddBackup: (serverId: string, address: string) => void;
   onOpenSaved: (serverId: string, address: string) => void;
 }) {
-  const [found, setFound] = useState<(Found & { needsSetup?: boolean })[]>([]);
+  const [found, setFound] = useState<Found[]>([]);
   const [scanning, setScanning] = useState(false);
   const [addr, setAddr] = useState("");
   const [testing, setTesting] = useState(false);
@@ -312,19 +312,11 @@ export function ConnectView({
           name: local.name,
           version: local.version,
           host: "This computer",
+          needs_setup: local.needs_setup,
           addresses: [local.address],
-          needsSetup: local.needs_setup,
-        } as Found & { needsSetup?: boolean });
-      }
-      setFound(list);
-      for (const f of list) {
-        if (!f.addresses[0]) continue;
-        void desktop.probe(f.addresses[0]).then((p) => {
-          if (p.kind === "foreman") {
-            setFound((cur) => cur.map((x) => (x.id === f.id ? { ...x, needsSetup: p.needs_setup } : x)));
-          }
         });
       }
+      setFound(list);
     } finally {
       setScanError(errors.join(" · "));
       setScanning(false);
@@ -401,7 +393,7 @@ export function ConnectView({
           {!scanning &&
             found.map((f) => {
               const a = f.addresses[0] ?? f.host;
-              const tone: Tone = f.needsSetup ? "warn" : "ok";
+              const tone: Tone = f.needs_setup ? "warn" : "ok";
               return (
                 <button
                   type="button"
@@ -416,10 +408,10 @@ export function ConnectView({
                     <b>{f.name}</b>
                     <div className="auth__hint auth__mono">
                       {a} · Foreman {f.version}
-                      {f.needsSetup ? " · new" : ""}
+                      {f.needs_setup ? " · new" : ""}
                     </div>
                   </div>
-                  <span className={`connect__tag connect--${tone}`}>{f.needsSetup ? "Not set up" : "Sign-in"}</span>
+                  <span className={`connect__tag connect--${tone}`}>{f.needs_setup ? "Not set up" : "Sign-in"}</span>
                 </button>
               );
             })}

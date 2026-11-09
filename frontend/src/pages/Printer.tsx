@@ -11,6 +11,7 @@ import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
+import { useSignedUrl } from "../hooks/useSignedUrl";
 import "./Printer.css";
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,7 @@ export default function Printer() {
   // Webcam
   const [activeCam, setActiveCam] = useState(0);
   const [camTs, setCamTs] = useState(Date.now());
+  const camSrc = useSignedUrl(printerId ? api.snapshotPath(printerId, camTs) : null);
 
   // Cancel dialog
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -409,7 +411,7 @@ export default function Printer() {
               <div className="webcam-view">
                 {webcams.length > 0 ? (
                   <img
-                    src={api.snapshotUrl(printerId, camTs)}
+                    src={camSrc ?? undefined}
                     alt={`${webcams[activeCam]?.name ?? "Webcam"} live view`}
                   />
                 ) : (
