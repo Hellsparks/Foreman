@@ -208,21 +208,6 @@
   padding: 0 8px;
 }
 
-.webcam-bar__opacity {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font: var(--fw-type-label) / 1 var(--fw-mono);
-  color: var(--fw-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.webcam-bar__opacity input {
-  width: 96px;
-  accent-color: var(--fw-accent-hover);
-}
-
 .webcam-bar__toggle {
   min-height: 30px;
   padding: 0 10px;

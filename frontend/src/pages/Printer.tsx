@@ -388,18 +388,6 @@ export default function Printer() {
                 </div>
                 <div className="webcam-bar__spacer" />
                 <div className="webcam-bar__tools">
-                  <label className="webcam-bar__opacity" title="Overlay opacity">
-                    <span>Opacity</span>
-                    <input
-                      type="range"
-                      min={0.2}
-                      max={1}
-                      step={0.05}
-                      value={overlayAlpha}
-                      onChange={(e) => setOverlayAlpha(Number(e.target.value))}
-                      aria-label="Overlay opacity"
-                    />
-                  </label>
                   <button
                     type="button"
                     className="webcam-bar__toggle"
@@ -755,7 +743,13 @@ export default function Printer() {
           </div>
         </div>
       ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Config" ? (
-        <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
+        <PrinterConfigTab
+          printerId={printerId}
+          printer={printer}
+          caps={caps}
+          overlayAlpha={overlayAlpha}
+          onOverlayAlpha={setOverlayAlpha}
+        />
       ) : (
         <div className="printer-placeholder" role="tabpanel" aria-label={activeTab}>
           <p>{activeTab} — coming soon</p>
@@ -823,10 +817,14 @@ function PrinterConfigTab({
   printerId,
   printer,
   caps,
+  overlayAlpha,
+  onOverlayAlpha,
 }: {
   printerId: number;
   printer: PrinterWithStatus;
   caps: PrinterCapabilities | null;
+  overlayAlpha: number;
+  onOverlayAlpha: (v: number) => void;
 }) {
   const [paths, setPaths] = useState<LocalPath[]>([]);
   const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
@@ -1380,6 +1378,42 @@ function PrinterConfigTab({
       </section>
 
       <SshSettings ref={sshRef} printerId={printerId} firmware={printer.firmware} />
+
+      {/* Display (browser-local, applies immediately) */}
+      <section
+        aria-label="Display"
+        style={{
+          border: "1px solid var(--fw-border)",
+          background: "var(--fw-raised)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 18 }}>Display</h2>
+        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: "bold" }}>
+            Webcam overlay opacity{" "}
+            <span style={{ fontFamily: "var(--fw-mono)", fontWeight: "normal", color: "var(--fw-muted)" }}>
+              {Math.round(overlayAlpha * 100)}%
+            </span>
+          </span>
+          <input
+            type="range"
+            min={0.2}
+            max={1}
+            step={0.05}
+            value={overlayAlpha}
+            onChange={(e) => onOverlayAlpha(Number(e.target.value))}
+            style={{ accentColor: "var(--fw-accent-hover)" }}
+          />
+          <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>
+            How see-through the Console and Macros panels are over the webcam. Applies immediately and is saved in
+            this browser.
+          </span>
+        </label>
+      </section>
 
       {/* ── Capabilities section ─────────────────────────────────── */}
       <section
