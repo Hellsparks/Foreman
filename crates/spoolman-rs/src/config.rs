@@ -108,8 +108,18 @@ impl SpoolmanConfig {
     }
 
     /// SQLite connection URL for sqlx `AnyPool`.
+    ///
+    /// Uses forward slashes on all platforms (Windows `Path::display()` emits
+    /// backslashes which SQLite rejects with SQLITE_CANTOPEN).  Absolute paths
+    /// require three slashes: `sqlite://` + `/path` on Unix or `sqlite:///` +
+    /// `C:/path` on Windows.
     pub fn sqlite_url(&self) -> String {
-        format!("sqlite://{}", self.sqlite_path().display())
+        let path_str = self.sqlite_path().to_string_lossy().replace('\\', "/");
+        if path_str.starts_with('/') {
+            format!("sqlite://{path_str}")
+        } else {
+            format!("sqlite:///{path_str}")
+        }
     }
 
     /// Build the sqlx connection URL for the configured database back-end.
