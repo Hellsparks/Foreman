@@ -84,6 +84,54 @@
   border-color: var(--fw-warning);
 }
 
+.pf-divider {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .pf-split {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  .pf-panel--browser {
+    flex: 0 0 var(--pf-split, 50%);
+  }
+
+  .pf-panel--file {
+    flex: 1 1 0;
+  }
+
+  .pf-divider {
+    display: block;
+    flex: 0 0 12px;
+    position: relative;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .pf-divider::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 5px;
+    width: 2px;
+    background: transparent;
+    transition: background var(--fw-duration-fast);
+  }
+
+  .pf-divider:hover::after,
+  .pf-divider:active::after {
+    background: var(--fw-accent);
+  }
+
+  .pf-divider:focus-visible {
+    outline: 2px solid var(--fw-focus);
+    outline-offset: -2px;
+  }
+}
+
 .pf-bar {
   display: flex;
   flex-wrap: wrap;
@@ -391,6 +439,63 @@
 .pf-xterm {
   height: 420px;
   padding: 6px 8px;
+}
+
+/* ── Files / Terminal fill the content area's height ──────────────────── */
+
+.shell__work:has(> .printer-fill:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--fw-space-4);
+}
+
+.printer-fill:not([hidden]) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.printer-fill .pf {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.printer-fill .pf-split {
+  flex: 1;
+  min-height: 0;
+}
+
+.printer-fill .pf-panel {
+  min-height: 0;
+}
+
+.printer-fill .pf-list {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+}
+
+.printer-fill .pf-editor,
+.printer-fill .pf-image {
+  min-height: 0;
+  resize: none;
+}
+
+.printer-fill .pf-image img {
+  max-height: 100%;
+}
+
+.printer-fill .pf-term {
+  flex: 1;
+  min-height: 0;
+}
+
+.printer-fill .pf-xterm {
+  flex: 1;
+  height: auto;
+  min-height: 200px;
 }
 
 .pf-paste {

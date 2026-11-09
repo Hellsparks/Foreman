@@ -759,12 +759,12 @@ export default function Printer() {
 
       {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
       {visited.has("Files") && (
-        <div hidden={activeTab !== "Files"}>
+        <div className="printer-fill" hidden={activeTab !== "Files"}>
           <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
         </div>
       )}
       {visited.has("Terminal") && (
-        <div hidden={activeTab !== "Terminal"}>
+        <div className="printer-fill" hidden={activeTab !== "Terminal"}>
           <TerminalTab printerId={printerId} firmware={printer.firmware} />
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Ref } from "react";
+import type { CSSProperties, Ref } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -34,7 +34,59 @@ function fmtSize(n: number | null): string {
 function fmtDate(secs: number | null): string {
   if (secs == null) return "";
   const d = new Date(secs * 1000);
-  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+const SPLIT_KEY = "fw-files-split";
+const SPLIT_MIN = 20;
+const SPLIT_MAX = 80;
+
+/** Draggable divider between the file list and the preview; width % remembered per browser. */
+function useSplitter() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pct, setPct] = useState(() => {
+    const v = Number(localStorage.getItem(SPLIT_KEY));
+    return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : 50;
+  });
+  useEffect(() => {
+    localStorage.setItem(SPLIT_KEY, String(Math.round(pct)));
+  }, [pct]);
+  const clamp = (v: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, v));
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const box = ref.current?.getBoundingClientRect();
+    if (!box || e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setPct(clamp(((ev.clientX - box.left) / box.width) * 100));
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 10 : 2;
+    if (e.key === "ArrowLeft") setPct((p) => clamp(p - step));
+    else if (e.key === "ArrowRight") setPct((p) => clamp(p + step));
+    else if (e.key === "Home") setPct(SPLIT_MIN);
+    else if (e.key === "End") setPct(SPLIT_MAX);
+    else return;
+    e.preventDefault();
+  };
+
+  return { ref, pct, onPointerDown, onKeyDown, reset: () => setPct(50) };
 }
 
 function parentOf(p: string): string {
@@ -209,6 +261,7 @@ function FileBrowser({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const split = useSplitter();
 
   const load = useCallback(
     (p: string) => {
@@ -398,7 +451,7 @@ function FileBrowser({
       : "Save + FIRMWARE_RESTART";
 
   return (
-    <div className="pf-split">
+    <div className="pf-split" ref={split.ref} style={{ "--pf-split": `${split.pct}%` } as CSSProperties}>
       <section aria-label="File browser" className="pf-panel pf-panel--browser">
         <div className="pf-bar">
           {crumbs.map((c) => (
@@ -477,6 +530,20 @@ function FileBrowser({
             ))}
         </div>
       </section>
+
+      <div
+        className="pf-divider"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize file list and preview (double-click to reset)"
+        aria-valuemin={SPLIT_MIN}
+        aria-valuemax={SPLIT_MAX}
+        aria-valuenow={Math.round(split.pct)}
+        tabIndex={0}
+        onPointerDown={split.onPointerDown}
+        onKeyDown={split.onKeyDown}
+        onDoubleClick={split.reset}
+      />
 
       <section aria-label="File" className={`pf-panel pf-panel--file${dirty ? " pf-panel--dirty" : ""}`}>
         {!sel ? (
