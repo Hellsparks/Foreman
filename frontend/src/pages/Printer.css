@@ -1,25 +1,41 @@
 /* Printer page — header, tabs, live tab layout */
 
+/* Tabs left, actions right, one row under the shell top bar. */
 .printer-header {
-  padding: 16px 32px 0;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
   border-bottom: 1px solid var(--fw-border);
 }
 
-.printer-header__top {
-  display: flex;
-  flex-wrap: wrap;
+/* Title block portaled into the shell top bar. */
+.printer-title__back {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 12px 16px;
+  justify-content: center;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  color: var(--fw-text);
+  border-radius: 2px;
+  cursor: pointer;
 }
 
-.printer-header__name {
+.printer-title__back:hover {
+  background: var(--fw-raised);
+}
+
+.printer-title__name {
   margin: 0;
-  font-size: 32px;
+  font-size: 20px;
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .printer-header__fw {
@@ -28,6 +44,7 @@
   color: var(--fw-muted);
   border: 1px solid var(--fw-border);
   padding: 1px 6px;
+  white-space: nowrap;
 }
 
 .printer-header__spacer { flex: 1; }
@@ -36,6 +53,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 4px;
+}
+
+.printer-header__actions .ui-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 /* Tab bar */
@@ -47,8 +71,8 @@
 }
 
 .printer-tab {
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 38px;
+  padding: 0 14px;
   margin-right: -1px;
   border: 1px solid var(--fw-border);
   border-bottom-color: var(--fw-border);
@@ -64,27 +88,103 @@
   font-weight: bold;
 }
 
-/* Live tab main area */
+/* Live tab: [webcam with overlays] [controls]; wraps on narrow screens */
 .printer-live {
-  padding: 24px 32px 48px;
+  padding: 16px 0 24px;
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
 }
 
-.printer-live__left {
-  flex: 999 1 560px;
+.printer-live__cam {
+  flex: 1 1 560px;
   min-width: 0;
+  container-type: inline-size;
+}
+
+/* Console / macros panels sliding in from the right over the feed */
+.cam-ov-stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  pointer-events: none;
+}
+
+.cam-ov {
+  pointer-events: auto;
+  max-width: calc(100% - 16px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--fw-border);
+  background: color-mix(in srgb, var(--fw-raised) var(--cam-ov-alpha, 85%), transparent);
+  box-shadow: var(--fw-shadow-overlay);
+  animation: cam-ov-in var(--fw-duration-normal, 200ms) cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes cam-ov-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cam-ov {
+    animation: none;
+  }
+}
+
+.cam-ov__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cam-ov__close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--fw-border);
+  background: transparent;
+  color: var(--fw-muted);
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.cam-ov__close:hover {
+  color: var(--fw-text);
+}
+
+.cam-ov__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.cam-ov .console-output {
+  background: color-mix(in srgb, var(--fw-surface) var(--cam-ov-alpha, 85%), transparent);
+}
+
+.cam-ov .console-input input,
+.cam-ov .macro-btn {
+  background: color-mix(in srgb, var(--fw-raised) var(--cam-ov-alpha, 85%), transparent);
 }
 
 .printer-live__right {
-  flex: 1 1 340px;
-  max-width: 400px;
-  min-width: 0;
+  flex: 0 1 360px;
+  min-width: 300px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -101,8 +201,32 @@
 
 .webcam-bar__spacer { flex: 1; }
 
+.webcam-bar__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.webcam-bar__toggle {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  color: var(--fw-text);
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.webcam-bar__toggle[aria-pressed="true"] {
+  border-color: var(--fw-accent-hover);
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+}
+
 .webcam-tab {
-  min-height: 44px;
+  min-height: 40px;
   padding: 0 14px;
   border: 0;
   border-right: 1px solid var(--fw-border);
@@ -118,9 +242,11 @@
   font-weight: bold;
 }
 
+/* 16:9 that never grows past the viewport height */
 .webcam-view {
   position: relative;
-  aspect-ratio: 16 / 9;
+  height: min(56.25cqw, calc(100dvh - 230px));
+  min-height: 160px;
   background: var(--fw-surface);
   display: flex;
   align-items: center;
@@ -365,7 +491,8 @@
   background: var(--fw-surface);
   border: 1px solid var(--fw-border);
   padding: 8px;
-  height: 120px;
+  flex: 1;
+  min-height: 120px;
   overflow: auto;
   white-space: pre-line;
 }
@@ -457,4 +584,58 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* Config tab: sticky save bar + sections flowing into as many columns as fit */
+.printer-config {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 0 32px;
+}
+
+.printer-config__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  background: var(--fw-background);
+  border-bottom: 1px solid var(--fw-border);
+}
+
+.printer-config__title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+}
+
+.printer-config__save {
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--fw-mono);
+  font-weight: bold;
+}
+
+.printer-config__save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.printer-config__cols {
+  column-width: 460px;
+  column-gap: 20px;
+}
+
+.printer-config__cols > * {
+  break-inside: avoid;
+  width: 100%;
+  margin: 0 0 20px;
 }

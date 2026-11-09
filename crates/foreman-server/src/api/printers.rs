@@ -100,6 +100,7 @@ pub async fn delete_printer(
 ) -> impl IntoResponse {
     // Stop the driver first.
     state.driver_manager.stop_driver(id).await;
+    state.ssh_pool.close(id).await;
 
     let pool = &state.foreman_db.pool;
     match foreman_core::repo::printer::delete(pool, id).await {

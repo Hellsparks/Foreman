@@ -184,6 +184,13 @@ export default function Settings() {
                 {expandedId === p.id && (
                   <div style={{ borderTop: "1px solid var(--fw-border)", padding: "16px" }}>
                     <SettingsPrinterConfigForm printer={p} />
+                    <RemovePrinter
+                      printer={p}
+                      onRemoved={() => {
+                        setPrinters((prev) => prev.filter((x) => x.id !== p.id));
+                        setExpandedId(null);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -195,6 +202,104 @@ export default function Settings() {
       <p className="page-placeholder" style={{ marginTop: 32 }}>
         Server config, backup, notifications — coming in phase 7.
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Remove printer (type the name to confirm)
+// ---------------------------------------------------------------------------
+
+function RemovePrinter({ printer, onRemoved }: { printer: PrinterWithStatus; onRemoved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const remove = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      await api.deletePrinter(printer.id);
+      onRemoved();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+
+  const btn = {
+    minHeight: 36,
+    padding: "0 14px",
+    border: "1px solid var(--fw-danger)",
+    color: "var(--fw-danger)",
+    background: "transparent",
+    borderRadius: 2,
+    cursor: "pointer",
+    fontSize: 13,
+  } as const;
+
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        paddingTop: 16,
+        borderTop: "1px solid var(--fw-border)",
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <div style={{ flex: "1 1 240px" }}>
+        <div style={{ fontWeight: "bold", fontSize: 13 }}>Remove printer</div>
+        <div style={{ fontSize: 12, color: "var(--fw-muted)" }}>
+          Removes it from Foreman (paths, SSH settings, macros). Job history is kept.
+        </div>
+      </div>
+      {!open ? (
+        <button type="button" style={btn} onClick={() => setOpen(true)}>
+          Remove printer…
+        </button>
+      ) : (
+        <>
+          <input
+            type="text"
+            autoFocus
+            aria-label={`Type ${printer.name} to confirm`}
+            placeholder={`Type “${printer.name}” to confirm`}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            style={{
+              minHeight: 36,
+              border: "1px solid var(--fw-danger)",
+              background: "var(--fw-raised)",
+              padding: "0 10px",
+              borderRadius: 2,
+              fontSize: 13,
+            }}
+          />
+          <button
+            type="button"
+            style={{ ...btn, background: "var(--fw-danger)", color: "var(--fw-on-accent)" }}
+            disabled={typed !== printer.name || busy}
+            onClick={() => void remove()}
+          >
+            {busy ? "Removing…" : "Remove"}
+          </button>
+          <button
+            type="button"
+            style={{ ...btn, borderColor: "var(--fw-muted)", color: "var(--fw-text)" }}
+            onClick={() => {
+              setOpen(false);
+              setTyped("");
+            }}
+          >
+            Cancel
+          </button>
+        </>
+      )}
+      {err && <span style={{ flexBasis: "100%", fontSize: 13, color: "var(--fw-danger)" }}>{err}</span>}
     </div>
   );
 }

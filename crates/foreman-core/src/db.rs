@@ -28,6 +28,10 @@ const MIGRATIONS: &[&str] = &[
     // 0003: Path failover timing settings.
     "ALTER TABLE printer ADD COLUMN fail_after_checks INTEGER NOT NULL DEFAULT 3",
     "ALTER TABLE printer ADD COLUMN return_after_secs  INTEGER NOT NULL DEFAULT 60",
+    // 0004: SSH host key presented after a change, awaiting approval.
+    "ALTER TABLE printer_ssh ADD COLUMN pending_host_key_fingerprint TEXT",
+    // 0005: idle auto-close for SSH connections (seconds, 0 = never).
+    "ALTER TABLE printer_ssh ADD COLUMN idle_timeout_secs INTEGER NOT NULL DEFAULT 900",
 ];
 
 /// Foreman-native database handle.

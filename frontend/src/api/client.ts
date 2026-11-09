@@ -2,6 +2,14 @@ import type { HealthResponse } from "./types/HealthResponse";
 import type { CreatePrinter } from "./types/CreatePrinter";
 import type { Printer } from "./types/Printer";
 import type { PrinterStatus } from "./types/PrinterStatus";
+import type { PrinterSsh } from "./types/PrinterSsh";
+import type { UpsertPrinterSsh } from "./types/UpsertPrinterSsh";
+import type { SftpEntry } from "./types/SftpEntry";
+import type { ShellMacro } from "./types/ShellMacro";
+import type { CreateShellMacro } from "./types/CreateShellMacro";
+import type { UpdateShellMacro } from "./types/UpdateShellMacro";
+
+export type { PrinterSsh, UpsertPrinterSsh, SftpEntry, ShellMacro, CreateShellMacro, UpdateShellMacro };
 
 /** Base URL for all API calls.  Empty string = same origin (works in both dev
  *  with Vite proxy and in production served by foreman-server). */
@@ -10,7 +18,8 @@ const BASE = "";
 class ApiError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    public readonly code: string | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -165,6 +174,56 @@ async function postNoContent(path: string, body?: unknown): Promise<void> {
   }
 }
 
+/** Fetch that surfaces the server's `{ error, code }` body in the thrown ApiError. */
+async function req<T>(method: string, path: string, body?: unknown, raw?: BodyInit): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: raw ?? (body !== undefined ? JSON.stringify(body) : undefined),
+  });
+  if (!res.ok) {
+    let msg = `${method} ${path} → ${res.status}`;
+    let code: string | null = null;
+    try {
+      const j = await res.json();
+      if (j && typeof j.error === "string") msg = j.error;
+      if (j && typeof j.code === "string") code = j.code;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, msg, code);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+/** Quick roots on a Klipper host (absolute paths). */
+export interface SshRoots {
+  home: string;
+  config: string;
+  gcodes: string;
+  logs: string;
+}
+
+export interface FilesInfo {
+  user: string;
+  host: string;
+  port: number;
+  roots: SshRoots;
+}
+
+export interface TextFile {
+  path: string;
+  content: string;
+  size: number;
+  truncated: boolean;
+  read_only: boolean;
+}
+
+const q = (path: string) => `path=${encodeURIComponent(path)}`;
+
 export const api = {
   health: () => get<HealthResponse>("/api/health"),
   listPrinters: () => get<PrinterWithStatus[]>("/api/printers"),
@@ -248,6 +307,70 @@ export const api = {
   /** Manually switch back to path 0 (only if path 0 is healthy). */
   switchBackToPath0: (id: number) =>
     postNoContent(`/api/printers/${id}/paths/switch-back`),
+  // ── SSH / SFTP / shell-macros ──────────────────────────────────────────
+  getSsh: (id: number) => req<PrinterSsh>("GET", `/api/printers/${id}/ssh`),
+  upsertSsh: (id: number, body: UpsertPrinterSsh) =>
+    req<PrinterSsh>("PUT", `/api/printers/${id}/ssh`, body),
+  deleteSsh: (id: number) => req<void>("DELETE", `/api/printers/${id}/ssh`),
+  /** Foreman's ed25519 public key (authorized_keys line). */
+  getSshPublicKey: () => req<{ public_key: string }>("GET", "/api/ssh/public-key"),
+  /** Pin the changed host key the printer presented. */
+  trustHostKey: (id: number) => req<PrinterSsh>("POST", `/api/printers/${id}/ssh/trust`),
+  /** Connect + authenticate; runs no command. */
+  testSsh: (id: number) =>
+    req<{ ok: boolean; user: string; host: string; home: string; host_key_fingerprint: string | null }>(
+      "POST",
+      `/api/printers/${id}/ssh/test`,
+    ),
+  filesInfo: (id: number) => req<FilesInfo>("GET", `/api/printers/${id}/files/roots`),
+  /** Pooled SFTP session state on the server. */
+  sshSession: (id: number) =>
+    req<{ open: boolean; open_secs?: number; idle_secs?: number }>("GET", `/api/printers/${id}/ssh/session`),
+  closeSshSession: (id: number) => req<void>("DELETE", `/api/printers/${id}/ssh/session`),
+  listFiles: (id: number, path: string) =>
+    req<SftpEntry[]>("GET", `/api/printers/${id}/files?${q(path)}`),
+  readFile: (id: number, path: string) =>
+    req<TextFile>("GET", `/api/printers/${id}/files/read?${q(path)}`),
+  downloadUrl: (id: number, path: string) => `${BASE}/api/printers/${id}/files/download?${q(path)}`,
+  /** Inline image URL for previews (raster formats only). */
+  previewUrl: (id: number, path: string) =>
+    `${BASE}/api/printers/${id}/files/download?${q(path)}&inline=true`,
+  /** Whole-file write; the server keeps `<file>.bak`. */
+  writeFile: (id: number, path: string, content: string) =>
+    req<{ ok: boolean; backup: boolean }>("PUT", `/api/printers/${id}/files/write`, { path, content }),
+  /** Save a Klipper .cfg then FIRMWARE_RESTART (refused while printing). */
+  saveAndRestart: (id: number, path: string, content: string) =>
+    req<{ ok: boolean; backup: boolean; restarted: boolean }>(
+      "POST",
+      `/api/printers/${id}/files/save-restart`,
+      { path, content },
+    ),
+  uploadFile: (id: number, path: string, file: Blob) =>
+    req<{ ok: boolean; path: string; size: number }>(
+      "POST",
+      `/api/printers/${id}/files/upload?${q(path)}`,
+      undefined,
+      file,
+    ),
+  deleteFile: (id: number, path: string) =>
+    req<void>("DELETE", `/api/printers/${id}/files?${q(path)}`),
+  mkdir: (id: number, path: string) =>
+    req<{ ok: boolean; path: string }>("POST", `/api/printers/${id}/files/mkdir`, { path }),
+  renameFile: (id: number, from: string, to: string) =>
+    req<{ ok: boolean; path: string }>("POST", `/api/printers/${id}/files/rename`, { from, to }),
+  listShellMacros: (id: number) =>
+    req<ShellMacro[]>("GET", `/api/printers/${id}/shell-macros`),
+  createShellMacro: (id: number, body: CreateShellMacro) =>
+    req<ShellMacro>("POST", `/api/printers/${id}/shell-macros`, body),
+  updateShellMacro: (id: number, mid: number, body: UpdateShellMacro) =>
+    req<ShellMacro>("PUT", `/api/printers/${id}/shell-macros/${mid}`, body),
+  deleteShellMacro: (id: number, mid: number) =>
+    req<void>("DELETE", `/api/printers/${id}/shell-macros/${mid}`),
+  /** WebSocket URL for the SSH terminal. */
+  terminalWsUrl: (id: number, cols: number, rows: number) => {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws/printers/${id}/terminal?cols=${cols}&rows=${rows}`;
+  },
 };
 
 export { ApiError };

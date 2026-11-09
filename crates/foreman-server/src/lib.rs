@@ -1,6 +1,7 @@
 mod api;
 pub mod config;
 mod driver_manager;
+mod ssh_pool;
 mod state;
 
 use axum::{
@@ -77,11 +78,37 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         .build()
         .unwrap_or_default();
 
+    // Secrets master key lives next to the DB, outside it.
+    let secrets = Arc::new(foreman_core::secrets::SecretBox::load_or_create(
+        &cfg.data_dir.join("secret.key"),
+    )?);
+    // SSH identity: generated once, stored encrypted in `setting`.
+    let (ssh_key, ssh_pub) =
+        foreman_core::ssh_client::ensure_identity(&foreman_db.pool, &secrets).await?;
+    info!(pub_key = %ssh_pub, "SSH identity ready");
+    let ssh_identity = Arc::new((ssh_key, ssh_pub));
+
+    let ssh_pool = Arc::new(ssh_pool::SshPool::default());
+    {
+        let ssh_pool = Arc::clone(&ssh_pool);
+        let db = foreman_db.pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                ssh_pool.reap(&db).await;
+            }
+        });
+    }
+
     let app_state = AppState {
         foreman_db,
         bus_tx: Arc::clone(&tx),
         driver_manager,
         http_client,
+        ssh_identity,
+        secrets,
+        ssh_pool,
     };
 
     // Static file serving for the frontend.
@@ -178,6 +205,60 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         .route(
             "/api/attention/{id}/dismiss",
             post(api::attention::dismiss_attention),
+        )
+        // SSH / SFTP / shell-macros
+        .route("/api/ssh/public-key", get(api::ssh::get_public_key))
+        .route(
+            "/api/printers/{id}/ssh",
+            get(api::ssh::get_ssh)
+                .put(api::ssh::upsert_ssh)
+                .delete(api::ssh::delete_ssh),
+        )
+        .route(
+            "/api/printers/{id}/ssh/trust",
+            post(api::ssh::trust_host_key),
+        )
+        .route("/api/printers/{id}/ssh/test", post(api::ssh::test_ssh))
+        .route(
+            "/api/printers/{id}/ssh/session",
+            get(api::ssh::session_status).delete(api::ssh::close_session),
+        )
+        .route("/api/printers/{id}/files/roots", get(api::ssh::roots))
+        .route(
+            "/api/printers/{id}/files",
+            get(api::ssh::list_files).delete(api::ssh::delete_file),
+        )
+        .route("/api/printers/{id}/files/read", get(api::ssh::read_file))
+        .route(
+            "/api/printers/{id}/files/download",
+            get(api::ssh::download_file),
+        )
+        .route("/api/printers/{id}/files/write", put(api::ssh::write_file))
+        .route(
+            "/api/printers/{id}/files/save-restart",
+            post(api::ssh::save_and_restart),
+        )
+        .route(
+            "/api/printers/{id}/files/upload",
+            post(api::ssh::upload_file),
+        )
+        .route("/api/printers/{id}/files/mkdir", post(api::ssh::mkdir))
+        .route(
+            "/api/printers/{id}/files/rename",
+            post(api::ssh::rename_file),
+        )
+        .route(
+            "/api/printers/{id}/shell-macros",
+            get(api::ssh::list_macros).post(api::ssh::create_macro),
+        )
+        .route(
+            "/api/printers/{id}/shell-macros/{mid}",
+            put(api::ssh::update_macro).delete(api::ssh::delete_macro),
+        )
+        // Terminal WebSocket
+        .route(
+            "/ws/printers/{id}/terminal",
+            get(api::terminal_ws::terminal_ws),
         )
         .route("/ws/events", get(api::ws::ws_handler))
         .fallback_service(static_service)

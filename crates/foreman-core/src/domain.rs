@@ -144,6 +144,124 @@ pub struct UpdatePrinterPath {
 }
 
 // ---------------------------------------------------------------------------
+// PrinterSsh
+// ---------------------------------------------------------------------------
+
+/// SSH / SFTP settings for a printer.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PrinterSsh {
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number")]
+    pub printer_id: i64,
+    pub ssh_user: String,
+    #[ts(type = "number")]
+    pub ssh_port: i64,
+    /// "key" | "password"
+    pub auth_type: String,
+    /// SHA-256 fingerprint of the pinned host key (TOFU).
+    pub host_key_fingerprint: Option<String>,
+    /// A different key the server presented; connections are refused until trusted.
+    pub pending_host_key_fingerprint: Option<String>,
+    /// A password is stored (never returned).
+    pub has_password: bool,
+    /// Close idle SSH/SFTP/terminal connections after this many seconds; 0 = never.
+    #[ts(type = "number")]
+    pub idle_timeout_secs: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Fields for creating or updating SSH settings on a printer.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct UpsertPrinterSsh {
+    pub ssh_user: String,
+    #[ts(type = "number | null")]
+    pub ssh_port: Option<i64>,
+    /// "key" | "password"
+    pub auth_type: Option<String>,
+    /// Only used when auth_type = "password"; encrypted at rest. `None` keeps the stored one.
+    pub password: Option<String>,
+    /// Idle auto-close in seconds (0 = never). `None` keeps the stored value (default 900).
+    #[ts(type = "number | null")]
+    pub idle_timeout_secs: Option<i64>,
+}
+
+// ---------------------------------------------------------------------------
+// ShellMacro
+// ---------------------------------------------------------------------------
+
+/// A named multi-line shell macro stored in Foreman.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ShellMacro {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+    /// Multi-line command body, newline-separated.
+    pub commands: String,
+    /// "printer" | "all_ssh"
+    pub scope: String,
+    /// Null when scope = "all_ssh".
+    #[ts(type = "number | null")]
+    pub printer_id: Option<i64>,
+    pub ask_before_run: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Fields required to create a new shell macro.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CreateShellMacro {
+    pub name: String,
+    pub commands: String,
+    pub scope: Option<String>,
+    pub ask_before_run: Option<bool>,
+}
+
+/// Fields that may be updated on an existing shell macro.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct UpdateShellMacro {
+    pub name: Option<String>,
+    pub commands: Option<String>,
+    /// "printer" | "all_ssh"
+    pub scope: Option<String>,
+    pub ask_before_run: Option<bool>,
+}
+
+// ---------------------------------------------------------------------------
+// SftpEntry  (returned by SFTP directory list)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum SftpEntryKind {
+    File,
+    Directory,
+    Symlink,
+    Other,
+}
+
+/// A single entry in an SFTP directory listing.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SftpEntry {
+    pub name: String,
+    pub path: String,
+    pub kind: SftpEntryKind,
+    #[ts(type = "number | null")]
+    pub size: Option<u64>,
+    /// Unix timestamp (seconds since epoch), if available.
+    #[ts(type = "number | null")]
+    pub modified: Option<i64>,
+}
+
+// ---------------------------------------------------------------------------
 // AttentionItem
 // ---------------------------------------------------------------------------
 

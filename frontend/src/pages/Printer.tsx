@@ -1,10 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
-import { BackButton, StatusChip, SectionLabel, Button } from "../ui";
+import { StatusChip, SectionLabel, Button } from "../ui";
+import { createPortal } from "react-dom";
+import { TOPBAR_SLOT_ID } from "../shell/TopBar";
+import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
+import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import "./Printer.css";
 
@@ -48,7 +53,7 @@ const STEPS = [0.1, 1, 10, 25, 50, 100];
 const BABY_STEPS = [-0.05, -0.01, 0.01, 0.05];
 const EXT_LENGTHS = [10, 25, 50, 100];
 const EXT_SPEEDS = [2, 5, 10];
-const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Config"] as const;
+const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Terminal", "Config"] as const;
 const DEFAULT_PRESETS = [
   { label: "PLA",  nozzle: 215, bed: 60 },
   { label: "PETG", nozzle: 245, bed: 85 },
@@ -59,6 +64,55 @@ const DEFAULT_PRESETS = [
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+
+function usePersistentFlag(key: string): [boolean, (f: (v: boolean) => boolean) => void] {
+  const [value, setValue] = useState(() => localStorage.getItem(key) === "1");
+  const update = useCallback(
+    (f: (v: boolean) => boolean) =>
+      setValue((v) => {
+        const next = f(v);
+        localStorage.setItem(key, next ? "1" : "0");
+        return next;
+      }),
+    [key],
+  );
+  return [value, update];
+}
+
+const OVERLAY_ALPHA_KEY = "foreman.live.overlayOpacity";
+
+function loadOverlayAlpha(): number {
+  const v = Number(localStorage.getItem(OVERLAY_ALPHA_KEY));
+  return Number.isFinite(v) && v >= 0.2 && v <= 1 ? v : 0.85;
+}
+
+/** A panel that slides in from the right edge over the webcam feed. */
+function CamOverlay({
+  label,
+  onClose,
+  width,
+  actions,
+  children,
+}: {
+  label: string;
+  onClose: () => void;
+  width: number;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="cam-ov" aria-label={label} style={{ width }}>
+      <div className="cam-ov__head">
+        <SectionLabel as="h2" style={{ flex: 1 }}>{label}</SectionLabel>
+        {actions}
+        <button type="button" className="cam-ov__close" onClick={onClose} aria-label={`Hide ${label}`} title={`Hide ${label}`}>
+          ›
+        </button>
+      </div>
+      <div className="cam-ov__body">{children}</div>
+    </section>
+  );
+}
 
 export default function Printer() {
   const { id } = useParams<{ id: string }>();
@@ -73,6 +127,13 @@ export default function Printer() {
 
   // Tab
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Live");
+  const [visited, setVisited] = useState<Set<string>>(() => new Set(["Live"]));
+  useEffect(() => {
+    setVisited((v) => (v.has(activeTab) ? v : new Set(v).add(activeTab)));
+  }, [activeTab]);
+
+  const [topbarSlot, setTopbarSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setTopbarSlot(document.getElementById(TOPBAR_SLOT_ID)), []);
 
   // Live status: prefer streaming from shell context, fall back to fetched
   const liveStatus: PrinterStatus | null = statuses[printerId] ?? printer?.status ?? null;
@@ -107,6 +168,12 @@ export default function Printer() {
 
   // All macros vs favourites
   const [showAllMacros, setShowAllMacros] = useState(false);
+
+  // Live tab side columns (remembered per browser)
+  const [consoleOpen, setConsoleOpen] = usePersistentFlag("foreman.live.consoleOpen");
+  const [macrosOpen, setMacrosOpen] = usePersistentFlag("foreman.live.macrosOpen");
+  const [overlayAlpha, setOverlayAlpha] = useState(loadOverlayAlpha);
+  useEffect(() => localStorage.setItem(OVERLAY_ALPHA_KEY, String(overlayAlpha)), [overlayAlpha]);
 
   // ---------------------------------------------------------------------------
   // Load printer data on mount
@@ -216,23 +283,47 @@ export default function Printer() {
   return (
     <>
       {/* ── Header ─────────────────────────────────────────────── */}
+      {topbarSlot &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              className="printer-title__back"
+              aria-label="Back to Fleet"
+              title="Back to Fleet"
+              onClick={() => navigate("/fleet")}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <h1 className="printer-title__name">{printer.name}</h1>
+            {fwTag && <span className="printer-header__fw">{fwTag}</span>}
+            {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+              <span style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}>
+                via {printer.active_path_name}
+              </span>
+            )}
+            <StatusChip tone={statusTone(state)} symbol={statusSymbol(state)} word={statusWord(state)} />
+          </>,
+          topbarSlot,
+        )}
       <header className="printer-header">
-        <BackButton label="Fleet" onClick={() => navigate("/fleet")} />
-        <div className="printer-header__top">
-          <h1 className="printer-header__name">{printer.name}</h1>
-          {fwTag && <span className="printer-header__fw">{fwTag}</span>}
-          {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
-            <span className="printer-header__path-badge" style={{ color: "var(--fw-warning)", fontSize: 12 }}>
-              via {printer.active_path_name}
-            </span>
-          )}
-          <StatusChip
-            tone={statusTone(state)}
-            symbol={statusSymbol(state)}
-            word={statusWord(state)}
-          />
-          <div className="printer-header__spacer" />
-          <div className="printer-header__actions">
+        <div className="printer-tabs" role="tablist" aria-label="Printer sections">
+          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={t === activeTab}
+              className={`printer-tab${t === activeTab ? " printer-tab--active" : ""}`}
+              onClick={() => setActiveTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="printer-header__spacer" />
+        <div className="printer-header__actions">
             {isPrinting && (
               <>
                 <Button
@@ -266,22 +357,6 @@ export default function Printer() {
                 </svg>
               </a>
             )}
-          </div>
-        </div>
-
-        {/* Tab bar */}
-        <div className="printer-tabs" role="tablist" aria-label="Printer sections">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={t === activeTab}
-              className={`printer-tab${t === activeTab ? " printer-tab--active" : ""}`}
-              onClick={() => setActiveTab(t)}
-            >
-              {t}
-            </button>
-          ))}
         </div>
       </header>
 
@@ -289,10 +364,8 @@ export default function Printer() {
       {activeTab === "Live" ? (
         <div className="printer-live" role="tabpanel" aria-label="Live">
 
-          {/* LEFT COLUMN: webcams, console, macros */}
-          <div className="printer-live__left">
-
-            {/* Webcam section */}
+          {/* Webcam: scales to fit the viewport */}
+          <div className="printer-live__cam">
             <section aria-label="Webcams" style={{ border: "1px solid var(--fw-border)", background: "var(--fw-raised)" }}>
               <div className="webcam-bar">
                 <div role="tablist" aria-label="Choose webcam" style={{ display: "flex", flexWrap: "wrap" }}>
@@ -308,10 +381,29 @@ export default function Printer() {
                     </button>
                   ))}
                   {webcams.length === 0 && (
-                    <span style={{ padding: "0 14px", lineHeight: "44px", color: "var(--fw-muted)", fontSize: 13 }}>
+                    <span style={{ padding: "0 14px", lineHeight: "40px", color: "var(--fw-muted)", fontSize: 13 }}>
                       No webcams
                     </span>
                   )}
+                </div>
+                <div className="webcam-bar__spacer" />
+                <div className="webcam-bar__tools">
+                  <button
+                    type="button"
+                    className="webcam-bar__toggle"
+                    aria-pressed={consoleOpen}
+                    onClick={() => setConsoleOpen((v) => !v)}
+                  >
+                    Console
+                  </button>
+                  <button
+                    type="button"
+                    className="webcam-bar__toggle"
+                    aria-pressed={macrosOpen}
+                    onClick={() => setMacrosOpen((v) => !v)}
+                  >
+                    Macros
+                  </button>
                 </div>
               </div>
               <div className="webcam-view">
@@ -323,12 +415,10 @@ export default function Printer() {
                 ) : (
                   <span style={{ color: "var(--fw-muted)" }}>No camera configured</span>
                 )}
-              </div>
-            </section>
 
-            {/* Console */}
-            <section className="live-panel live-panel--gap-sm" aria-label="Console" style={{ padding: "12px 16px" }}>
-              <SectionLabel as="h2">Console</SectionLabel>
+                <div className="cam-ov-stack" style={{ "--cam-ov-alpha": `${Math.round(overlayAlpha * 100)}%` } as CSSProperties}>
+          {consoleOpen && (
+          <CamOverlay label="Console" onClose={() => setConsoleOpen(() => false)} width={340}>
               <div className="console-output" ref={consoleRef}>
                 {consoleLines.length === 0
                   ? "Ready — type a G-code command below."
@@ -368,21 +458,20 @@ export default function Printer() {
                 />
                 <button type="button" onClick={sendGcode}>Send</button>
               </div>
-            </section>
+          </CamOverlay>
+          )}
 
-            {/* Macros */}
-            <section className="live-panel live-panel--gap" aria-label="Macros" style={{ padding: "12px 16px" }}>
-              <div className="macros-header">
-                <SectionLabel as="h2" style={{ flex: 1 }}>
-                  Macros {showAllMacros ? "" : "· favourites"}
-                </SectionLabel>
-                <Button
-                  variant="small"
-                  onClick={() => setShowAllMacros((v) => !v)}
-                >
-                  {showAllMacros ? "Favourites" : `All ${macros.length}`}
-                </Button>
-              </div>
+          {macrosOpen && (
+          <CamOverlay
+            label={`Macros${showAllMacros ? "" : " · favourites"}`}
+            onClose={() => setMacrosOpen(() => false)}
+            width={280}
+            actions={
+              <Button variant="small" onClick={() => setShowAllMacros((v) => !v)}>
+                {showAllMacros ? "Favourites" : `All ${macros.length}`}
+              </Button>
+            }
+          >
               <div className="macro-grid">
                 {displayMacros.map((m) => (
                   <button
@@ -398,6 +487,10 @@ export default function Printer() {
                     {showAllMacros ? "No macros discovered" : "No favourites set"}
                   </span>
                 )}
+              </div>
+          </CamOverlay>
+          )}
+                </div>
               </div>
             </section>
           </div>
@@ -446,16 +539,12 @@ export default function Printer() {
                   onBlur={() => {
                     setNozzleFocused(false);
                     const val = Number(nozzleDraft);
-                    if (!isNaN(val) && val >= 0 && val <= 300) {
+                    if (!isNaN(val) && val >= 0 && val <= 300 && val !== nozzleTarget) {
                       cmd("set_nozzle_temp", { target: val });
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      const val = Number(nozzleDraft);
-                      if (!isNaN(val) && val >= 0 && val <= 300) {
-                        cmd("set_nozzle_temp", { target: val });
-                      }
                       (e.target as HTMLInputElement).blur();
                     }
                   }}
@@ -492,16 +581,12 @@ export default function Printer() {
                   onBlur={() => {
                     setBedFocused(false);
                     const val = Number(bedDraft);
-                    if (!isNaN(val) && val >= 0 && val <= 120) {
+                    if (!isNaN(val) && val >= 0 && val <= 120 && val !== bedTarget) {
                       cmd("set_bed_temp", { target: val });
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      const val = Number(bedDraft);
-                      if (!isNaN(val) && val >= 0 && val <= 120) {
-                        cmd("set_bed_temp", { target: val });
-                      }
                       (e.target as HTMLInputElement).blur();
                     }
                   }}
@@ -657,12 +742,30 @@ export default function Printer() {
             </section>
           </div>
         </div>
-      ) : activeTab === "Config" ? (
-        <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
+      ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Config" ? (
+        <PrinterConfigTab
+          printerId={printerId}
+          printer={printer}
+          caps={caps}
+          overlayAlpha={overlayAlpha}
+          onOverlayAlpha={setOverlayAlpha}
+        />
       ) : (
         <div className="printer-placeholder" role="tabpanel" aria-label={activeTab}>
           <p>{activeTab} — coming soon</p>
           <p style={{ fontSize: 13 }}>This tab will be implemented in a future phase.</p>
+        </div>
+      )}
+
+      {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
+      {visited.has("Files") && (
+        <div hidden={activeTab !== "Files"}>
+          <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
+        </div>
+      )}
+      {visited.has("Terminal") && (
+        <div hidden={activeTab !== "Terminal"}>
+          <TerminalTab printerId={printerId} firmware={printer.firmware} />
         </div>
       )}
 
@@ -714,10 +817,14 @@ function PrinterConfigTab({
   printerId,
   printer,
   caps,
+  overlayAlpha,
+  onOverlayAlpha,
 }: {
   printerId: number;
   printer: PrinterWithStatus;
   caps: PrinterCapabilities | null;
+  overlayAlpha: number;
+  onOverlayAlpha: (v: number) => void;
 }) {
   const [paths, setPaths] = useState<LocalPath[]>([]);
   const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
@@ -731,6 +838,7 @@ function PrinterConfigTab({
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [activePath, setActivePath] = useState<{ index: number; path: PrinterPath } | null>(null);
+  const sshRef = useRef<SshSettingsHandle>(null);
 
   useEffect(() => {
     api.listPaths(printerId).then((list) => {
@@ -866,6 +974,8 @@ function PrinterConfigTab({
         }))
       );
 
+      await sshRef.current?.save();
+
       setSavedMsg("Saved");
       setTimeout(() => setSavedMsg(""), 3000);
     } catch (e: unknown) {
@@ -917,11 +1027,26 @@ function PrinterConfigTab({
   ];
 
   return (
-    <div
-      role="tabpanel"
-      aria-label="Config"
-      style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 20, padding: "20px 24px" }}
-    >
+    <div role="tabpanel" aria-label="Config" className="printer-config">
+      <div className="printer-config__bar">
+        <h2 className="printer-config__title">Printer settings</h2>
+        {savedMsg && (
+          <span
+            role="status"
+            style={{
+              fontSize: 13,
+              color: savedMsg.startsWith("Error") ? "var(--fw-danger)" : "var(--fw-success)",
+            }}
+          >
+            {savedMsg}
+          </span>
+        )}
+        <button type="button" className="printer-config__save" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+
+      <div className="printer-config__cols">
       {/* ── Connection section ───────────────────────────────────── */}
       <section
         style={{
@@ -1252,6 +1377,44 @@ function PrinterConfigTab({
         </label>
       </section>
 
+      <SshSettings ref={sshRef} printerId={printerId} firmware={printer.firmware} />
+
+      {/* Display (browser-local, applies immediately) */}
+      <section
+        aria-label="Display"
+        style={{
+          border: "1px solid var(--fw-border)",
+          background: "var(--fw-raised)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 18 }}>Display</h2>
+        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: "bold" }}>
+            Webcam overlay opacity{" "}
+            <span style={{ fontFamily: "var(--fw-mono)", fontWeight: "normal", color: "var(--fw-muted)" }}>
+              {Math.round(overlayAlpha * 100)}%
+            </span>
+          </span>
+          <input
+            type="range"
+            min={0.2}
+            max={1}
+            step={0.05}
+            value={overlayAlpha}
+            onChange={(e) => onOverlayAlpha(Number(e.target.value))}
+            style={{ accentColor: "var(--fw-accent-hover)" }}
+          />
+          <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>
+            How see-through the Console and Macros panels are over the webcam. Applies immediately and is saved in
+            this browser.
+          </span>
+        </label>
+      </section>
+
       {/* ── Capabilities section ─────────────────────────────────── */}
       <section
         style={{
@@ -1298,79 +1461,7 @@ function PrinterConfigTab({
           Hardened nozzle (abrasive filaments allowed)
         </label>
       </section>
-
-      {/* ── Save + Remove ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          style={{
-            minHeight: 44,
-            padding: "0 20px",
-            border: "1px solid transparent",
-            background: "var(--fw-accent-hover)",
-            color: "var(--fw-on-accent)",
-            borderRadius: 2,
-            cursor: "pointer",
-            fontFamily: "var(--fw-mono)",
-            fontWeight: "bold",
-          }}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-        {savedMsg && (
-          <span
-            role="status"
-            style={{
-              fontSize: 13,
-              color: savedMsg.startsWith("Error") ? "var(--fw-danger)" : "var(--fw-success)",
-            }}
-          >
-            {savedMsg}
-          </span>
-        )}
       </div>
-
-      {/* ── Remove printer ───────────────────────────────────────── */}
-      <section
-        style={{
-          border: "1px solid var(--fw-danger)",
-          background: "var(--fw-raised)",
-          padding: 20,
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: 12,
-        }}
-      >
-        <div style={{ flex: "1 1 260px" }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Remove printer</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--fw-muted)" }}>
-            Removes it from Foreman. Job history is kept.
-          </p>
-        </div>
-        <button
-          type="button"
-          style={{
-            minHeight: 44,
-            padding: "0 16px",
-            border: "1px solid var(--fw-danger)",
-            color: "var(--fw-danger)",
-            background: "transparent",
-            borderRadius: 2,
-            cursor: "pointer",
-          }}
-          onClick={() => {
-            if (confirm(`Remove "${printer.name}" from Foreman?`)) {
-              api.deletePrinter(printerId).catch(() => {});
-              window.history.back();
-            }
-          }}
-        >
-          Remove printer…
-        </button>
-      </section>
     </div>
   );
 }

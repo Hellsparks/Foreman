@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Printer page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A;--fw-scrim:#25282066}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055;--fw-scrim:#00000099}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.55;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Fleet</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="padding: 16px 32px 0; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--fw-border)">
+<a href="Main.dc.html" style="align-self: flex-start; min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M15 5l-7 7 7 7"/></svg>Fleet</a>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px">
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">{{p.name}}</h1>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted); border: 1px solid var(--fw-border); padding: 1px 6px">{{p.fw}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{st.fg}}; background: {{st.bg}}">{{st.label}}</span>
+<div style="flex: 1"></div>
+<sc-if value="{{canPause}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{togglePause}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">{{pauseLabel}}</button>
+<button type="button" onClick="{{askCancel}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-danger); color: var(--fw-danger); background: transparent; border-radius: 2px; cursor: pointer">Cancel print…</button>
+</sc-if>
+<a href="#" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Native UI<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg></a>
+</div>
+<div role="tablist" aria-label="Printer sections" style="display: flex; flex-wrap: wrap; gap: 0; margin-bottom: -1px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
+<button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 0 18px; background: {{t.bg}}; border: 1px solid {{t.border}}; border-bottom-color: {{t.bottom}}; margin-right: -1px; cursor: pointer; font-weight: {{t.weight}}">{{t.label}}<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)"> {{t.badge}}</span></button>
+</sc-for>
+</div>
+</header>
+
+<main role="tabpanel" aria-label="{{tabLabel}}" style="padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 20px">
+
+<sc-if value="{{isLive}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Webcams" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0; border-bottom: 1px solid var(--fw-border)">
+<div role="tablist" aria-label="Choose webcam" style="display: flex; flex-wrap: wrap">
+<sc-for list="{{cams}}" as="c" hint-placeholder-count="3">
+<button type="button" role="tab" aria-selected="{{c.sel}}" onClick="{{c.pick}}" style="min-height: 44px; padding: 0 14px; border: 0; border-right: 1px solid var(--fw-border); border-bottom: 3px solid {{c.marker}}; background: {{c.bg}}; cursor: pointer; font-size: 13px; font-weight: {{c.weight}}">{{c.name}}</button>
+</sc-for>
+</div>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{toggleGrid}}" aria-pressed="{{camGridPressed}}" style="min-height: 44px; padding: 0 12px; border: 0; border-left: 1px solid var(--fw-border); background: {{camGridBg}}; cursor: pointer; font-size: 13px">{{camGridLabel}}</button>
+<button type="button" style="min-height: 44px; padding: 0 12px; border: 0; border-left: 1px solid var(--fw-border); background: transparent; cursor: pointer; font-size: 13px">Fullscreen</button>
+<button type="button" onClick="{{goCamConfig}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">+ Webcam</button>
+</div>
+<sc-if value="{{camSingle}}" hint-placeholder-val="{{ true }}">
+<div role="img" aria-label="{{camMain.name}} live view" style="position: relative; aspect-ratio: 16 / 9; background: var(--fw-surface); display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">
+<div style="display: flex; justify-content: space-between; padding: 10px 12px"><span>{{camMain.name}} · {{camMain.res}} · {{camMain.kind}}</span><span><span style="color: var(--fw-danger)">●</span> LIVE {{camMain.fps}}</span></div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 12px; background: var(--fw-raised); border-top: 1px solid var(--fw-border); color: var(--fw-text)">
+<img src="{{jobThumb}}" alt="" width="48" height="36" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<span style="font-family: Arial, Helvetica, sans-serif; font-weight: bold; font-size: 14px">{{p.job}}</span>
+<span>{{p.jobSub}}</span>
+<div style="flex: 1 1 120px; height: 6px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="height: 100%; width: {{p.pct}}%; background: {{st.fg}}"></div></div>
+<span style="font-weight: bold">{{p.pct}}%</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{camGrid}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; background: var(--fw-border)">
+<sc-for list="{{cams}}" as="c" hint-placeholder-count="3">
+<button type="button" onClick="{{c.focus}}" aria-label="Show {{c.name}} large" style="aspect-ratio: 16 / 9; background: var(--fw-surface); border: 0; padding: 8px 10px; display: flex; align-items: flex-end; justify-content: space-between; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)"><span>{{c.name}}</span><span><span style="color: var(--fw-danger)">●</span> {{c.res}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+</section>
+
+<section aria-label="Console" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Console</h2>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; background: var(--fw-surface); border: 1px solid var(--fw-border); padding: 8px; height: 120px; overflow: auto; white-space: pre-line">{{p.console}}</div>
+<label style="display: flex; gap: 8px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">G-code command</span>
+<input type="text" placeholder="Send G-code, ↑ for history" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">
+<button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Send</button></label>
+</section>
+
+<section aria-label="Macros" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center"><h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Macros · favourites</h2><a href="#" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">All {{p.macroCount}}</a></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{p.macros}}" as="m" hint-placeholder-count="5">
+<button type="button" onClick="{{m.run}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{m.label}}</button>
+</sc-for>
+</div>
+</section>
+</div>
+
+<div style="flex: 1 1 340px; max-width: 400px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<section aria-label="Temperatures" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 10px 12px; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 4px; padding-bottom: 6px">
+<h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Temps</h2>
+<sc-for list="{{presetsAll}}" as="pr" hint-placeholder-count="4">
+<button type="button" onClick="{{pr.run}}" aria-label="{{pr.label}} preset for all heaters" style="min-height: 32px; padding: 0 8px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; font-size: 11px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{pr.label}}</button>
+</sc-for>
+</div>
+<sc-for list="{{heaters}}" as="h" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 8px; min-height: 48px; border-top: 1px solid var(--fw-border)">
+<span style="flex: 1; font-size: 13px">{{h.name}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; width: 56px; text-align: right; color: {{h.nowFg}}">{{h.now}}°</span>
+<span aria-hidden="true" style="color: var(--fw-muted)">→</span>
+<input type="number" min="0" max="{{h.max}}" step="1" value="{{h.target}}" onChange="{{h.set}}" aria-label="{{h.name}} target, max {{h.max}} °C" style="width: 64px; min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 6px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; color: var(--fw-text)">
+<button type="button" onClick="{{h.off}}" aria-label="Turn {{h.name}} off" style="min-height: 40px; width: 40px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; font-size: 11px; border-radius: 2px">Off</button>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="Toolhead" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 4px">
+<h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Toolhead</h2>
+<sc-for list="{{axes}}" as="ax" hint-placeholder-count="3">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 1px 5px; color: {{ax.hfg}}; background: {{ax.hbg}}">{{ax.homedLabel}}</span>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px">
+<sc-for list="{{axes}}" as="ax" hint-placeholder-count="3"><span><span style="color: var(--fw-muted)">{{ax.name}}</span> <b>{{ax.pos}}</b></span></sc-for>
+<span><span style="color: var(--fw-muted)">ΔZ</span> <b>{{zoffLabel}}</b></span>
+</div>
+<p style="margin: 0; font-size: 12px; color: {{jogNoteFg}}">{{jogNote}}</p>
+<div style="display: flex; gap: 8px; align-items: flex-start">
+<div role="group" aria-label="Move X and Y" style="display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 3px">
+<sc-for list="{{pad}}" as="c" hint-placeholder-count="9">
+<sc-if value="{{c.show}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{c.run}}" disabled="{{jogLocked}}" aria-label="{{c.aria}}" style="width: 44px; height: 44px; padding: 0; border: 1px solid var(--fw-muted); background: {{c.bg}}; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; font-size: 12px">{{c.label}}</button>
+</sc-if>
+<sc-if value="{{c.blank}}" hint-placeholder-val="{{ false }}"><span aria-hidden="true"></span></sc-if>
+</sc-for>
+</div>
+<div role="group" aria-label="Move Z" style="display: grid; grid-template-rows: repeat(3, 44px); gap: 3px">
+<button type="button" onClick="{{zUp}}" disabled="{{jogLocked}}" aria-label="Move Z up" style="width: 44px; height: 44px; padding: 0; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; font-size: 12px">Z+</button>
+<button type="button" onClick="{{homeZ}}" disabled="{{jogLocked}}" aria-label="Home Z" style="width: 44px; height: 44px; padding: 0; border: 1px solid var(--fw-muted); background: var(--fw-surface); border-radius: 2px; cursor: pointer; font-size: 12px">⌂Z</button>
+<button type="button" onClick="{{zDown}}" disabled="{{jogLocked}}" aria-label="Move Z down" style="width: 44px; height: 44px; padding: 0; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; font-size: 12px">Z−</button>
+</div>
+<div role="group" aria-label="Homing and levelling" style="flex: 1; min-width: 0; display: grid; grid-template-rows: repeat(3, 44px); gap: 3px">
+<button type="button" onClick="{{homeAll}}" disabled="{{jogLocked}}" style="border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; font-size: 12px">⌂ Home all</button>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px">
+<button type="button" onClick="{{homeX}}" disabled="{{jogLocked}}" style="border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">⌂ X</button>
+<button type="button" onClick="{{homeY}}" disabled="{{jogLocked}}" style="border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">⌂ Y</button>
+</div>
+<button type="button" onClick="{{level}}" disabled="{{jogLocked}}" style="border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{levelLabel}}</button>
+</div>
+</div>
+<div role="group" aria-label="Move distance in millimetres" style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr))">
+<sc-for list="{{steps}}" as="sp" hint-placeholder-count="6">
+<button type="button" onClick="{{sp.pick}}" aria-pressed="{{sp.on}}" style="min-height: 36px; padding: 0; margin-left: -1px; border: 1px solid {{sp.border}}; background: {{sp.bg}}; color: {{sp.fg}}; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{sp.label}}</button>
+</sc-for>
+</div>
+<sc-for list="{{factors}}" as="fa" hint-placeholder-count="2">
+<label style="display: flex; align-items: center; gap: 8px; min-height: 36px"><span style="width: 44px; font-size: 12px">{{fa.name}}</span>
+<input type="range" min="{{fa.min}}" max="{{fa.max}}" step="1" value="{{fa.val}}" onInput="{{fa.set}}" style="flex: 1; min-width: 0; accent-color: var(--fw-accent-hover)">
+<output style="width: 44px; text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{fa.val}}%</output>
+<button type="button" onClick="{{fa.reset}}" aria-label="Reset {{fa.name}} to 100%" style="min-height: 32px; padding: 0 6px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; font-size: 11px; border-radius: 2px">↺</button></label>
+</sc-for>
+<div role="group" aria-label="Z offset" style="display: flex; align-items: center; gap: 3px">
+<span style="width: 44px; font-size: 12px">ΔZ</span>
+<sc-for list="{{babysteps}}" as="b" hint-placeholder-count="4">
+<button type="button" onClick="{{b.run}}" style="flex: 1; min-height: 36px; padding: 0; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px">{{b.label}}</button>
+</sc-for>
+<button type="button" onClick="{{saveZoff}}" style="min-height: 36px; padding: 0 8px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 11px">Save</button>
+</div>
+</section>
+
+<section aria-label="Extruder" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Extruder</h2>
+<div role="group" aria-label="Extrude length in millimetres" style="display: flex; align-items: center"><span style="width: 52px; font-size: 12px">mm</span>
+<sc-for list="{{extLens}}" as="e" hint-placeholder-count="4">
+<button type="button" onClick="{{e.pick}}" aria-pressed="{{e.on}}" style="flex: 1; min-height: 36px; margin-left: -1px; border: 1px solid {{e.border}}; background: {{e.bg}}; color: {{e.fg}}; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{e.label}}</button>
+</sc-for></div>
+<div role="group" aria-label="Extrude speed in millimetres per second" style="display: flex; align-items: center"><span style="width: 52px; font-size: 12px">mm/s</span>
+<sc-for list="{{extSpds}}" as="e" hint-placeholder-count="3">
+<button type="button" onClick="{{e.pick}}" aria-pressed="{{e.on}}" style="flex: 1; min-height: 36px; margin-left: -1px; border: 1px solid {{e.border}}; background: {{e.bg}}; color: {{e.fg}}; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{e.label}}</button>
+</sc-for></div>
+<p style="margin: 0; font-size: 12px; color: {{extNoteFg}}">{{extNote}}</p>
+<div style="display: flex; gap: 6px">
+<button type="button" onClick="{{retract}}" disabled="{{extLocked}}" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">↑ Retract</button>
+<button type="button" onClick="{{extrude}}" disabled="{{extLocked}}" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">↓ Extrude</button>
+</div>
+</section>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isQueue}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<p style="flex: 1 1 300px; margin: 0; color: var(--fw-muted)">Next job starts automatically once the plate is marked cleared. Drag to reorder, or use the row menu.</p>
+<a href="Library.dc.html" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center">Add from Library</a>
+</div>
+<ol aria-label="Queue" style="list-style: none; margin: 0; padding: 0; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<sc-for list="{{queue}}" as="q" hint-placeholder-count="3">
+<li style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px; border-bottom: 1px solid var(--fw-border)">
+<span aria-hidden="true" style="color: var(--fw-muted); cursor: grab; font-size: 18px">⋮⋮</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--fw-muted); width: 20px">{{q.n}}</span>
+<img src="{{q.thumb}}" alt="" width="56" height="42" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<div style="flex: 1 1 240px; min-width: 0"><div style="font-weight: bold">{{q.file}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{q.sub}}</div></div>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 3px 8px; color: {{q.fg}}; background: {{q.bg}}">{{q.tag}}</span>
+<button type="button" onClick="{{q.up}}" aria-label="Move {{q.file}} up" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer">↑</button>
+<button type="button" onClick="{{q.remove}}" aria-label="Remove {{q.file}} from queue" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">Remove</button>
+</li>
+</sc-for>
+</ol>
+</sc-if>
+
+<sc-if value="{{isSpools}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; color: var(--fw-muted)">Pick a slot to load or change its spool. Checks for material, nozzle and remaining filament happen in the panel.</p>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px">
+<sc-for list="{{slots}}" as="sl" hint-placeholder-count="4">
+<button type="button" onClick="{{sl.pick}}" aria-pressed="{{sl.active}}" style="text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--fw-raised); border: 1px solid {{sl.border}}; outline: {{sl.outline}}; cursor: pointer; min-height: 132px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; color: var(--fw-muted)">{{sl.slot}}</span>
+<span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 28px; height: 28px; background: {{sl.hex}}; border: 1px {{sl.edge}} var(--fw-muted)"></span><b>{{sl.label}}</b></span>
+<span style="font-size: 12px; color: var(--fw-muted)">{{sl.sub}}</span>
+<span aria-hidden="true" style="height: 6px; width: 100%; background: var(--fw-surface); border: 1px solid var(--fw-border)"><span style="display: block; height: 100%; width: {{sl.pct}}%; background: var(--fw-muted)"></span></span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isService}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<sc-for list="{{tasks}}" as="k" hint-placeholder-count="3">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; border-bottom: 1px solid var(--fw-border)">
+<div style="flex: 1 1 220px"><div style="font-weight: bold">{{k.name}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{k.sub}}</div></div>
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 4px">
+<div style="height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="height: 100%; width: {{k.pct}}%; background: {{k.fg}}"></div></div>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: {{k.fg}}">{{k.status}}</span>
+</div>
+<button type="button" onClick="{{k.done}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Mark done</button>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isHistory}}" hint-placeholder-val="{{ false }}">
+<div style="overflow-x: auto; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px">
+<thead><tr>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">File</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Finished</th>
+<th style="text-align: right; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Time</th>
+<th style="text-align: right; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Filament</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Outcome</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{history}}" as="j" hint-placeholder-count="5">
+<tr>
+<td style="padding: 0 12px; height: 56px; border-bottom: 1px solid var(--fw-border)"><span style="display: flex; align-items: center; gap: 10px"><img src="{{j.thumb}}" alt="" width="48" height="36" style="flex: none; display: block; border: 1px solid var(--fw-border)">{{j.file}}</span></td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); color: var(--fw-muted)">{{j.when}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{j.time}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{j.grams}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border)"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 3px 8px; color: {{j.fg}}; background: {{j.bg}}">{{j.outcome}}</span></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</sc-if>
+
+<sc-if value="{{isFiles}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<div role="tablist" aria-label="Files or terminal" style="display: flex">
+<sc-for list="{{fx.subs}}" as="t" hint-placeholder-count="2"><button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" disabled="{{t.off}}" style="min-height: 40px; padding: 0 14px; margin-left: -1px; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.fg}}; cursor: pointer; font-size: 13px">{{t.label}}</button></sc-for>
+</div>
+<span style="flex: 1; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{fx.conn}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-success)">● {{fx.proto}}</span>
+</div>
+<sc-if value="{{fx.noSsh}}" hint-placeholder-val="{{ false }}"><div style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 10px 12px; font-size: 13px; color: var(--fw-muted)">{{fx.noSshText}}</div></sc-if>
+
+<sc-if value="{{fx.isBrowse}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; min-width: 0">
+<section aria-label="File browser" style="flex: 1 1 380px; min-width: 0; border: 1px solid var(--fw-border); background: var(--fw-raised); display: flex; flex-direction: column">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--fw-border)">
+<sc-for list="{{fx.crumbs}}" as="c" hint-placeholder-count="3"><button type="button" onClick="{{c.go}}" style="min-height: 32px; padding: 0 8px; border: 1px solid var(--fw-border); background: var(--fw-surface); cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-text); border-radius: 2px">{{c.label}}</button></sc-for>
+<span style="flex: 1"></span>
+<sc-for list="{{fx.places}}" as="q" hint-placeholder-count="3"><button type="button" onClick="{{q.go}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 32px; font-size: 12px">{{q.label}}</button></sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--fw-border)">
+<button type="button" onClick="{{fx.up}}" disabled="{{fx.atRoot}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">↑ Up</button>
+<button type="button" onClick="{{fx.upload}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Upload…</button>
+<button type="button" onClick="{{fx.mkdir}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">New folder</button>
+<button type="button" onClick="{{fx.refresh}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Refresh</button>
+</div>
+<div role="list" style="display: flex; flex-direction: column">
+<sc-for list="{{fx.entries}}" as="e" hint-placeholder-count="6">
+<button type="button" role="listitem" onClick="{{e.open}}" style="display: grid; grid-template-columns: 42px minmax(0, 1fr) 80px 110px; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-bottom: 1px solid var(--fw-border); background: {{e.bg}}; cursor: pointer; text-align: left; color: var(--fw-text)">
+<sc-if value="{{e.hasThumb}}" hint-placeholder-val="{{ false }}"><img src="{{e.thumb}}" alt="" width="40" height="30" style="display: block; border: 1px solid var(--fw-border)"></sc-if><sc-if value="{{e.noThumb}}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{e.icon}}</span></sc-if>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{e.name}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted); text-align: right">{{e.size}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)">{{e.date}}</span>
+</button>
+</sc-for>
+</div>
+</section>
+<section aria-label="File" style="flex: 1 1 420px; min-width: 0; border: 1px solid {{fx.edBorder}}; background: var(--fw-raised); display: flex; flex-direction: column">
+<sc-if value="{{fx.noFile}}" hint-placeholder-val="{{ false }}"><div style="padding: 24px; color: var(--fw-muted); font-size: 13px">Pick a file. Text files (.cfg, .conf, .log, .sh) open here to read or edit; others can be downloaded.</div></sc-if>
+<sc-if value="{{fx.hasFile}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--fw-border)">
+<b style="flex: 1 1 140px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis">{{fx.fname}}</b>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: {{fx.stateFg}}">{{fx.state}}</span>
+<button type="button" onClick="{{fx.download}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Download</button>
+<button type="button" onClick="{{fx.rename}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Rename</button>
+<button type="button" onClick="{{fx.del}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; border-color: var(--fw-danger); color: var(--fw-danger)">{{fx.delLabel}}</button>
+</div>
+<sc-if value="{{fx.isText}}" hint-placeholder-val="{{ true }}">
+<textarea aria-label="File contents" onInput="{{fx.edit}}" readonly="{{fx.readonly}}" spellcheck="false" style="flex: 1; min-height: 300px; resize: vertical; border: 0; background: #0b0c0a; color: #d9e7c4; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre; tab-size: 2">{{fx.text}}</textarea>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--fw-border)">
+<span style="flex: 1 1 160px; font-size: 12px; color: var(--fw-muted)">{{fx.edNote}}</span>
+<button type="button" onClick="{{fx.revert}}" disabled="{{fx.clean}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Revert</button>
+<button type="button" onClick="{{fx.save}}" disabled="{{fx.clean}}" style="min-height: 36px; padding: 0 14px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; font-size: 13px">Save</button>
+<sc-if value="{{fx.isKlipperCfg}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{fx.saveRestart}}" disabled="{{fx.restartOff}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">{{fx.restartLabel}}</button></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{fx.isBin}}" hint-placeholder-val="{{ false }}"><div style="padding: 16px; font-size: 13px; color: var(--fw-muted)">{{fx.binNote}}</div></sc-if>
+</sc-if>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{fx.isTerm}}" hint-placeholder-val="{{ false }}">
+<section aria-label="SSH terminal" style="border: 1px solid var(--fw-border); background: #0b0c0a; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #2a2f26; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #8a9a7a"><span style="flex: 1">{{fx.conn}} · xterm 120×32</span>
+<sc-for list="{{fx.snips}}" as="q" hint-placeholder-count="4"><span style="display: inline-flex"><button type="button" onClick="{{q.run}}" title="{{q.cmd}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; border-color: {{q.border}}">{{q.label}}</button><sc-if value="{{q.canEdit}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{q.edit}}" aria-label="Edit {{q.label}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; margin-left: -1px">✎</button></sc-if></span></sc-for>
+<button type="button" onClick="{{fx.newSnip}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; border-style: dashed">+ Add</button>
+</div>
+<sc-if value="{{fx.formOpen}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: end; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #2a2f26; background: #11130f">
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 0 1 160px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #8a9a7a">Button name<input type="text" value="{{fx.fName}}" onInput="{{fx.setFName}}" placeholder="e.g. restart cam" style="min-height: 32px; border: 1px solid #3a4234; background: #0b0c0a; color: #d9e7c4; padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 260px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #8a9a7a">Command<textarea rows="3" onInput="{{fx.setFCmd}}" spellcheck="false" placeholder="sudo systemctl restart crowsnest&#10;one command per line, or a whole script" style="min-height: 56px; resize: vertical; border: 1px solid #3a4234; background: #0b0c0a; color: #d9e7c4; padding: 6px 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.4">{{fx.fCmd}}</textarea></label>
+<label style="display: flex; flex-direction: column; gap: 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #8a9a7a">Show on<select onChange="{{fx.setFScope}}" style="min-height: 32px; border: 1px solid #3a4234; background: #0b0c0a; color: #d9e7c4; padding: 0 6px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"><option value="this" selected="{{fx.fThis}}">This printer</option><option value="all" selected="{{fx.fAll}}">All SSH printers</option></select></label>
+<label style="display: flex; align-items: center; gap: 6px; min-height: 32px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #d9e7c4"><input type="checkbox" checked="{{fx.fConfirm}}" onChange="{{fx.toggleFConfirm}}" style="width: 16px; height: 16px; accent-color: var(--fw-accent-hover)"> Ask before running</label>
+<button type="button" onClick="{{fx.saveSnip}}" disabled="{{fx.fOff}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; min-height: 32px; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-color: transparent; font-weight: bold">{{fx.fSaveLabel}}</button>
+<sc-if value="{{fx.fEditing}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{fx.delSnip}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; min-height: 32px; border-color: var(--fw-danger); color: var(--fw-danger)">Delete</button></sc-if>
+<button type="button" onClick="{{fx.cancelSnip}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; min-height: 32px">Cancel</button>
+<span style="flex: 1 1 100%; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: #8a9a7a">Saved in Foreman, not on the printer. “All SSH printers” shows it on every printer you can SSH into. Runs in this terminal so you see the output; the audit log records it.</span>
+</div>
+</sc-if>
+<div role="log" aria-live="polite" style="height: 360px; overflow-y: auto; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.5; color: #d9e7c4; white-space: pre-wrap"><sc-for list="{{fx.lines}}" as="l" hint-placeholder-count="6"><div style="color: {{l.fg}}">{{l.t}}</div></sc-for></div>
+<sc-if value="{{fx.hasPaste}}" hint-placeholder-val="{{ false }}">
+<div style="border-top: 1px solid var(--fw-warning); background: #1a1508; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-warning)">Paste {{fx.pasteN}} lines? They run one after another, like typing each and pressing Enter.</span><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: #d9e7c4; white-space: pre-wrap; max-height: 120px; overflow-y: auto; border-left: 2px solid #3a4234; padding-left: 8px">{{fx.pasteText}}</div><div style="display: flex; gap: 6px"><button type="button" onClick="{{fx.pasteRun}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-color: transparent; font-weight: bold">Run all {{fx.pasteN}}</button><button type="button" onClick="{{fx.pasteOne}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px">Paste as one line</button><button type="button" onClick="{{fx.pasteCancel}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px">Cancel</button><button type="button" onClick="{{fx.demoPaste}}" style="min-height: 28px; padding: 0 8px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px; margin-left: auto; border-style: dashed">demo: paste again</button></div></div>
+</sc-if>
+<div style="display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid #2a2f26"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: #9fd36a">{{fx.prompt}}</span><input type="text" aria-label="Command" value="{{fx.cmd}}" onInput="{{fx.setCmd}}" onKeyDown="{{fx.key}}" onPaste="{{fx.paste}}" spellcheck="false" style="flex: 1; min-height: 32px; border: 0; background: transparent; color: #d9e7c4; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; outline: none"><button type="button" onClick="{{fx.run}}" style="min-height: 28px; padding: 0 10px; border: 1px solid #3a4234; background: transparent; color: #d9e7c4; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px">Run ↵</button><button type="button" onClick="{{fx.demoPaste}}" title="Demo: simulate pasting a 3-line script" style="min-height: 28px; padding: 0 10px; border: 1px dashed #3a4234; background: transparent; color: #8a9a7a; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; border-radius: 2px">demo paste</button></div>
+</section>
+<span style="font-size: 12px; color: var(--fw-muted)">A real terminal (xterm.js in the app, SSH from the Foreman server via russh). Runs as {{fx.user}}; anything you do here is logged in the printer's command audit.</span>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{isConfig}}" hint-placeholder-val="{{ false }}">
+<div style="max-width: 720px; display: flex; flex-direction: column; gap: 20px">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 18px">Connection</h2>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="flex: 1; font-size: 13px; font-weight: bold">Connection paths <span style="font-weight: normal; color: var(--fw-muted)">· tried top to bottom</span></span><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: {{cp.sumFg}}">● {{cp.summary}}</span></div>
+<sc-for list="{{cp.rows}}" as="r" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 26px minmax(90px, 0.8fr) minmax(0, 1.6fr) 96px auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid {{r.border}}; background: var(--fw-surface)">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; color: var(--fw-muted); text-align: center">{{r.n}}</span>
+<input type="text" value="{{r.label}}" onInput="{{r.setLabel}}" aria-label="Path {{r.n}} name" style="min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; box-sizing: border-box; width: 100%; font-size: 13px">
+<input type="text" value="{{r.url}}" onInput="{{r.setUrl}}" aria-label="Path {{r.n}} address" spellcheck="false" style="min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; box-sizing: border-box; width: 100%; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 3px 6px; text-align: center; color: {{r.fg}}; background: {{r.bg}}">{{r.status}}</span>
+<span style="display: flex; gap: 4px"><button type="button" onClick="{{r.up}}" disabled="{{r.first}}" aria-label="Move up" style="width: 32px; height: 32px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px; color: var(--fw-text)">↑</button><button type="button" onClick="{{r.down}}" disabled="{{r.last}}" aria-label="Move down" style="width: 32px; height: 32px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px; color: var(--fw-text)">↓</button><button type="button" onClick="{{r.fail}}" title="Demo: make this path fail / recover" style="width: 32px; height: 32px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px; color: var(--fw-text); width: auto; padding: 0 6px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; border-style: dashed">{{r.failLabel}}</button><button type="button" onClick="{{r.remove}}" disabled="{{r.only}}" aria-label="Remove path {{r.n}}" style="width: 32px; height: 32px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px; color: var(--fw-text)">✕</button></span>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<button type="button" onClick="{{cp.add}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; border-style: dashed">+ Add backup path</button>
+<button type="button" onClick="{{cp.testAll}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Test all</button>
+<span style="font-size: 12px; color: var(--fw-muted)">{{cp.msg}}</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Switch to the next path after</span><select style="min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; box-sizing: border-box"><option>3 failed checks (≈6 s)</option><option>1 failed check</option><option>5 failed checks (≈10 s)</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Go back up when a higher path is</span><select style="min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; box-sizing: border-box"><option>healthy for 60 s</option><option>healthy for 10 min</option><option>never (manual)</option></select></label>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 13px"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: var(--fw-accent-hover)"> SSH, webcams and file uploads follow the active path</label>
+<span style="font-size: 12px; color: var(--fw-muted)">A switch shows on the printer card and in Attention ("Using backup path: Tailscale"). Running jobs keep going; only Foreman's connection moves.</span>
+</div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">{{p.authLabel}}</span><input type="password" value="12345678" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"><span style="font-size: 12px; color: var(--fw-muted)">{{p.authHelp}}</span></label>
+<div style="display: flex; align-items: center; gap: 12px"><button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Test connection</button><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-success)">✓ Connected · 18 ms</span></div>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 20px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 18px">SSH / SFTP</h2>
+<sc-if value="{{fx.hasSsh}}" hint-placeholder-val="{{ true }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">User</span><input type="text" value="pi" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">Port</span><input type="number" value="22" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace"></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">Sign in with</span><select style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"><option>Foreman key (ed25519)</option><option>Password</option></select></label>
+</div>
+<div style="font-size: 13px; display: flex; flex-direction: column; gap: 4px"><span>Host key <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">SHA256:Qf3a…9xLk</code> · trusted 2 Nov</span><span style="font-size: 12px; color: var(--fw-muted)">Foreman pins the printer's host key the first time and refuses to connect if it changes, until you approve the new one here. Its public key to add to ~/.ssh/authorized_keys: <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">ssh-ed25519 AAAAC3Nz…foreman@workshop</code></span></div>
+<div style="display: flex; gap: 8px"><button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Copy public key</button><button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Test SSH</button></div>
+</sc-if>
+<sc-if value="{{fx.noSsh}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 13px; color: var(--fw-muted)">{{fx.noSshText}}</p></sc-if>
+</section>
+
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px"><h2 style="flex: 1; margin: 0; font-size: 18px">Capabilities</h2><button type="button" onClick="{{probe}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Probe again</button></div>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">{{probeNote}}</p>
+<sc-for list="{{p.caps}}" as="c" hint-placeholder-count="4">
+<div style="display: flex; justify-content: space-between; gap: 12px; min-height: 40px; align-items: center; border-bottom: 1px solid var(--fw-border)"><span>{{c.k}}</span><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{c.v}}</span></div>
+</sc-for>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 44px"><input type="checkbox" checked="{{p.abrasive}}" style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"> Hardened nozzle (abrasive filaments allowed)</label>
+</section>
+<section aria-label="Webcams" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px"><h2 style="flex: 1; margin: 0; font-size: 18px">Webcams</h2><button type="button" onClick="{{addCam}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">+ Add webcam</button></div>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Read from the printer where possible (Moonraker webcams, Bambu built-in). Add extra USB or IP cameras here; the first one is the default on Live and on the Fleet card.</p>
+<sc-for list="{{cams}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; padding: 10px; background: var(--fw-surface); border: 1px solid var(--fw-border)">
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px"><span style="font-size: 12px; font-weight: bold">Name</span><input type="text" value="{{c.name}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 3 1 220px"><span style="font-size: 12px; font-weight: bold">Stream URL</span><input type="text" value="{{c.url}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 0 1 110px"><span style="font-size: 12px; font-weight: bold">Type</span><select style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>{{c.kind}}</option><option>MJPEG</option><option>WebRTC</option><option>HLS</option><option>RTSPS</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; flex: 0 1 90px"><span style="font-size: 12px; font-weight: bold">Rotate</span><select style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>0°</option><option>90°</option><option>180°</option><option>270°</option></select></label>
+<label style="display: flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px"><input type="checkbox" style="width: 18px; height: 18px; accent-color: var(--fw-accent-hover)"> Flip</label>
+</div>
+</sc-for>
+</section>
+<div style="display: flex; align-items: center; gap: 12px">
+<button type="button" onClick="{{save}}" style="min-height: 44px; padding: 0 20px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Save changes</button>
+<span role="status" style="font-size: 13px; color: var(--fw-success)">{{savedNote}}</span>
+</div>
+<section style="border: 1px solid var(--fw-danger); background: var(--fw-raised); padding: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<div style="flex: 1 1 260px"><h2 style="margin: 0; font-size: 18px">Remove printer</h2><p style="margin: 4px 0 0; font-size: 13px; color: var(--fw-muted)">Removes it from Foreman. Job history is kept.</p></div>
+<button type="button" onClick="{{askRemove}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-danger); color: var(--fw-danger); background: transparent; border-radius: 2px; cursor: pointer">Remove printer…</button>
+</section>
+</div>
+</sc-if>
+</main>
+</div>
+
+<sc-if value="{{loadOpen}}" hint-placeholder-val="{{ false }}">
+<aside aria-label="Load spool" style="flex: 1 1 380px; max-width: 440px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Load spool</div><h2 style="margin: 2px 0 0; font-size: 22px">{{p.name}} · {{curSlot}}</h2></div>
+<button type="button" onClick="{{closeLoad}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">Find spool</span><input type="search" placeholder="Name, #id, colour or location" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<div role="radiogroup" aria-label="Spools" style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{cands}}" as="c" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{c.checked}}" onClick="{{c.pick}}" style="text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--fw-raised); border: 1px solid {{c.border}}; outline: {{c.outline}}; cursor: pointer">
+<span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 22px; height: 22px; background: {{c.hex}}; border: 1px solid var(--fw-muted)"></span><b style="flex: 1">{{c.label}}</b><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 2px 6px; color: {{c.fg}}; background: {{c.bg}}">{{c.tag}}</span></span>
+<span style="font-size: 12px; color: var(--fw-muted)">{{c.sub}}</span>
+<sc-if value="{{c.showWhy}}" hint-placeholder-val="{{ false }}"><span style="font-size: 13px; color: {{c.fg}}">{{c.why}}</span></sc-if>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{needsOverride}}" hint-placeholder-val="{{ false }}">
+<label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--fw-danger); background: var(--fw-danger-bg)"><input type="checkbox" checked="{{override}}" onChange="{{toggleOverride}}" style="width: 20px; height: 20px; margin-top: 2px; accent-color: var(--fw-danger)"><span>Load anyway. I know this nozzle can be damaged by this filament.</span></label>
+</sc-if>
+<div style="flex: 1"></div>
+<div style="display: flex; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 16px">
+<button type="button" onClick="{{doLoad}}" disabled="{{loadDisabled}}" style="flex: 1; min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{loadLabel}}</button>
+<button type="button" onClick="{{closeLoad}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Cancel</button>
+</div>
+</aside>
+</sc-if>
+
+<sc-if value="{{dialogOpen}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; z-index: 20; background: var(--fw-scrim); display: flex; align-items: flex-start; justify-content: center; padding-top: 160px">
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="width: 520px; max-width: calc(100% - 32px); background: var(--fw-raised); border: 1px solid var(--fw-muted); box-shadow: var(--fw-shadow-overlay); padding: 24px; display: flex; flex-direction: column; gap: 16px">
+<h2 id="dlg-title" style="margin: 0; font-size: 22px">{{dlg.title}}</h2>
+<p style="margin: 0; color: var(--fw-muted)">{{dlg.body}}</p>
+<sc-if value="{{dlg.typed}}" hint-placeholder-val="{{ false }}">
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 13px; font-weight: bold">Type “{{p.name}}” to confirm</span><input type="text" value="{{typedVal}}" onInput="{{onTyped}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+</sc-if>
+<div style="display: flex; justify-content: flex-end; gap: 8px">
+<button type="button" onClick="{{closeDialog}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">{{dlg.keep}}</button>
+<button type="button" onClick="{{dlg.confirm}}" disabled="{{dlg.disabled}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-danger); color: var(--fw-background); border-radius: 2px; cursor: pointer; font-weight: bold">{{dlg.go}}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<sc-if value="{{t.canUndo}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button></sc-if>
+<button type="button" onClick="{{t.dismiss}}" aria-label="Dismiss" style="width: 36px; height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"printer":{"editor":"enum","options":["voron","x1c"],"default":"voron","section":"Content"},"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'live', paused: false, cancelled: false, dialog: null, typed: '', slot: null, pick: null, override: false, loaded: {}, queueOrder: null, removedQ: {}, done: {}, toasts: [], saved: '', probed: false, targets: {}, pos: null, homed: { x: true, y: true, z: true }, step: 10, speed: 100, flow: 100, zoff: 0, extLen: 50, extSpd: 5, cam: 0, camGrid: false, addedCams: 0, fsub: 'browse', fpath: null, fsel: null, fedits: {}, fsaved: {}, fdel: null, fdeleted: {}, fextra: {}, term: null, cmd: '', restartArm: false, usnips: [{ id: 1, label: 'restart cam', cmd: 'sudo systemctl restart crowsnest', all: true, confirm: false }, { id: 2, label: 'reboot host', cmd: 'sudo reboot', all: false, confirm: true }], snipForm: null, snipArm: null, pasteBuf: null };
+    this.tid = 0;
+  }
+
+  cpaths(key, defaults, onMsg) {
+    const s = this.state; const all = s.cpPaths || {}; const paths = all[key] || defaults; const down = (s.cpDown || {})[key] || {};
+    const set = (list) => this.setState({ cpPaths: { ...(this.state.cpPaths || {}), [key]: list } });
+    const active = paths.findIndex(p => !down[p.id]);
+    const msg = (t) => this.setState({ cpMsg: { ...(this.state.cpMsg || {}), [key]: t } });
+    return {
+      summary: active < 0 ? 'all paths down' : active === 0 ? 'on primary · ' + paths[0].label : 'on backup ' + (active + 1) + ' · ' + paths[active].label,
+      sumFg: active < 0 ? 'var(--fw-danger)' : active === 0 ? 'var(--fw-success)' : 'var(--fw-warning)',
+      msg: (s.cpMsg || {})[key] || '',
+      rows: paths.map((p, i) => { const isDown = !!down[p.id]; const on = i === active;
+        return { n: i + 1, label: p.label, url: p.url, first: i === 0, last: i === paths.length - 1, only: paths.length === 1,
+          status: isDown ? 'DOWN' : on ? 'ACTIVE · ' + p.ms + ' ms' : 'STANDBY', fg: isDown ? 'var(--fw-danger)' : on ? 'var(--fw-success)' : 'var(--fw-muted)', bg: isDown ? 'var(--fw-danger-bg)' : on ? 'var(--fw-success-bg)' : 'var(--fw-surface)',
+          border: on ? 'var(--fw-success)' : 'var(--fw-border)', failLabel: isDown ? 'recover' : 'fail',
+          setLabel: (e) => set(paths.map(x => x.id === p.id ? { ...x, label: e.target.value } : x)), setUrl: (e) => set(paths.map(x => x.id === p.id ? { ...x, url: e.target.value } : x)),
+          up: () => { if (!i) return; const a = paths.slice(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; set(a); },
+          down: () => { if (i === paths.length - 1) return; const a = paths.slice(); [a[i + 1], a[i]] = [a[i], a[i + 1]]; set(a); },
+          remove: () => { if (paths.length > 1) { set(paths.filter(x => x.id !== p.id)); msg('Removed ' + p.label); } },
+          fail: () => { const d = { ...down, [p.id]: !isDown }; this.setState({ cpDown: { ...(this.state.cpDown || {}), [key]: d } }); const na = paths.findIndex(x => !d[x.id]); msg(isDown ? p.label + ' is back' + (na === i ? ' · switched back up after 60 s healthy' : '') : p.label + ' failed 3 checks · ' + (na < 0 ? 'no path left, printer offline' : 'switched to ' + paths[na].label)); } }; }),
+      add: () => set([...paths, { id: 'p' + Date.now(), label: 'Backup ' + (paths.length + 1), url: '', ms: 60 }]),
+      testAll: () => msg(paths.map(p => p.label + (down[p.id] ? ' ✖' : ' ✓ ' + p.ms + ' ms')).join(' · '))
+    };
+  }
+  toast(text, undo) {
+    const id = ++this.tid;
+    this.setState({ toasts: [...this.state.toasts, { id, text, undo }].slice(-2) });
+  }
+  motion(p, which, printing, tone) {
+    const s = this.state;
+    const bed = which === 'voron' ? { x: 350, y: 350, z: 340 } : { x: 256, y: 256, z: 256 };
+    const pos = s.pos || (which === 'voron' ? { x: 175.0, y: 175.0, z: 12.4 } : { x: 128.0, y: 128.0, z: 3.2 });
+    const locked = printing && !s.paused;
+    const PRE = { PLA: { Nozzle: 215, Bed: 60, Chamber: 0 }, PETG: { Nozzle: 245, Bed: 85, Chamber: 0 }, ABS: { Nozzle: 255, Bed: 100, Chamber: 45 }, Off: { Nozzle: 0, Bed: 0, Chamber: 0 } };
+    const MAX = { Nozzle: 300, Bed: 120, Chamber: 60 };
+    const tKey = (n) => which + n;
+    const tgt = (h) => (s.targets[tKey(h.name)] !== undefined ? s.targets[tKey(h.name)] : h.target);
+    const setT = (name, v, quiet) => {
+      const n = Math.max(0, Math.min(MAX[name], Math.round(Number(v) || 0)));
+      this.setState({ targets: { ...this.state.targets, [tKey(name)]: n } });
+      if (!quiet) this.toast(name + ' target → ' + n + ' °C', null);
+    };
+    const heaters = p.temps.map(h => {
+      const t = tgt(h);
+      return { name: h.name, now: h.now, target: t, max: MAX[h.name], nowFg: t > 0 && Math.abs(h.now - t) > 3 ? 'var(--fw-warning)' : 'var(--fw-text)',
+        set: (e) => setT(h.name, e.target.value, true), off: () => setT(h.name, 0) };
+    });
+    const presetsAll = Object.keys(PRE).map(k => ({ label: k, run: () => {
+      const next = { ...this.state.targets };
+      p.temps.forEach(h => { next[tKey(h.name)] = PRE[k][h.name]; });
+      this.setState({ targets: next });
+      this.toast(k === 'Off' ? 'All heaters off' : k + ' preset: ' + p.temps.map(h => h.name + ' ' + PRE[k][h.name]).join(' · '), null);
+    } }));
+    const move = (ax, dir) => {
+      if (locked) return;
+      if (!this.state.homed[ax]) { this.toast('Home ' + ax.toUpperCase() + ' first', null); return; }
+      const cur = this.state.pos || pos;
+      const v = Math.max(0, Math.min(bed[ax], +(cur[ax] + dir * this.state.step).toFixed(2)));
+      this.setState({ pos: { ...cur, [ax]: v } });
+    };
+    const home = (axs) => {
+      if (locked) return;
+      const cur = this.state.pos || pos; const np = { ...cur }; const h = { ...this.state.homed };
+      axs.forEach(a => { np[a] = a === 'z' ? 10 : bed[a]; h[a] = true; });
+      this.setState({ pos: np, homed: h });
+      this.toast('Homed ' + axs.map(a => a.toUpperCase()).join(''), null);
+    };
+    const cell = (label, aria, run, bg) => ({ show: true, blank: false, label, aria, run, bg: bg || 'transparent' });
+    const blank = { show: false, blank: true, label: '', aria: '', run: null, bg: 'transparent' };
+    const pad = [blank, cell('Y+', 'Move Y plus', () => move('y', 1)), blank,
+      cell('X−', 'Move X minus', () => move('x', -1)), cell('⌂XY', 'Home X and Y', () => home(['x', 'y']), 'var(--fw-surface)'), cell('X+', 'Move X plus', () => move('x', 1)),
+      blank, cell('Y−', 'Move Y minus', () => move('y', -1)), blank];
+    const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'transparent', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const steps = [0.1, 1, 10, 25, 50, 100].map(v => ({ label: String(v), ...seg(s.step === v), pick: () => this.setState({ step: v }) }));
+    const axes = ['x', 'y', 'z'].map(a => ({ name: a.toUpperCase(), pos: s.homed[a] ? pos[a].toFixed(2) : '?', homedLabel: (s.homed[a] ? '✓ ' : '✕ ') + a.toUpperCase(), hfg: s.homed[a] ? tone.ok[0] : tone.warn[0], hbg: s.homed[a] ? tone.ok[1] : tone.warn[1] }));
+    const factors = [['Speed', 'speed', 10, 300], ['Flow', 'flow', 50, 150]].map(([name, key, min, max]) => ({ name, min, max, val: s[key],
+      set: (e) => this.setState({ [key]: Number(e.target.value) }), reset: () => this.setState({ [key]: 100 }) }));
+    const babysteps = [-0.05, -0.01, 0.01, 0.05].map(d => ({ label: (d > 0 ? '+' : '−') + Math.abs(d).toFixed(2), run: () => this.setState({ zoff: +(this.state.zoff + d).toFixed(3) }) }));
+    const nozzle = heaters.find(h => h.name === 'Nozzle');
+    const cold = nozzle && nozzle.now < 170;
+    const extLocked = locked || cold;
+    const extLens = [10, 25, 50, 100].map(v => ({ label: String(v), ...seg(s.extLen === v), pick: () => this.setState({ extLen: v }) }));
+    const extSpds = [2, 5, 10].map(v => ({ label: String(v), ...seg(s.extSpd === v), pick: () => this.setState({ extSpd: v }) }));
+    return {
+      heaters, presetsAll, maxNote: p.temps.map(h => h.name.toLowerCase() + ' ' + MAX[h.name] + ' °C').join(', '),
+      jogLocked: locked,
+      jogNote: locked ? 'Locked while printing: moves are off. Speed, flow and Z offset still work. Pause to move the toolhead.' : 'Moves ' + s.step + ' mm per press at 100 mm/s (XY) / 10 mm/s (Z).',
+      jogNoteFg: locked ? 'var(--fw-warning)' : 'var(--fw-muted)',
+      axes, pad, steps, factors, babysteps,
+      zoffLabel: (s.zoff >= 0 ? '+' : '−') + Math.abs(s.zoff).toFixed(3),
+      zUp: () => move('z', 1), zDown: () => move('z', -1),
+      homeAll: () => home(['x', 'y', 'z']), homeX: () => home(['x']), homeY: () => home(['y']), homeZ: () => home(['z']),
+      levelLabel: which === 'voron' ? 'QUAD_GANTRY_LEVEL' : 'Auto bed levelling',
+      level: () => { if (!locked) this.toast((which === 'voron' ? 'Quad gantry level' : 'Bed levelling') + ' started', null); },
+      saveZoff: () => this.toast('Z offset ' + (s.zoff >= 0 ? '+' : '−') + Math.abs(s.zoff).toFixed(3) + ' saved to config', null),
+      extLens, extSpds, extLocked,
+      extNote: locked ? 'Locked while printing.' : cold ? 'Nozzle is ' + (nozzle ? nozzle.now : 0) + ' °C. Heat to at least 170 °C to extrude.' : s.extLen + ' mm at ' + s.extSpd + ' mm/s ≈ ' + Math.round(s.extLen / s.extSpd) + ' s.',
+      extNoteFg: extLocked ? 'var(--fw-warning)' : 'var(--fw-muted)',
+      extrude: () => this.toast('Extruding ' + s.extLen + ' mm at ' + s.extSpd + ' mm/s', null),
+      retract: () => this.toast('Retracting ' + s.extLen + ' mm', null)
+    };
+  }
+  cameras(which) {
+    const s = this.state;
+    const CAMS = {
+      voron: [{ name: 'Chamber', res: '1080p', kind: 'WebRTC', fps: '30 fps', url: 'http://voron24.local/webcam/' }, { name: 'Nozzle', res: '720p', kind: 'MJPEG', fps: '15 fps', url: 'http://voron24.local/webcam2/' }, { name: 'Bed side', res: '720p', kind: 'MJPEG', fps: '15 fps', url: 'http://voron24.local/webcam3/' }],
+      x1c: [{ name: 'Chamber (built-in)', res: '1080p', kind: 'RTSPS', fps: '30 fps', url: 'rtsps://192.168.1.60:322/streaming/live/1' }, { name: 'USB front', res: '720p', kind: 'MJPEG', fps: '15 fps', url: 'http://192.168.1.70:8080/?action=stream' }]
+    };
+    const list = CAMS[which].concat(Array.from({ length: s.addedCams }, (_, i) => ({ name: 'New webcam ' + (i + 1), res: '—', kind: 'MJPEG', fps: '', url: 'http://' })));
+    const idx = Math.min(s.cam, list.length - 1);
+    const cams = list.map((c, i) => {
+      const on = i === idx && !s.camGrid;
+      return { ...c, sel: on ? 'true' : 'false', marker: on ? 'var(--fw-accent)' : 'transparent', bg: on ? 'var(--fw-surface)' : 'transparent', weight: on ? 'bold' : 'normal',
+        pick: () => this.setState({ cam: i, camGrid: false }), focus: () => this.setState({ cam: i, camGrid: false }),
+        remove: () => { if (i >= CAMS[which].length) this.setState({ addedCams: Math.max(0, this.state.addedCams - 1) }); } };
+    });
+    return {
+      cams, camMain: list[idx], camGrid: s.camGrid, camSingle: !s.camGrid,
+      camGridLabel: s.camGrid ? 'Single view' : 'Grid view', camGridPressed: s.camGrid ? 'true' : 'false', camGridBg: s.camGrid ? 'var(--fw-surface)' : 'transparent',
+      toggleGrid: () => this.setState({ camGrid: !s.camGrid }),
+      goCamConfig: () => this.setState({ tab: 'config' }),
+      addCam: () => this.setState({ addedCams: s.addedCams + 1 })
+    };
+  }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  renderVals() {
+    const s = this.state;
+    const which = this.props.printer ?? 'voron';
+    const tone = { info: ['var(--fw-info)', 'var(--fw-info-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'], off: ['var(--fw-muted)', 'var(--fw-surface)'] };
+    const V = {
+      voron: {
+        name: 'Voron 2.4 350', fw: 'KLIPPER', cam: 'Chamber cam · 1080p', job: 'enclosure_lid_v3.gcode', jobSub: 'Layer 142 / 226 · 1 h 12 m left · ends 14:52', pct: 63,
+        temps: [{ name: 'Nozzle', now: 245, target: 245 }, { name: 'Bed', now: 85, target: 85 }],
+        macros: ['LOAD_FILAMENT', 'UNLOAD_FILAMENT', 'PARK', 'QUAD_GANTRY_LEVEL', 'BED_MESH_CALIBRATE'], macroCount: 23,
+        console: '14:01:12  M117 Layer 142/226\n14:01:40  // Fan speed 60%\n14:02:05  echo: Bed mesh loaded (default)\n14:02:31  M117 Layer 143/226',
+        host: 'voron24.local:7125', authLabel: 'API key (optional)', authHelp: 'Only needed if Moonraker has authorization enabled.',
+        caps: [{ k: 'Bed', v: '350 × 350 × 340 mm' }, { k: 'Nozzle', v: '0.4 mm brass' }, { k: 'Extruders', v: '1' }, { k: 'Spoolman reporting', v: 'Moonraker reports usage' }], abrasive: false,
+        slots: [{ id: 'T0', slot: 'T0 · EXTRUDER', spool: 42 }]
+      },
+      x1c: {
+        name: 'Bambu X1C', fw: 'BAMBU', cam: 'Chamber cam · 720p', job: 'chess_plate_3.3mf', jobSub: 'Layer 31 / 190 · 1 h 54 m left · ends 16:30', pct: 14,
+        temps: [{ name: 'Nozzle', now: 220, target: 220 }, { name: 'Bed', now: 55, target: 55 }, { name: 'Chamber', now: 34, target: 0 }],
+        macros: ['Calibrate', 'Unload filament', 'Chamber light', 'Auxiliary fan 50%'], macroCount: 4,
+        console: '14:01:12  print.gcode_state RUNNING\n14:01:40  AMS1 tray 0 → extruder\n14:02:05  layer_num 30\n14:02:31  layer_num 31',
+        host: '192.168.1.60', authLabel: 'Access code', authHelp: 'From the printer screen: Settings → WLAN. Developer Mode on for full control.',
+        caps: [{ k: 'Bed', v: '256 × 256 × 256 mm' }, { k: 'Nozzle', v: '0.4 mm hardened steel' }, { k: 'AMS', v: '1 unit · 4 slots' }, { k: 'Auth mode', v: 'Developer Mode' }], abrasive: true,
+        slots: [{ id: 'A1', slot: 'AMS 1 · SLOT 1', spool: 57 }, { id: 'A2', slot: 'AMS 1 · SLOT 2', spool: 61 }, { id: 'A3', slot: 'AMS 1 · SLOT 3', spool: 42 }, { id: 'A4', slot: 'AMS 1 · SLOT 4', spool: null }, { id: 'EXT', slot: 'EXTERNAL SPOOL', spool: null }]
+      }
+    };
+    const p = V[which];
+    const SP = {
+      42: { label: '#42 Prusament PETG Galaxy Black', hex: '#1d1d22', mat: 'PETG', g: 812, of: 1000, loc: 'loaded' },
+      57: { label: '#57 PolyLite PLA Teal', hex: '#1f8a8a', mat: 'PLA', g: 120, of: 1000, loc: 'loaded' },
+      61: { label: '#61 Bambu PLA Basic White', hex: '#f4f4ef', mat: 'PLA', g: 1000, of: 1000, loc: 'Shelf B2' },
+      63: { label: '#63 eSun ABS+ Grey', hex: '#8a8f94', mat: 'ABS', g: 690, of: 1000, loc: 'Dry box 1' },
+      64: { label: '#64 Bambu PLA Basic White', hex: '#f4f4ef', mat: 'PLA', g: 640, of: 1000, loc: 'Shelf B2' },
+      70: { label: '#70 Fiberlogy PA12-CF', hex: '#2b2b2b', mat: 'PA12-CF', g: 480, of: 500, loc: 'Dry box 2', abrasive: true }
+    };
+    const slotSpool = (sl) => (s.loaded[which + sl.id] !== undefined ? s.loaded[which + sl.id] : sl.spool);
+    const printing = !s.cancelled;
+    const st = s.cancelled ? { label: '○ Cancelled · clear plate', fg: tone.warn[0], bg: tone.warn[1] } : s.paused ? { label: '‖ Paused', fg: tone.warn[0], bg: tone.warn[1] } : { label: '▶ Printing ' + p.pct + '%', fg: tone.info[0], bg: tone.info[1] };
+    const tabDefs = [['live', 'Live', ''], ['queue', 'Queue', '3'], ['spools', 'Spools', String(p.slots.length)], ['service', 'Service', which === 'voron' ? '1 due' : ''], ['history', 'History', ''], ['files', which === 'voron' ? 'Files · SSH' : 'Files', ''], ['config', 'Config', '']];
+    const tabs = tabDefs.map(([id, label, badge]) => {
+      const on = s.tab === id;
+      return { label, badge, sel: on ? 'true' : 'false', bg: on ? 'var(--fw-background)' : 'transparent', border: on ? 'var(--fw-border)' : 'transparent', bottom: on ? 'var(--fw-background)' : 'transparent', weight: on ? 'bold' : 'normal', pick: () => this.setState({ tab: id, slot: null }) };
+    });
+    const Q = [
+      { id: 'q1', file: 'chess_plate_4.3mf', sub: 'Chess set — walnut/maple · 2 h 10 m · 58 g PLA Teal', tag: '✓ Ready', t: 'ok' },
+      { id: 'q2', file: 'cable_clip_x20.gcode', sub: '45 m · 22 g PETG', tag: '⚠ Needs PETG', t: 'warn' },
+      { id: 'q3', file: 'housing_top.gcode', sub: 'From OrcaSlicer · 2 h 05 m · 64 g PLA White', tag: '✓ Ready', t: 'ok' }
+    ];
+    const order = s.queueOrder || Q.map(q => q.id);
+    const qList = order.filter(id => !s.removedQ[id]).map(id => Q.find(q => q.id === id));
+    const queue = qList.map((q, i) => ({ ...q, n: i + 1, thumb: this.thumbOf(q.file, /PETG/.test(q.sub) ? '#1d1d22' : /White/.test(q.sub) ? '#f4f4ef' : '#1f8a8a'), fg: tone[q.t][0], bg: tone[q.t][1],
+      up: () => { const o = [...order]; const k = o.indexOf(q.id); if (k > 0) { [o[k - 1], o[k]] = [o[k], o[k - 1]]; this.setState({ queueOrder: o }); } },
+      remove: () => { this.setState({ removedQ: { ...this.state.removedQ, [q.id]: true } }); this.toast('Removed ' + q.file + ' from queue', () => { const r = { ...this.state.removedQ }; delete r[q.id]; this.setState({ removedQ: r }); }); } }));
+    const slots = p.slots.map(sl => {
+      const id = slotSpool(sl); const sp = id ? SP[id] : null; const active = s.slot === sl.id;
+      return { slot: sl.slot, label: sp ? sp.label : 'Empty', hex: sp ? sp.hex : 'transparent', edge: sp ? 'solid' : 'dashed', sub: sp ? sp.g + ' g of ' + sp.of + ' g left · ' + sp.mat : 'Tap to load a spool', pct: sp ? Math.round(sp.g / sp.of * 100) : 0,
+        active: active ? 'true' : 'false', border: active ? 'var(--fw-focus)' : 'var(--fw-border)', outline: active ? '1px solid var(--fw-focus)' : 'none',
+        pick: () => this.setState({ slot: sl.id, pick: null, override: false }) };
+    });
+    const curDef = p.slots.find(x => x.id === s.slot);
+    const curId = curDef ? slotSpool(curDef) : null;
+    const candIds = [61, 64, 57, 63, 70, 42].filter(id => id !== curId);
+    const cands = candIds.map(id => {
+      const sp = SP[id];
+      let t = 'ok', tag = '✓ OK', why = '';
+      if (sp.abrasive && !p.abrasive) { t = 'bad'; tag = '✖ Blocked'; why = 'Abrasive filament on a brass nozzle will wear it out within hours.'; }
+      else if (sp.g < 150) { t = 'warn'; tag = '⚠ Low'; why = 'Only ' + sp.g + ' g left. Weigh it to be sure before a long print.'; }
+      else if (sp.loc === 'loaded') { t = 'warn'; tag = '⚠ In use'; why = 'Loaded on another printer. Loading here unassigns it there.'; }
+      const on = s.pick === id;
+      return { label: sp.label, hex: sp.hex, sub: sp.mat + ' · ' + sp.g + ' g · ' + (sp.loc === 'loaded' ? 'loaded elsewhere' : sp.loc), tag, why, fg: tone[t][0], bg: tone[t][1], showWhy: on && t !== 'ok',
+        checked: on ? 'true' : 'false', border: on ? 'var(--fw-focus)' : 'var(--fw-border)', outline: on ? '1px solid var(--fw-focus)' : 'none', blocked: t === 'bad',
+        pick: () => this.setState({ pick: id, override: false }) };
+    });
+    const pickC = cands.find(c => c.checked === 'true');
+    const needsOverride = !!(pickC && pickC.blocked);
+    const T = which === 'voron'
+      ? [{ id: 'belt', name: 'Belt tension', h: 212, of: 200 }, { id: 'wipe', name: 'Nozzle brush & wipe', h: 41, of: 50 }, { id: 'rails', name: 'Lubricate linear rails', h: 120, of: 300 }]
+      : [{ id: 'noz', name: 'Nozzle swap', h: 380, of: 400 }, { id: 'carb', name: 'Carbon rods clean', h: 90, of: 200 }];
+    const tasks = T.map(k => {
+      const h = s.done[which + k.id] ? 0 : k.h; const over = h > k.of; const soon = !over && h / k.of > 0.8;
+      const t = over ? 'bad' : soon ? 'warn' : 'ok';
+      return { name: k.name, sub: 'Every ' + k.of + ' print hours', pct: Math.min(100, Math.round(h / k.of * 100)), fg: tone[t][0], status: over ? '✖ Overdue · ' + h + ' / ' + k.of + ' h' : soon ? '⚠ Due soon · ' + h + ' / ' + k.of + ' h' : '✓ ' + h + ' / ' + k.of + ' h',
+        done: () => { this.setState({ done: { ...this.state.done, [which + k.id]: true } }); this.toast(k.name + ' marked done · counter reset', () => { const d = { ...this.state.done }; delete d[which + k.id]; this.setState({ done: d }); }); } };
+    });
+    const H = [['enclosure_side_l.gcode', 'Today 11:40', '3 h 12 m', '96 g', 'ok', '✓ Good'], ['enclosure_side_r.gcode', 'Today 08:21', '3 h 10 m', '95 g', 'ok', '✓ Good'], ['hinge_test.gcode', 'Yesterday', '24 m', '6 g', 'bad', '✖ Failed · adhesion'], ['fan_mount.gcode', 'Yesterday', '1 h 02 m', '31 g', 'ok', '✓ Good'], ['benchy.gcode', 'Mon', '42 m', '12 g', 'off', '○ Cancelled']];
+    const history = H.map(([file, when, time, grams, t, outcome]) => ({ thumb: this.thumbOf(file, which === 'voron' ? '#1d1d22' : '#1f8a8a'), file, when, time, grams, outcome, fg: tone[t][0], bg: tone[t][1] }));
+    const closeDialog = () => this.setState({ dialog: null, typed: '' });
+    let dlg = { title: '', body: '', keep: '', go: '', typed: false, disabled: false, confirm: closeDialog };
+    if (s.dialog === 'cancel') dlg = { title: 'Cancel this print?', body: p.job + ' is ' + p.pct + '% done. Cancelling cannot be undone; the part on the bed is lost and the printer will need its plate cleared.', keep: 'Keep printing', go: 'Cancel print', typed: false, disabled: false,
+      confirm: () => { this.setState({ dialog: null, cancelled: true, paused: false }); this.toast('Print cancelled · plate needs clearing', null); } };
+    if (s.dialog === 'remove') dlg = { title: 'Remove ' + p.name + '?', body: 'The printer is removed from Foreman. Job history and statistics are kept. You can add it again later.', keep: 'Keep printer', go: 'Remove printer', typed: true, disabled: s.typed !== p.name,
+      confirm: () => { this.setState({ dialog: null, typed: '' }); this.toast(p.name + ' removed (demo)', null); } };
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      p, st, tabs, tabLabel: tabDefs.find(t => t[0] === s.tab)[1],
+      isLive: s.tab === 'live', isQueue: s.tab === 'queue', isSpools: s.tab === 'spools', isService: s.tab === 'service', isHistory: s.tab === 'history', isConfig: s.tab === 'config', cp: this.cpaths(which, which === 'voron' ? [{ id: 'a', label: 'LAN · mDNS', url: 'http://voron24.local:7125', ms: 4 }, { id: 'b', label: 'LAN · IP', url: 'http://192.168.1.42:7125', ms: 3 }, { id: 'c', label: 'Tailscale', url: 'http://100.84.12.7:7125', ms: 38 }] : [{ id: 'a', label: 'LAN · IP', url: 'mqtts://192.168.1.60:8883', ms: 6 }, { id: 'b', label: 'LAN · hostname', url: 'mqtts://x1c.local:8883', ms: 7 }]), jobThumb: this.thumbOf(p.job, which === 'voron' ? '#1d1d22' : '#1f8a8a'), isFiles: s.tab === 'files', fx: (() => {
+        const ssh = which === 'voron';
+        const PRN = `# Voron 2.4 350 · printer.cfg
+[include mainsail.cfg]
+[include macros.cfg]
+[include KAMP_Settings.cfg]
+
+[mcu]
+serial: /dev/serial/by-id/usb-Klipper_stm32f446xx_2A0036-if00
+
+[printer]
+kinematics: corexy
+max_velocity: 300
+max_accel: 8000
+square_corner_velocity: 5.0
+
+[skew_correction]
+
+[extruder]
+nozzle_diameter: 0.400
+max_extrude_only_distance: 150
+#*# <---------------------- SAVE_CONFIG ---------------------->
+#*# [extruder]
+#*# pid_kp = 26.213`;
+        const FS = ssh ? {
+          '/home/pi': [['printer_data', 'd'], ['klipper', 'd'], ['moonraker', 'd'], ['mainsail', 'd'], ['.bashrc', 'f', '3.5 KB', '12 Mar']],
+          '/home/pi/printer_data': [['config', 'd'], ['gcodes', 'd'], ['logs', 'd'], ['database', 'd']],
+          '/home/pi/printer_data/config': [['printer.cfg', 'f', '6.1 KB', 'today 09:12', PRN], ['macros.cfg', 'f', '4.8 KB', '3 Nov', '[gcode_macro PRINT_START]\ngcode:\n  G28\n  QUAD_GANTRY_LEVEL\n  SKEW_PROFILE LOAD=foreman\n  BED_MESH_CALIBRATE ADAPTIVE=1'], ['moonraker.conf', 'f', '1.2 KB', '1 Nov', '[server]\nhost: 0.0.0.0\nport: 7125\n\n[spoolman]\nserver: http://foreman.local:7912'], ['KAMP_Settings.cfg', 'f', '2.0 KB', '20 Oct', '[include ./KAMP/Adaptive_Meshing.cfg]'], ['printer-20261102_101544.cfg', 'f', '6.0 KB', '2 Nov', '# backup made by SAVE_CONFIG']],
+          '/home/pi/printer_data/gcodes': [['enclosure_lid_v3.gcode', 'f', '18.4 MB', 'today 07:58'], ['calistar_100mm.gcode', 'f', '2.1 MB', '5 Nov'], ['skew_test_xy.gcode', 'f', '1.4 MB', '2 Nov']],
+          '/home/pi/printer_data/logs': [['klippy.log', 'f', '4.3 MB', 'now', 'Start printer at Sun Nov  8 07:58:02 2026\nStats 3012.4: gcodein=0 mcu: mcu_awake=0.004 ...\nStats 3013.4: print_time=1412.889 buffer_time=1.820'], ['moonraker.log', 'f', '880 KB', 'now', '2026-11-08 07:58:03 [server] Moonraker version v0.10.x\n2026-11-08 07:58:04 [spoolman] Connected to http://foreman.local:7912']],
+          '/home/pi/klipper': [['klippy', 'd'], ['scripts', 'd'], ['README.md', 'f', '1.1 KB', '1 Nov', '# Klipper']], '/home/pi/moonraker': [['moonraker', 'd']], '/home/pi/mainsail': [['index.html', 'f', '3 KB', '1 Nov']], '/home/pi/printer_data/database': [['moonraker-sql.db', 'f', '640 KB', 'now']]
+        } : {
+          '/': [['cache', 'd'], ['model', 'd'], ['timelapse', 'd']],
+          '/cache': [['chess_plate_3.3mf', 'f', '6.2 MB', 'today 12:36'], ['chess_plate_2.3mf', 'f', '6.0 MB', 'Sat']], '/model': [['gear_pa12cf.3mf', 'f', '1.8 MB', 'Fri']], '/timelapse': [['video_2026-11-07.mp4', 'f', '182 MB', 'Sat']]
+        };
+        const root = ssh ? '/home/pi' : '/';
+        const path = s.fpath || (ssh ? '/home/pi/printer_data/config' : '/');
+        const join = (a, n) => (a === '/' ? '' : a) + '/' + n;
+        const listRaw = (FS[path] || []).concat(s.fextra[path] || []).filter(x => !s.fdeleted[join(path, x[0])]);
+        const list = listRaw.slice().sort((a, b) => (a[1] === b[1] ? a[0].localeCompare(b[0]) : a[1] === 'd' ? -1 : 1));
+        const selRow = s.fsel ? listRaw.find(x => join(path, x[0]) === s.fsel) : null;
+        const isText = !!(selRow && /\.(cfg|conf|log|sh|md|bashrc)$|^\.bashrc$/.test(selRow[0]));
+        const orig = selRow && selRow[4] ? selRow[4].replace(/\\n/g, '\n') : (selRow ? '' : '');
+        const text = s.fsel && s.fedits[s.fsel] !== undefined ? s.fedits[s.fsel] : (s.fsel && s.fsaved[s.fsel] !== undefined ? s.fsaved[s.fsel] : orig);
+        const dirty = !!(s.fsel && s.fedits[s.fsel] !== undefined && s.fedits[s.fsel] !== (s.fsaved[s.fsel] !== undefined ? s.fsaved[s.fsel] : orig));
+        const isLog = !!(selRow && /\.log$/.test(selRow[0]));
+        const isKcfg = !!(selRow && ssh && /config\/.*\.cfg$/.test(s.fsel || ''));
+        const go = (pp) => this.setState({ fpath: pp, fsel: null, fdel: null, restartArm: false });
+        const parts = path === '/' ? [] : path.split('/').filter(Boolean);
+        const crumbs = [{ label: ssh ? '~' : 'sd:/', go: () => go(root) }].concat((ssh ? parts.slice(2) : parts).map((n, i) => ({ label: n, go: () => go((ssh ? '/home/pi/' : '/') + (ssh ? parts.slice(2, 3 + i) : parts.slice(0, i + 1)).join('/')) })));
+        const T0 = [{ t: 'Linux voron 6.6.31+rpt-rpi-v8 #1 SMP aarch64', fg: '#8a9a7a' }, { t: 'Last login: Sun Nov  8 07:41 from foreman.local', fg: '#8a9a7a' }];
+        const term = s.term || T0;
+        const OUT = { 'ls': 'printer_data  klipper  moonraker  mainsail', 'uptime': ' 09:41:12 up 3 days,  2:10,  1 user,  load average: 0.42, 0.38, 0.35', 'df -h /': 'Filesystem  Size  Used Avail Use% Mounted on\n/dev/root    29G  7.9G   20G  29% /', 'systemctl status klipper': '● klipper.service - Klipper 3D printer firmware SV1\n     Active: active (running) since Thu 2026-11-05 07:31:02', 'vcgencmd measure_temp': "temp=51.2'C", 'tail -n 3 printer_data/logs/klippy.log': 'Stats 3013.4: print_time=1412.889 buffer_time=1.820\nStats 3014.4: print_time=1413.902 buffer_time=1.811\nStats 3015.4: print_time=1414.915 buffer_time=1.803' };
+        const runMany = (cmds) => { let t = term.slice(); cmds.map(x => x.trim()).filter(Boolean).forEach(cm => { const out = OUT[cm] || ('(demo) ran: ' + cm); t = t.concat([{ t: 'pi@voron:~ $ ' + cm, fg: '#9fd36a' }]).concat(String(out).split('\n').map(x => ({ t: x, fg: '#d9e7c4' }))); }); this.setState({ cmd: '', pasteBuf: null, term: t.slice(-80) }); };
+        const run = (c) => { if (/\n/.test(c || '')) { runMany(c.split('\n')); return; } const cm = (c || '').trim(); if (!cm) return; const out = cm === 'clear' ? null : (OUT[cm] || ('(demo) ran: ' + cm));
+          this.setState({ cmd: '', term: cm === 'clear' ? [] : [...term, { t: 'pi@voron:~ $ ' + cm, fg: '#9fd36a' }].concat(String(out).split('\n').map(t => ({ t, fg: '#d9e7c4' }))).slice(-60) }); };
+        const subSeg = (on, off) => ({ on: on ? 'true' : 'false', off, border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+        const delArmed = s.fdel && s.fdel === s.fsel;
+        return {
+          hasSsh: ssh, noSsh: !ssh, noSshText: 'Bambu printers have no SSH. Files are browsed over the printer\'s built-in FTPS (SD card, LAN mode). No terminal.',
+          proto: ssh ? 'SFTP over SSH' : 'FTPS · port 990', conn: ssh ? 'pi@voron.local:22' : 'bblp@x1c.local · SD card', user: 'pi',
+          subs: [{ label: 'Files', pick: () => this.setState({ fsub: 'browse' }), ...subSeg(s.fsub !== 'term', false) }, { label: 'Terminal', pick: () => this.setState({ fsub: 'term' }), ...subSeg(s.fsub === 'term', !ssh) }],
+          isBrowse: s.fsub !== 'term' || !ssh, isTerm: s.fsub === 'term' && ssh,
+          crumbs, atRoot: path === root, up: () => go(path.slice(0, path.lastIndexOf('/')) || '/'),
+          places: ssh ? [{ label: 'config', go: () => go('/home/pi/printer_data/config') }, { label: 'gcodes', go: () => go('/home/pi/printer_data/gcodes') }, { label: 'logs', go: () => go('/home/pi/printer_data/logs') }] : [],
+          upload: () => { const n = 'upload_' + (Object.keys(s.fextra).length + 1) + '.cfg'; this.setState({ fextra: { ...s.fextra, [path]: [...(s.fextra[path] || []), [n, 'f', '1 KB', 'now', '# uploaded']] } }); this.toast('Uploaded ' + n + ' to ' + path, null); },
+          mkdir: () => { this.setState({ fextra: { ...s.fextra, [path]: [...(s.fextra[path] || []), ['new_folder', 'd']] } }); this.toast('Created new_folder', null); },
+          refresh: () => this.toast('Refreshed ' + path, null),
+          entries: list.map(x => { const fp = join(path, x[0]); const isModel = /\.(gcode|3mf|stl)$/.test(x[0]); return { hasThumb: isModel, noThumb: !isModel, thumb: isModel ? this.thumbOf(x[0], /lid|enclosure/.test(x[0]) ? '#1d1d22' : /gear/.test(x[0]) ? '#2b2b2b' : '#1f8a8a') : '', name: x[0] + (x[1] === 'd' ? '/' : ''), icon: x[1] === 'd' ? '▸' : '·', size: x[2] || '', date: x[3] || '', bg: s.fsel === fp ? 'var(--fw-info-bg)' : 'transparent',
+            open: () => x[1] === 'd' ? go(fp) : this.setState({ fsel: fp, fdel: null, restartArm: false }) }; }),
+          noFile: !selRow, hasFile: !!selRow, fname: s.fsel || '', isText, isBin: !!selRow && !isText,
+          binNote: selRow && /\.gcode|\.3mf$/.test(selRow[0]) ? 'G-code/3MF. Download it, or open it in Library to print or queue it.' : 'Binary file. Download to open it.',
+          text, edit: (e) => this.setState({ fedits: { ...s.fedits, [s.fsel]: e.target.value } }), readonly: isLog,
+          clean: !dirty, state: isLog ? 'read-only · live log' : dirty ? 'unsaved changes' : 'saved', stateFg: dirty ? 'var(--fw-warning)' : 'var(--fw-muted)', edBorder: dirty ? 'var(--fw-warning)' : 'var(--fw-border)',
+          edNote: isLog ? 'Logs are read-only. Download for the full file.' : isKcfg ? 'Saving keeps a .bak copy. Klipper only reads it after FIRMWARE_RESTART.' : 'Saving keeps a .bak copy next to the file.',
+          revert: () => { const f = { ...s.fedits }; delete f[s.fsel]; this.setState({ fedits: f }); },
+          save: () => { const prev = s.fsaved[s.fsel]; this.setState({ fsaved: { ...s.fsaved, [s.fsel]: text }, fedits: (() => { const f = { ...s.fedits }; delete f[s.fsel]; return f; })() }); this.toast('Saved ' + s.fsel.split('/').pop() + ' · backup .bak kept', () => this.setState({ fsaved: { ...this.state.fsaved, [s.fsel]: prev } })); },
+          isKlipperCfg: isKcfg, restartOff: printing && !s.restartArm ? false : false,
+          restartLabel: s.restartArm ? (printing ? 'Printing! Restart anyway?' : 'Click again to restart') : 'Save + FIRMWARE_RESTART',
+          saveRestart: () => { if (!s.restartArm) { this.setState({ restartArm: true }); return; } this.setState({ restartArm: false, fsaved: { ...s.fsaved, [s.fsel]: text }, fedits: {} }); this.toast(printing ? 'Not restarted: printer is printing. Saved; restart after the job.' : 'Saved and sent FIRMWARE_RESTART', null); },
+          download: () => this.toast('Downloading ' + (s.fsel || '').split('/').pop(), null),
+          rename: () => this.toast('Rename: type the new name inline (demo)', null),
+          delLabel: delArmed ? 'Delete? Click again' : 'Delete',
+          del: () => { if (!delArmed) { this.setState({ fdel: s.fsel }); return; } const fp = s.fsel; this.setState({ fdeleted: { ...s.fdeleted, [fp]: true }, fsel: null, fdel: null }); this.toast('Deleted ' + fp.split('/').pop(), () => { const d = { ...this.state.fdeleted }; delete d[fp]; this.setState({ fdeleted: d }); }); },
+          hasPaste: !!s.pasteBuf, pasteN: s.pasteBuf ? s.pasteBuf.length : 0, pasteText: s.pasteBuf ? s.pasteBuf.join('\n') : '',
+          paste: (e) => { const t = e.clipboardData ? e.clipboardData.getData('text') : ''; if (t && /\n/.test(t.trim())) { if (e.preventDefault) e.preventDefault(); this.setState({ pasteBuf: t.trim().split(/\r?\n/) }); } },
+          demoPaste: () => this.setState({ pasteBuf: ['cd ~/printer_data/config', 'ls', 'uptime'] }),
+          pasteRun: () => runMany(s.pasteBuf), pasteOne: () => this.setState({ cmd: s.pasteBuf.join(' && '), pasteBuf: null }), pasteCancel: () => this.setState({ pasteBuf: null }),
+          lines: term, prompt: 'pi@voron:~ $', cmd: s.cmd, setCmd: (e) => this.setState({ cmd: e.target.value }), key: (e) => { if (e.key === 'Enter') run(e.target.value); }, run: () => run(s.cmd),
+          snips: [['uptime', 'uptime'], ['df -h /', 'df -h /'], ['klipper status', 'systemctl status klipper'], ['tail klippy.log', 'tail -n 3 printer_data/logs/klippy.log']].map(([label, cmd]) => ({ label, cmd, run: () => run(cmd), canEdit: false, border: '#3a4234' }))
+            .concat(s.usnips.map(u => { const armed = s.snipArm === u.id; return { label: armed ? 'run “' + u.label + '”? click again' : u.label, cmd: u.cmd, canEdit: true, border: armed ? 'var(--fw-warning)' : '#6b7a5a',
+              run: () => { if (u.confirm && !armed) { this.setState({ snipArm: u.id }); return; } this.setState({ snipArm: null }); run(u.cmd); },
+              edit: () => this.setState({ snipForm: { id: u.id, label: u.label, cmd: u.cmd, all: u.all, confirm: u.confirm } }) }; })),
+          formOpen: !!s.snipForm, fName: s.snipForm ? s.snipForm.label : '', fCmd: s.snipForm ? s.snipForm.cmd : '', fThis: !!(s.snipForm && !s.snipForm.all), fAll: !!(s.snipForm && s.snipForm.all), fConfirm: !!(s.snipForm && s.snipForm.confirm),
+          fEditing: !!(s.snipForm && s.snipForm.id), fSaveLabel: s.snipForm && s.snipForm.id ? 'Save' : 'Add button', fOff: !(s.snipForm && s.snipForm.label.trim() && s.snipForm.cmd.trim()),
+          setFName: (e) => this.setState({ snipForm: { ...this.state.snipForm, label: e.target.value } }), setFCmd: (e) => { const v = e.target.value; this.setState({ snipForm: { ...this.state.snipForm, cmd: v, confirm: this.state.snipForm.confirm || /\b(sudo|rm|reboot|shutdown|dd|mkfs)\b/.test(v) } }); },
+          setFScope: (e) => this.setState({ snipForm: { ...this.state.snipForm, all: e.target.value === 'all' } }), toggleFConfirm: () => this.setState({ snipForm: { ...this.state.snipForm, confirm: !this.state.snipForm.confirm } }),
+          newSnip: () => this.setState({ snipForm: { id: null, label: '', cmd: '', all: false, confirm: false } }), cancelSnip: () => this.setState({ snipForm: null }),
+          saveSnip: () => { const f = s.snipForm; const prev = s.usnips; const list = f.id ? s.usnips.map(u => u.id === f.id ? { ...u, ...f } : u) : [...s.usnips, { ...f, id: Date.now() }]; this.setState({ usnips: list, snipForm: null }); this.toast((f.id ? 'Updated ' : 'Added ') + '“' + f.label + '”' + (f.all ? ' for all SSH printers' : ' for this printer'), () => this.setState({ usnips: prev })); },
+          delSnip: () => { const f = s.snipForm; const prev = s.usnips; this.setState({ usnips: s.usnips.filter(u => u.id !== f.id), snipForm: null }); this.toast('Removed “' + f.label + '”', () => this.setState({ usnips: prev })); }
+        };
+      })(),
+      canPause: printing, pauseLabel: s.paused ? 'Resume' : 'Pause',
+      togglePause: () => { this.setState({ paused: !s.paused }); },
+      askCancel: () => this.setState({ dialog: 'cancel' }),
+      askRemove: () => this.setState({ dialog: 'remove', typed: '' }),
+      p: { ...p, macros: p.macros.map(m => ({ label: m, run: () => this.toast('Ran ' + m + ' on ' + p.name, null) })) },
+      ...this.motion(p, which, printing, tone),
+      ...this.cameras(which),
+      queue, slots, cands, needsOverride, override: s.override,
+      toggleOverride: () => this.setState({ override: !s.override }),
+      loadOpen: s.tab === 'spools' && !!s.slot,
+      curSlot: curDef ? curDef.slot : '',
+      closeLoad: () => this.setState({ slot: null }),
+      loadDisabled: !pickC || (needsOverride && !s.override),
+      loadLabel: pickC ? 'Load ' + pickC.label.split(' ')[0] : 'Pick a spool',
+      doLoad: () => {
+        const key = which + s.slot; const prev = curId; const prevSet = s.loaded[key];
+        this.setState({ loaded: { ...s.loaded, [key]: s.pick }, slot: null });
+        this.toast('Loaded ' + SP[s.pick].label + ' into ' + curDef.slot, () => { const l = { ...this.state.loaded }; if (prevSet === undefined) delete l[key]; else l[key] = prev; this.setState({ loaded: l }); });
+      },
+      tasks, history,
+      probe: () => this.setState({ probed: true }),
+      probeNote: s.probed ? 'Probed just now · nothing changed.' : 'Read from the printer on 3 Nov. Fields below come from the probe.',
+      save: () => this.setState({ saved: '✓ Saved ' + new Date().toTimeString().slice(0, 5) }),
+      savedNote: s.saved,
+      dialogOpen: !!s.dialog, dlg, closeDialog,
+      typedVal: s.typed, onTyped: (e) => this.setState({ typed: e.target.value }),
+      toasts: s.toasts.map(t => ({ text: t.text, canUndo: !!t.undo,
+        undo: () => { if (t.undo) t.undo(); this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }); },
+        dismiss: () => this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
