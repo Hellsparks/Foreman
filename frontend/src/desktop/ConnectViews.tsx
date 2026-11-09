@@ -288,14 +288,23 @@ export function ConnectView({
   const [result, setResult] = useState<Result | null>(null);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [newRoute, setNewRoute] = useState("");
+  const [scanError, setScanError] = useState("");
 
   const scan = async () => {
     setScanning(true);
+    setScanError("");
+    const errors: string[] = [];
     try {
       // An unclaimed server only listens on 127.0.0.1 and isn't announced, so look here too.
       const [list, local] = await Promise.all([
-        desktop.discover().catch(() => [] as Found[]),
-        desktop.probe(LOCAL_ADDRESS).catch(() => null),
+        desktop.discover().catch((e) => {
+          errors.push(`LAN scan: ${String(e)}`);
+          return [] as Found[];
+        }),
+        desktop.probe(LOCAL_ADDRESS).catch((e) => {
+          errors.push(`${LOCAL_ADDRESS}: ${String(e)}`);
+          return null;
+        }),
       ]);
       if (local?.kind === "foreman" && !list.some((f) => f.id === local.server_id)) {
         list.unshift({
@@ -317,6 +326,7 @@ export function ConnectView({
         });
       }
     } finally {
+      setScanError(errors.join(" · "));
       setScanning(false);
     }
   };
@@ -387,6 +397,7 @@ export function ConnectView({
             </button>
           </div>
           {!scanning && found.length === 0 && <p className="auth__hint">No Foreman servers answered on this network.</p>}
+          {!scanning && scanError && <Notice tone="bad" title="✖ Scan failed" body={scanError} />}
           {!scanning &&
             found.map((f) => {
               const a = f.addresses[0] ?? f.host;
