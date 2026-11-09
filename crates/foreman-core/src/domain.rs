@@ -42,6 +42,8 @@ pub struct Printer {
     pub serial_number: Option<String>,
     /// Bambu LAN access code (8-digit).
     pub access_code: Option<String>,
+    /// TLS certificate SHA-256 fingerprint (TOFU pinning for Bambu/FTPS).
+    pub tls_fingerprint: Option<String>,
     /// User-defined labels.
     pub tags: Vec<String>,
     pub hardened_nozzle: bool,

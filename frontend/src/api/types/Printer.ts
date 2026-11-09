@@ -18,6 +18,10 @@ serial_number: string | null,
  */
 access_code: string | null, 
 /**
+ * TLS certificate SHA-256 fingerprint (TOFU pinning for Bambu/FTPS).
+ */
+tls_fingerprint: string | null, 
+/**
  * User-defined labels.
  */
 tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint, created_at: string, updated_at: string, };

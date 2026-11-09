@@ -153,8 +153,8 @@ async fn capture_a1_reports() {
                     Ok(Event::Incoming(Packet::Publish(publish))) => {
                         if publish.topic == report_topic {
                             if let Ok(mut val) = serde_json::from_slice::<serde_json::Value>(&publish.payload) {
-                                // Strip serial from the payload.
-                                strip_serial(&mut val, &serial);
+                                // Strip serial, access code, and IP from the payload.
+                                strip_secrets(&mut val, &[&serial, &access_code, &host]);
                                 messages.push(val);
                                 print!("\r  captured {} messages", messages.len());
                                 std::io::stdout().flush().ok();
@@ -189,21 +189,23 @@ async fn capture_a1_reports() {
     );
 }
 
-fn strip_serial(val: &mut serde_json::Value, serial: &str) {
+fn strip_secrets(val: &mut serde_json::Value, secrets: &[&str]) {
     match val {
         serde_json::Value::String(s) => {
-            if s.contains(serial) {
-                *s = s.replace(serial, "REDACTED");
+            for secret in secrets {
+                if s.contains(secret) {
+                    *s = s.replace(secret, "REDACTED");
+                }
             }
         }
         serde_json::Value::Object(map) => {
             for v in map.values_mut() {
-                strip_serial(v, serial);
+                strip_secrets(v, secrets);
             }
         }
         serde_json::Value::Array(arr) => {
             for v in arr {
-                strip_serial(v, serial);
+                strip_secrets(v, secrets);
             }
         }
         _ => {}

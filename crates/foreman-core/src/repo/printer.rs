@@ -24,6 +24,7 @@ struct PrinterRow {
     api_key: Option<String>,
     serial_number: Option<String>,
     access_code: Option<String>,
+    tls_fingerprint: Option<String>,
     tags: String,
     hardened_nozzle: i64,
     sort_order: i64,
@@ -78,6 +79,7 @@ impl PrinterRow {
             api_key: self.api_key,
             serial_number: self.serial_number,
             access_code: self.access_code,
+            tls_fingerprint: self.tls_fingerprint,
             tags: parse_tags(&self.tags),
             hardened_nozzle: self.hardened_nozzle != 0,
             sort_order: self.sort_order,
@@ -93,12 +95,12 @@ impl PrinterRow {
 
 const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tags, hardened_nozzle, sort_order, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, sort_order, created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tags, hardened_nozzle, sort_order, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, sort_order, created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.
@@ -193,6 +195,35 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     .map_err(|e| AppError::Database(e.to_string()))?;
 
     get(pool, id).await
+}
+
+/// Store the TLS certificate fingerprint for a printer (TOFU pinning).
+pub async fn update_tls_fingerprint(
+    pool: &SqlitePool,
+    id: i64,
+    fingerprint: &str,
+) -> Result<(), AppError> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query("UPDATE printer SET tls_fingerprint=?, updated_at=? WHERE id=?")
+        .bind(fingerprint)
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Clear the TLS certificate fingerprint (re-TOFU on next connect).
+pub async fn clear_tls_fingerprint(pool: &SqlitePool, id: i64) -> Result<(), AppError> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query("UPDATE printer SET tls_fingerprint=NULL, updated_at=? WHERE id=?")
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
 }
 
 /// Delete a printer (and its cascading children).

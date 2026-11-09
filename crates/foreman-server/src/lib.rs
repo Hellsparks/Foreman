@@ -69,7 +69,7 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     }
 
     // Driver manager: load printers from DB and spawn drivers.
-    let driver_manager = DriverManager::new(Arc::clone(&tx));
+    let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
     driver_manager.start_all(&foreman_db.pool).await;
 
     let app_state = AppState {
@@ -98,6 +98,10 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         .route("/api/printers", get(api::printers::list_printers))
         .route("/api/printers", post(api::printers::create_printer))
         .route("/api/printers/{id}", delete(api::printers::delete_printer))
+        .route(
+            "/api/printers/{id}/trust-new-cert",
+            post(api::printers::trust_new_cert),
+        )
         .route("/ws/events", get(api::ws::ws_handler))
         .fallback_service(static_service)
         .with_state(app_state)

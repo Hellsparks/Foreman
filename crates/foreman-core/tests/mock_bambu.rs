@@ -2,8 +2,9 @@
 //!
 //! Reads the recorded A1 fixture (`fixtures/bambu_a1_reports.json`), feeds
 //! each report through the Bambu driver's status parser, and verifies key
-//! transitions: idle → printing → finish → idle, temps, progress, AMS trays,
-//! HMS codes, fan speeds, and layer counts.
+//! fields: state, temps, progress, AMS trays, HMS codes, fan speeds, layers.
+//!
+//! Fixture captured from a real Bambu Lab A1 (session 17).
 
 use foreman_core::events::{PrinterState, PrinterStatus};
 use serde_json::Value;
@@ -114,6 +115,11 @@ impl TestCachedStatus {
             self.merge_ams(ams);
         }
 
+        // Also handle top-level vt_tray (some reports put it outside ams).
+        if let Some(vt) = print.get("vt_tray") {
+            self.push_vt_tray(vt);
+        }
+
         // HMS.
         if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
             self.hms_codes = hms
@@ -177,7 +183,60 @@ impl TestCachedStatus {
                 }
             }
         }
+
+        // vt_tray inside the ams object.
+        if let Some(vt) = ams.get("vt_tray") {
+            let tray_type = vt.get("tray_type").and_then(|v| v.as_str());
+            if tray_type.is_some() && tray_type != Some("") {
+                let color = vt.get("tray_color").and_then(|v| v.as_str()).map(|c| {
+                    if c.len() == 8 {
+                        c[..6].to_owned()
+                    } else {
+                        c.to_owned()
+                    }
+                });
+                let material = tray_type.map(|s| s.to_owned());
+                let remaining = vt
+                    .get("remain")
+                    .and_then(|v| v.as_u64())
+                    .map(|r| r.min(100) as u8);
+                trays.push(foreman_core::events::AmsTray {
+                    slot: 254,
+                    color,
+                    material,
+                    remaining,
+                });
+            }
+        }
+
         self.ams_trays = trays;
+    }
+
+    fn push_vt_tray(&mut self, vt: &Value) {
+        let tray_type = vt.get("tray_type").and_then(|v| v.as_str());
+        if tray_type.is_none() || tray_type == Some("") {
+            return;
+        }
+        // Remove any existing vt_tray (slot 254) before adding.
+        self.ams_trays.retain(|t| t.slot != 254);
+        let color = vt.get("tray_color").and_then(|v| v.as_str()).map(|c| {
+            if c.len() == 8 {
+                c[..6].to_owned()
+            } else {
+                c.to_owned()
+            }
+        });
+        let material = tray_type.map(|s| s.to_owned());
+        let remaining = vt
+            .get("remain")
+            .and_then(|v| v.as_u64())
+            .map(|r| r.min(100) as u8);
+        self.ams_trays.push(foreman_core::events::AmsTray {
+            slot: 254,
+            color,
+            material,
+            remaining,
+        });
     }
 
     fn to_status(&self) -> PrinterStatus {
@@ -219,114 +278,93 @@ fn parse_fan(val: &Value) -> Option<u8> {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn replay_a1_fixture() {
+fn replay_real_a1_fixture() {
     let fixture = include_str!("fixtures/bambu_a1_reports.json");
     let reports: Vec<Value> = serde_json::from_str(fixture).expect("fixture parse");
-    assert_eq!(reports.len(), 8, "expected 8 reports in fixture");
+    assert!(reports.len() >= 6, "expected at least 6 reports in fixture");
 
     let mut cached = TestCachedStatus::new();
 
-    // --- Report 0: pushall response (idle) ---
+    // --- Report 0: pushall response (A1, FAILED state, AMS Lite 4 trays) ---
     cached.merge_report(reports[0].get("print").unwrap());
     let s = cached.to_status();
-    assert_eq!(s.state, PrinterState::Idle);
-    assert!((s.nozzle.as_ref().unwrap().actual - 25.5).abs() < 0.1);
-    assert!((s.bed.as_ref().unwrap().actual - 24.2).abs() < 0.1);
+
+    // State: FAILED (printer has a leftover error).
+    assert_eq!(s.state, PrinterState::Error);
+
+    // Temperatures: idle, targets at 0.
+    assert!((s.nozzle.as_ref().unwrap().actual - 25.09375).abs() < 0.01);
+    assert!((s.bed.as_ref().unwrap().actual - 24.6875).abs() < 0.01);
     assert_eq!(s.nozzle.as_ref().unwrap().target, 0.0);
+    assert_eq!(s.bed.as_ref().unwrap().target, 0.0);
+
+    // Progress: 0%.
     assert_eq!(s.progress, Some(0.0));
 
-    // AMS: 3 loaded trays (slot 3 empty).
-    assert_eq!(s.ams_trays.len(), 3);
-    assert_eq!(s.ams_trays[0].slot, 0);
-    assert_eq!(s.ams_trays[0].color.as_deref(), Some("FF0000"));
-    assert_eq!(s.ams_trays[0].material.as_deref(), Some("PLA"));
-    assert_eq!(s.ams_trays[0].remaining, Some(85));
-    assert_eq!(s.ams_trays[1].slot, 1);
-    assert_eq!(s.ams_trays[1].color.as_deref(), Some("00FF00"));
-    assert_eq!(s.ams_trays[2].slot, 2);
-    assert_eq!(s.ams_trays[2].material.as_deref(), Some("PETG"));
-    assert_eq!(s.ams_trays[2].remaining, Some(44));
+    // Layers from previous print still visible.
+    assert_eq!(s.layer, Some(3));
+    assert_eq!(s.total_layers, Some(1021));
+    assert_eq!(s.remaining_time, Some(1114));
 
-    // No HMS.
+    // AMS Lite: 4 loaded trays + vt_tray.
+    assert_eq!(s.ams_trays.len(), 5); // 4 AMS + 1 vt_tray
+    assert_eq!(s.ams_trays[0].slot, 0);
+    assert_eq!(s.ams_trays[0].color.as_deref(), Some("5A657B"));
+    assert_eq!(s.ams_trays[0].material.as_deref(), Some("PLA"));
+    assert_eq!(s.ams_trays[0].remaining, Some(100));
+    assert_eq!(s.ams_trays[1].slot, 1);
+    assert_eq!(s.ams_trays[1].color.as_deref(), Some("FFFFFF"));
+    assert_eq!(s.ams_trays[2].slot, 2);
+    assert_eq!(s.ams_trays[2].color.as_deref(), Some("104831"));
+    assert_eq!(s.ams_trays[3].slot, 3);
+    assert_eq!(s.ams_trays[3].color.as_deref(), Some("000000"));
+    assert_eq!(s.ams_trays[3].material.as_deref(), Some("PLA"));
+    // vt_tray (external spool holder, slot 254).
+    assert_eq!(s.ams_trays[4].slot, 254);
+    assert_eq!(s.ams_trays[4].color.as_deref(), Some("A7A9AA"));
+    assert_eq!(s.ams_trays[4].material.as_deref(), Some("PLA"));
+
+    // No HMS errors.
     assert!(s.hms_codes.is_empty());
 
-    // Fans off.
+    // All fans off.
     let fans = s.fans.as_ref().unwrap();
     assert_eq!(fans.part_fan, Some(0));
     assert_eq!(fans.heatbreak_fan, Some(0));
+    assert_eq!(fans.aux_fan, Some(0));
+    assert_eq!(fans.chamber_fan, Some(0));
 
-    // --- Report 1: print starting (heating) ---
-    cached.merge_report(reports[1].get("print").unwrap());
-    let s = cached.to_status();
-    assert_eq!(s.state, PrinterState::Printing);
-    assert!((s.nozzle.as_ref().unwrap().target - 220.0).abs() < 0.1);
-    assert!((s.bed.as_ref().unwrap().target - 60.0).abs() < 0.1);
-    assert_eq!(s.total_layers, Some(150));
-    assert_eq!(s.remaining_time, Some(5400));
-    assert_eq!(s.filename.as_deref(), Some("benchy_pla_0.20mm.gcode.3mf"));
-
-    // --- Report 2: mid-print (33%) ---
-    cached.merge_report(reports[2].get("print").unwrap());
-    let s = cached.to_status();
-    assert_eq!(s.state, PrinterState::Printing);
-    assert!((s.progress.unwrap() - 0.33).abs() < 0.01);
-    assert_eq!(s.layer, Some(50));
-    assert_eq!(s.remaining_time, Some(3600));
-
-    // Fans running.
-    let fans = s.fans.as_ref().unwrap();
-    assert_eq!(fans.part_fan, Some(100)); // 15/15 = 100%
-    assert_eq!(fans.aux_fan, Some(53)); // 8/15 ≈ 53%
-
-    // --- Report 3: progress to 66% ---
-    cached.merge_report(reports[3].get("print").unwrap());
-    let s = cached.to_status();
-    assert!((s.progress.unwrap() - 0.66).abs() < 0.01);
-    assert_eq!(s.layer, Some(100));
-    assert_eq!(s.remaining_time, Some(1800));
-
-    // --- Report 4: HMS warning ---
-    cached.merge_report(reports[4].get("print").unwrap());
-    let s = cached.to_status();
-    assert_eq!(s.hms_codes.len(), 1);
-    assert_eq!(s.hms_codes[0].attr, 50331648);
-    assert_eq!(s.hms_codes[0].code, 32772);
-
-    // --- Report 5: HMS cleared, 95% ---
-    cached.merge_report(reports[5].get("print").unwrap());
-    let s = cached.to_status();
-    assert!(s.hms_codes.is_empty());
-    assert!((s.progress.unwrap() - 0.95).abs() < 0.01);
-    assert_eq!(s.layer, Some(143));
-
-    // --- Report 6: print finished ---
-    cached.merge_report(reports[6].get("print").unwrap());
-    let s = cached.to_status();
-    assert_eq!(s.state, PrinterState::Idle); // FINISH maps to Idle
-    assert!((s.progress.unwrap() - 1.0).abs() < 0.01);
-    assert_eq!(s.layer, Some(150));
-    assert_eq!(s.nozzle.as_ref().unwrap().target, 0.0);
-    assert_eq!(s.bed.as_ref().unwrap().target, 0.0);
-    let fans = s.fans.as_ref().unwrap();
-    assert_eq!(fans.part_fan, Some(0));
-
-    // --- Report 7: cooldown, back to idle ---
-    cached.merge_report(reports[7].get("print").unwrap());
-    let s = cached.to_status();
-    assert_eq!(s.state, PrinterState::Idle);
+    // gcode_file is "" in pushall → filename is None.
+    // subtask_name has a leftover value but gcode_file takes priority.
     assert!(s.filename.is_none());
-    assert_eq!(s.layer, Some(0));
-    assert_eq!(s.total_layers, Some(0));
+
+    // --- Partial updates: verify temp drift is picked up ---
+    for report in &reports[1..reports.len() - 1] {
+        cached.merge_report(report.get("print").unwrap());
+    }
+    let s = cached.to_status();
+    // After all partials, temps should have shifted slightly.
+    assert!(s.nozzle.as_ref().unwrap().actual > 24.0);
+    assert!(s.bed.as_ref().unwrap().actual > 24.0);
+
+    // --- Last report: second pushall (full dump again) ---
+    let last = reports.last().unwrap();
+    cached.merge_report(last.get("print").unwrap());
+    let s = cached.to_status();
+    // State should still be FAILED.
+    assert_eq!(s.state, PrinterState::Error);
+    // AMS still has 5 trays.
+    assert_eq!(s.ams_trays.len(), 5);
 }
 
 #[test]
 fn serial_to_model() {
-    // Test the model mapping logic from the driver.
     assert_eq!(model_from_serial("00W12345678"), Some("A1"));
     assert_eq!(model_from_serial("01S12345678"), Some("A1 Mini"));
     assert_eq!(model_from_serial("00M12345678"), Some("X1 Carbon"));
     assert_eq!(model_from_serial("01P12345678"), Some("P1P"));
     assert_eq!(model_from_serial("03P12345678"), Some("P1S"));
+    assert_eq!(model_from_serial("03912345678"), Some("A1")); // newer A1 prefix
     assert_eq!(model_from_serial("ZZZ12345678"), None);
     assert_eq!(model_from_serial("AB"), None);
 }
@@ -342,6 +380,17 @@ fn model_from_serial(serial: &str) -> Option<&'static str> {
         "01S" => Some("A1 Mini"),
         "03P" => Some("P1S"),
         "030" => Some("X1E"),
+        "039" => Some("A1"),
         _ => None,
     }
+}
+
+#[test]
+fn cert_fingerprint_is_consistent() {
+    // Verify the fingerprint function produces consistent output.
+    let cert_bytes = b"fake certificate DER bytes for testing";
+    let fp1 = foreman_core::drivers::bambu::cert_fingerprint(cert_bytes);
+    let fp2 = foreman_core::drivers::bambu::cert_fingerprint(cert_bytes);
+    assert_eq!(fp1, fp2);
+    assert_eq!(fp1.len(), 64); // SHA-256 = 32 bytes = 64 hex chars
 }

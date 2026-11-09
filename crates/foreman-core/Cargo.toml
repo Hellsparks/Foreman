@@ -26,6 +26,14 @@ futures-util = { workspace = true }
 # MQTT (Bambu LAN driver)
 rumqttc = { workspace = true }
 
+# TLS cert fingerprinting (TOFU pinning)
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+# FTPS (Bambu SD card file ops — sync API in spawn_blocking)
+suppaftp = { workspace = true }
+native-tls = { workspace = true }
+
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 

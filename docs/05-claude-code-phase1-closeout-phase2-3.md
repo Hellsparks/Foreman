@@ -64,18 +64,18 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 ### 2.3 PrinterDriver trait + drivers
 - [x] Trait: connect, status stream, capabilities probe, commands (start/pause/resume/cancel, set temp, jog/home, macro, raw G-code, light), file ops (list/upload/delete/start) — file ops are used by Phase 3.
 - [x] **Moonraker:** WebSocket JSON-RPC with object subscriptions (not polling). Probe bed size, nozzle, extruders, MMU, webcams, macros from Moonraker/Klipper config.
-- [ ] **OctoPrint** and **Duet:** polling drivers with per-driver interval.
-- [x] Mock printer servers (Moonraker + OctoPrint at least) that replay `test-gcodes/` scenarios; used in integration tests.
+- [ ] **OctoPrint** and **Duet:** moved post-v1 (no test hardware); backlog: OctoPrint, Duet, PrusaLink, Marlin USB — OctoPrint-compatible upload endpoint in 3.4 stays.
+- [x] Mock printer servers (Moonraker + Bambu) that replay `test-gcodes/` scenarios; used in integration tests.
 
 ### 2.3b Bambu LAN driver (moved up from Phase 9 — owner has a real Bambu + a real Klipper printer to test on)
 - [x] MQTT over TLS, port 8883, user `bblp`, password = LAN access code, topics `device/<serial>/report` and `device/<serial>/request`. Send `pushall` on connect; merge partial reports into a full status (state, temps, fans, progress, layer, AMS trays with colour/material/remaining, HMS errors).
 - [ ] Commands: pause/resume/stop, set temps, light, fan, G-code line, AMS tray select where supported. Map into the same `PrinterDriver` trait.
-- [ ] FTPS (implicit TLS) on port 990 for file list/upload/delete on the SD card; start a print from an uploaded `.3mf` (project_file command). These feed the Library browser in Phase 3.
-- [ ] Camera: X1 RTSPS stream; P1/A1 JPEG stream (verify ports/framing against a reference lib and the real printer; log what was found).
+- [~] FTPS (implicit TLS) on port 990 for file list/upload/delete on the SD card; start a print from an uploaded `.3mf` (project_file command). These feed the Library browser in Phase 3. **Code implemented (session 17) but port 990 is closed on the A1 — FTPS may be X1C/P1-only. Needs verification on other hardware.**
+- [~] Camera: X1 RTSPS stream; P1/A1 JPEG stream (verify ports/framing against a reference lib and the real printer; log what was found). **Port 6000 is TCP-reachable on the A1 but TLS handshake times out (session 17, 3 attempts). Protocol may require active print or different framing.**
 - [ ] Auth modes: **Developer Mode** first (printer in LAN Only mode, Developer Mode toggled on — no signing). **Signed mode** second: owner-supplied cert/key, commands signed; rejected commands return error 84033543 → raise an Attention item that says which mode is needed.
 - [ ] Capabilities probe from model + report (bed size, nozzle, AMS count, chamber, camera type).
-- [ ] Mock Bambu MQTT/FTPS server recorded from the owner's printer (capture real `report` payloads once, replay in tests).
-- [ ] Use a reference implementation for message formats (e.g. OpenBambuAPI docs, ha-bambulab) — read, don't copy; note sources in the corrections log.
+- [x] Mock Bambu MQTT/FTPS server recorded from the owner's printer (capture real `report` payloads once, replay in tests).
+- [x] Use a reference implementation for message formats (e.g. OpenBambuAPI docs, ha-bambulab) — read, don't copy; note sources in the corrections log.
 
 ### 2.4 Tiered connection paths (W2)
 - [ ] Each printer has an ordered list of paths (name + URL). Health check on the active path; after N failed checks (default 3, ≈6 s) switch to the next; move back up when a higher path is healthy for a set time (default 60 s, or manual). Running jobs are never touched.
@@ -158,7 +158,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 | 15 | 2.3 trait + Moonraker driver + mock |
 | 16 | 2.3b Bambu LAN driver (MQTT + status + commands), tested on the real printer |
 | 17 | 2.3b Bambu FTPS + camera + recorded mock; signed mode |
-| 18 | 2.3 OctoPrint + Duet; 2.4 connection paths |
+| 18 | 2.4 connection paths |
 | 19 | 2.5 SSH / SFTP / terminal / shell macros / audit |
 | 20 | 2.6 printer page API + 2.7 fleet + Attention + 2.8 settings |
 | 21 | 3.1 file store + parser + thumbnails |
@@ -213,6 +213,22 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 **Upstream Python v0.27.1 opens the migrated DB successfully:** Installed via `uv` into `/tmp/spoolman-pyenv` (Python 3.12). Needed: add venv `bin/` to `PATH` (alembic is called as a subprocess), set `PYTHONPATH` to vendor source + site-packages explicitly (uv venv uses symlinks so Python's venv auto-detection doesn't add site-packages). Create stub `vendor/spoolman-upstream/client_v2/build/index.html` to pass the client-build check. Upstream reports 1 filament, 12 vendors — all correct.
 
 **Bug found and fixed: extra field values double-encoded on write, decoded on read (wrong per upstream contract).** Upstream contract (`spoolman/api/v1/models.py` line 57): *"Every value in the extra map is a JSON-encoded string regardless of the field's type. Consumers must JSON-decode each value."* spoolman-rs was calling `val.to_string()` on a `Value::String` in `set_values()`, which re-encoded an already-JSON-encoded string. On read, `get_values()` was JSON-decoding the stored value, returning native types instead of raw strings. Fix: `set_values()` stores `s.clone()` for `Value::String(s)`; `get_values()` / `get_values_batch()` / `get_distinct_values()` return `Value::String(raw_val)` without decoding. Two regression tests added (`extra_field_values_round_trip_as_raw_json_strings`, `extra_field_float_stored_by_upstream_survives_read`). All 13 tests pass.
+
+### Session 17 — 2026-11-09 (Bambu real A1 verify + TOFU pinning + FTPS/camera)
+
+**Real A1 capture:** Connected to A1 at 10.0.0.249:8883 via MQTT/TLS, captured 43 messages, stripped serial/access_code/IP, wrote 6-message fixture (`bambu_a1_reports.json`). Replay test verifies state (FAILED), temps (25.09°C nozzle, 24.69°C bed), 5 AMS trays (4 AMS Lite + vt_tray slot 254), real colours, fans off, HMS empty.
+
+**Serial prefix `039`:** Real A1 serial starts with `039` (not `00W`). Added mapping in `model_from_serial`. Confirmed via ha-bambulab community data — newer A1 production batches use `039`.
+
+**TOFU cert pinning (replacing AcceptAnyCert):** Implemented `TofuCertVerifier` using rustls `ServerCertVerifier` trait. SHA-256 fingerprint captured during TLS handshake via `Arc<Mutex<Option<String>>>`. First connect stores fingerprint in DB (`printer.tls_fingerprint` column, migration 0002). Subsequent connects verify match; mismatch → refuse + publish `printer.connection` error event. API endpoint `POST /api/printers/{id}/trust-new-cert` clears the pin and restarts the driver.
+
+**FTPS port 990 closed on A1:** Port scan shows only 3000, 6000, 8883 open. FTPS code implemented (`list_files`, `upload_file`, `delete_file` via sync `NativeTlsFtpStream` in `spawn_blocking`) but untestable on this printer. A1 may not expose FTPS — FTPS is documented mainly for X1C/P1 series.
+
+**Camera port 6000 TLS timeout:** Port 6000 is TCP-reachable (SYN-ACK within 1ms) but all TLS handshake attempts time out (3 attempts: raw TLS wrap, auth-frame-before-TLS, OpenBambuAPI 68-byte auth packet with 0x40 0x3d magic). The A1 camera protocol may differ from documented X1 protocol or may only activate during a print.
+
+**Port 3000:** Responds to TCP connections, contents unknown. Not documented in OpenBambuAPI.
+
+**DB migration approach:** Initial schema `0001_initial.sql` now includes `tls_fingerprint` column directly. `0002_tls_fingerprint.sql` kept as incremental `ALTER TABLE` for existing dev databases. `ForemanDb::run_migrations()` applies these after schema creation, ignoring "duplicate column" errors for idempotency.
 
 ### Session 11 — 2026-11-08 (C.1 CI)
 

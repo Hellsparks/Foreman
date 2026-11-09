@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS printer (
     api_key          TEXT,
     serial_number    TEXT,              -- Bambu serial
     access_code      TEXT,              -- Bambu LAN access code
+    tls_fingerprint  TEXT,              -- SHA-256 hex of TLS cert (TOFU pinning)
     tags             TEXT    NOT NULL DEFAULT '[]',  -- JSON array of strings
     hardened_nozzle  INTEGER NOT NULL DEFAULT 0,     -- bool (0/1)
     sort_order       INTEGER NOT NULL DEFAULT 0,

@@ -19,6 +19,14 @@ use crate::error::AppError;
 /// Embedded initial schema (all tables, idempotent via IF NOT EXISTS).
 const SCHEMA_SQL: &str = include_str!("../migrations/0001_initial.sql");
 
+/// Incremental migrations applied after the initial schema.
+/// Each is a single SQL statement. We catch "duplicate column" errors to make
+/// them idempotent (the column already exists in fresh databases).
+const MIGRATIONS: &[&str] = &[
+    // 0002: TLS fingerprint pinning for Bambu printers.
+    "ALTER TABLE printer ADD COLUMN tls_fingerprint TEXT",
+];
+
 /// Foreman-native database handle.
 #[derive(Debug, Clone)]
 pub struct ForemanDb {
@@ -45,8 +53,27 @@ impl ForemanDb {
             .map_err(|e| AppError::Database(format!("open db: {e}")))?;
 
         Self::run_schema(&pool).await?;
+        Self::run_migrations(&pool).await?;
 
         Ok(ForemanDb { pool })
+    }
+
+    /// Apply incremental migrations, ignoring "duplicate column" errors
+    /// so they are idempotent across fresh and existing databases.
+    async fn run_migrations(pool: &SqlitePool) -> Result<(), AppError> {
+        for stmt in MIGRATIONS {
+            match sqlx::query(*stmt).execute(pool).await {
+                Ok(_) => {}
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("duplicate column") {
+                        continue;
+                    }
+                    return Err(AppError::Database(format!("migration: {e}\nSQL: {stmt}")));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Execute the embedded schema SQL, skipping blank lines and comments.

@@ -29,6 +29,7 @@ struct DriverHandle {
 pub struct DriverManager {
     drivers: RwLock<HashMap<i64, DriverHandle>>,
     bus_tx: Arc<broadcast::Sender<ServerEvent>>,
+    pool: SqlitePool,
     /// Last-known status per printer (updated by drivers via events).
     status_cache: RwLock<HashMap<i64, PrinterStatus>>,
     /// Cached capabilities per printer.
@@ -36,10 +37,11 @@ pub struct DriverManager {
 }
 
 impl DriverManager {
-    pub fn new(bus_tx: Arc<broadcast::Sender<ServerEvent>>) -> Arc<Self> {
+    pub fn new(bus_tx: Arc<broadcast::Sender<ServerEvent>>, pool: SqlitePool) -> Arc<Self> {
         let mgr = Arc::new(Self {
             drivers: RwLock::new(HashMap::new()),
             bus_tx: Arc::clone(&bus_tx),
+            pool,
             status_cache: RwLock::new(HashMap::new()),
             capabilities_cache: RwLock::new(HashMap::new()),
         });
@@ -119,6 +121,8 @@ impl DriverManager {
                     host,
                     serial,
                     access_code,
+                    tls_fingerprint: printer.tls_fingerprint.clone(),
+                    pool: self.pool.clone(),
                 };
                 info!(printer_id = printer.id, name = %printer.name, "starting bambu driver");
                 Arc::new(BambuDriver::new(config, Arc::clone(&self.bus_tx)))

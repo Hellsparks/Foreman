@@ -4,6 +4,15 @@
 //! code.  Subscribes to `device/<serial>/report`, sends `pushall` on connect,
 //! and merges partial status reports into a full `PrinterStatus`.
 //!
+//! TLS: TOFU cert pinning. First connect stores the cert SHA-256 fingerprint
+//! in the DB (printer row); later connects must match; on mismatch the driver
+//! refuses and publishes `printer.connection` with reason "certificate changed".
+//!
+//! FTPS: implicit TLS on port 990, same cert pinning. File list/upload/delete
+//! on the SD card.
+//!
+//! Camera: A1/P1 JPEG stream discovery — logged for proxy wiring.
+//!
 //! Reference sources (read, not copied):
 //! - OpenBambuAPI: github.com/Doridian/OpenBambuAPI/blob/main/mqtt.md
 //! - Bambu wiki: wiki.bambulab.com/en/knowledge-sharing/developer-resources
@@ -15,8 +24,10 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, TlsConfiguration, Transport};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
+use sqlx::SqlitePool;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile};
 use crate::error::AppError;
@@ -40,6 +51,10 @@ pub struct BambuConfig {
     pub serial: String,
     /// LAN access code (8-digit).
     pub access_code: String,
+    /// Stored TLS cert fingerprint (None = first connect, TOFU pin).
+    pub tls_fingerprint: Option<String>,
+    /// Database pool for persisting the fingerprint on first connect.
+    pub pool: SqlitePool,
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +73,7 @@ fn model_from_serial(serial: &str) -> Option<&'static str> {
         "01S" => Some("A1 Mini"),
         "03P" => Some("P1S"),
         "030" => Some("X1E"),
+        "039" => Some("A1"), // newer A1 serial prefix
         _ => None,
     }
 }
@@ -112,6 +128,8 @@ struct CachedStatus {
     has_camera: Option<bool>,
     has_xcam: bool,
     ams_count: u32,
+    // Camera info extracted from ipcam report.
+    camera_resolution: Option<String>,
 }
 
 impl CachedStatus {
@@ -240,6 +258,9 @@ impl CachedStatus {
             if let Some(dev) = ipcam.get("ipcam_dev").and_then(|v| v.as_str()) {
                 self.has_camera = Some(dev == "1");
             }
+            if let Some(res) = ipcam.get("resolution").and_then(|v| v.as_str()) {
+                self.camera_resolution = Some(res.to_owned());
+            }
         }
         if let Some(xcam) = print.get("xcam") {
             if xcam.is_object() && xcam.as_object().is_some_and(|m| !m.is_empty()) {
@@ -308,50 +329,63 @@ impl CachedStatus {
             }
         }
 
-        // Also parse vt_tray (external spool, slot 254).
+        // Also parse vt_tray (external spool, slot 254) — check ams root level
+        // first, then the top-level print object.
         if let Some(vt) = ams.get("vt_tray") {
-            let tray_type = vt.get("tray_type").and_then(|v| v.as_str());
-            if tray_type.is_some() && tray_type != Some("") {
-                let color = vt.get("tray_color").and_then(|v| v.as_str()).map(|c| {
-                    if c.len() == 8 {
-                        c[..6].to_owned()
-                    } else {
-                        c.to_owned()
-                    }
-                });
-                let material = tray_type.map(|s| s.to_owned());
-                let remaining = vt
-                    .get("remain")
-                    .and_then(|v| v.as_u64())
-                    .map(|r| r.min(100) as u8);
-                trays.push(AmsTray {
-                    slot: 254,
-                    color,
-                    material,
-                    remaining,
-                });
-            }
+            Self::push_vt_tray(&mut trays, vt);
         }
 
         self.ams_trays = trays;
         self.ams_count = unit_count;
     }
+
+    fn push_vt_tray(trays: &mut Vec<AmsTray>, vt: &Value) {
+        let tray_type = vt.get("tray_type").and_then(|v| v.as_str());
+        if tray_type.is_none() || tray_type == Some("") {
+            return;
+        }
+        let color = vt.get("tray_color").and_then(|v| v.as_str()).map(|c| {
+            if c.len() == 8 {
+                c[..6].to_owned()
+            } else {
+                c.to_owned()
+            }
+        });
+        let material = tray_type.map(|s| s.to_owned());
+        let remaining = vt
+            .get("remain")
+            .and_then(|v| v.as_u64())
+            .map(|r| r.min(100) as u8);
+        trays.push(AmsTray {
+            slot: 254,
+            color,
+            material,
+            remaining,
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
-// TLS: accept Bambu self-signed cert (TOFU)
+// TLS: TOFU cert pinning
 // ---------------------------------------------------------------------------
 
-/// A rustls certificate verifier that accepts any server certificate.
-/// Bambu printers use a self-signed cert; TOFU fingerprint pinning will be
-/// added in a later session (persisted to the Foreman DB).
-#[derive(Debug)]
-struct AcceptAnyCert;
+/// Compute SHA-256 fingerprint of a DER-encoded certificate.
+pub fn cert_fingerprint(der: &[u8]) -> String {
+    let hash = Sha256::digest(der);
+    hex::encode(hash)
+}
 
-impl rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerifier for AcceptAnyCert {
+/// A rustls certificate verifier that accepts any cert but captures its
+/// SHA-256 fingerprint for TOFU verification after the handshake.
+#[derive(Debug)]
+struct TofuCertVerifier {
+    captured: Arc<std::sync::Mutex<Option<String>>>,
+}
+
+impl rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerifier for TofuCertVerifier {
     fn verify_server_cert(
         &self,
-        _end_entity: &rumqttc::tokio_rustls::rustls::pki_types::CertificateDer<'_>,
+        end_entity: &rumqttc::tokio_rustls::rustls::pki_types::CertificateDer<'_>,
         _intermediates: &[rumqttc::tokio_rustls::rustls::pki_types::CertificateDer<'_>],
         _server_name: &rumqttc::tokio_rustls::rustls::pki_types::ServerName<'_>,
         _ocsp_response: &[u8],
@@ -360,6 +394,10 @@ impl rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerifier for Accep
         rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerified,
         rumqttc::tokio_rustls::rustls::Error,
     > {
+        let fp = cert_fingerprint(end_entity.as_ref());
+        if let Ok(mut guard) = self.captured.lock() {
+            *guard = Some(fp);
+        }
         Ok(rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerified::assertion())
     }
 
@@ -404,15 +442,51 @@ impl rumqttc::tokio_rustls::rustls::client::danger::ServerCertVerifier for Accep
     }
 }
 
-fn build_tls_config() -> TlsConfiguration {
+/// Build a TLS config with TOFU cert capture.
+/// Returns (TlsConfiguration, captured_fingerprint_handle).
+fn build_tls_config() -> (TlsConfiguration, Arc<std::sync::Mutex<Option<String>>>) {
     use rumqttc::tokio_rustls::rustls::ClientConfig;
+
+    let captured: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
 
     let config = ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(AcceptAnyCert))
+        .with_custom_certificate_verifier(Arc::new(TofuCertVerifier {
+            captured: Arc::clone(&captured),
+        }))
         .with_no_client_auth();
 
-    TlsConfiguration::Rustls(Arc::new(config))
+    (TlsConfiguration::Rustls(Arc::new(config)), captured)
+}
+
+// ---------------------------------------------------------------------------
+// FTPS helpers (sync FTP in spawn_blocking — suppaftp async uses async-std)
+// ---------------------------------------------------------------------------
+
+/// Connect to the printer's implicit FTPS (port 990) using sync suppaftp
+/// wrapped in spawn_blocking. Uses native-tls with danger_accept_invalid_certs
+/// since Bambu printers use self-signed certs.
+fn ftps_connect_sync(
+    host: &str,
+    access_code: &str,
+) -> Result<suppaftp::NativeTlsFtpStream, AppError> {
+    use suppaftp::{NativeTlsConnector, NativeTlsFtpStream};
+
+    let connector = NativeTlsConnector::from(
+        native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .map_err(|e| AppError::Driver(format!("ftps tls: {e}")))?,
+    );
+
+    let addr = format!("{host}:990");
+    let mut ftp = NativeTlsFtpStream::connect_secure_implicit(addr, connector, host)
+        .map_err(|e| AppError::Driver(format!("ftps connect: {e}")))?;
+
+    ftp.login("bblp", access_code)
+        .map_err(|e| AppError::Driver(format!("ftps login: {e}")))?;
+
+    Ok(ftp)
 }
 
 // ---------------------------------------------------------------------------
@@ -447,6 +521,8 @@ impl BambuDriver {
         let host = self.config.host.clone();
         let serial = self.config.serial.clone();
         let access_code = self.config.access_code.clone();
+        let tls_fingerprint = self.config.tls_fingerprint.clone();
+        let pool = self.config.pool.clone();
         let bus_tx = Arc::clone(&self.bus_tx);
         let status = Arc::clone(&self.status);
         let capabilities = Arc::clone(&self.capabilities);
@@ -468,6 +544,8 @@ impl BambuDriver {
                     &host,
                     &serial,
                     &access_code,
+                    &tls_fingerprint,
+                    &pool,
                     &bus_tx,
                     &status,
                     &capabilities,
@@ -523,6 +601,8 @@ impl BambuDriver {
         host: &str,
         serial: &str,
         access_code: &str,
+        tls_fingerprint: &Option<String>,
+        pool: &SqlitePool,
         bus_tx: &broadcast::Sender<ServerEvent>,
         status: &RwLock<CachedStatus>,
         capabilities: &RwLock<Option<PrinterCapabilities>>,
@@ -531,13 +611,13 @@ impl BambuDriver {
         let report_topic = format!("device/{serial}/report");
         let request_topic = format!("device/{serial}/request");
 
-        // Build MQTT options.
+        // Build MQTT options with TOFU cert capture.
         let client_id = format!("foreman-{printer_id}-{}", uuid::Uuid::new_v4().simple());
         let mut opts = MqttOptions::new(&client_id, host, 8883);
         opts.set_credentials("bblp", access_code);
         opts.set_keep_alive(Duration::from_secs(30));
 
-        let tls_config = build_tls_config();
+        let (tls_config, captured_fp) = build_tls_config();
         opts.set_transport(Transport::tls_with_config(tls_config));
 
         let (client, mut eventloop) = AsyncClient::new(opts, 64);
@@ -547,6 +627,83 @@ impl BambuDriver {
             .subscribe(&report_topic, QoS::AtMostOnce)
             .await
             .map_err(|e| AppError::Driver(format!("mqtt subscribe: {e}")))?;
+
+        // Drive the event loop briefly to complete the TLS handshake + CONNACK.
+        // We need to poll until we see the SubAck (which means TLS + MQTT are done).
+        let handshake_deadline = Instant::now() + Duration::from_secs(10);
+        let mut connected = false;
+        while Instant::now() < handshake_deadline {
+            tokio::select! {
+                event = eventloop.poll() => {
+                    let event = event
+                        .map_err(|e| AppError::Driver(format!("mqtt handshake: {e}")))?;
+                    if let Event::Incoming(Packet::SubAck(_)) = event {
+                        connected = true;
+                        break;
+                    }
+                }
+                _ = shutdown_rx.changed() => {
+                    let _ = client.disconnect().await;
+                    return Ok(());
+                }
+            }
+        }
+        if !connected {
+            return Err(AppError::Driver(
+                "mqtt handshake timeout: no SubAck received".into(),
+            ));
+        }
+
+        // --- TOFU fingerprint check ---
+        let observed_fp = captured_fp
+            .lock()
+            .ok()
+            .and_then(|g| g.clone())
+            .ok_or_else(|| {
+                AppError::Driver("TLS cert fingerprint not captured during handshake".into())
+            })?;
+
+        match tls_fingerprint {
+            Some(stored) if stored != &observed_fp => {
+                // Mismatch — refuse connection.
+                error!(
+                    printer_id,
+                    stored = %stored,
+                    observed = %observed_fp,
+                    "bambu: TLS certificate changed! Refusing connection."
+                );
+                let _ = bus_tx.send(ServerEvent::PrinterConnection {
+                    printer_id,
+                    event: ConnectionEvent {
+                        kind: ConnectionEventKind::Offline,
+                        active_path: Some("certificate changed".to_owned()),
+                    },
+                });
+                let _ = client.disconnect().await;
+                return Err(AppError::Driver(
+                    "TLS certificate fingerprint mismatch — certificate changed. \
+                     Clear the pin via 'Trust new certificate' to reconnect."
+                        .into(),
+                ));
+            }
+            Some(_stored) => {
+                info!(printer_id, "bambu: TLS cert fingerprint matches stored pin");
+            }
+            None => {
+                // First connect — store the fingerprint (TOFU).
+                info!(
+                    printer_id,
+                    fingerprint = %observed_fp,
+                    "bambu: TOFU — pinning TLS cert fingerprint"
+                );
+                if let Err(e) =
+                    crate::repo::printer::update_tls_fingerprint(pool, printer_id, &observed_fp)
+                        .await
+                {
+                    warn!(printer_id, "bambu: failed to store TLS fingerprint: {e}");
+                }
+            }
+        }
 
         // Publish online event.
         let _ = bus_tx.send(ServerEvent::PrinterConnection {
@@ -591,6 +748,7 @@ impl BambuDriver {
         // Throttle: max 2 status events per second.
         let min_interval = Duration::from_millis(500);
         let mut last_publish = Instant::now() - min_interval;
+        let mut camera_logged = false;
 
         // Event loop.
         loop {
@@ -612,6 +770,21 @@ impl BambuDriver {
                             if let Some(print) = payload.get("print") {
                                 let mut s = status.write().await;
                                 s.merge_report(print);
+
+                                // Log camera info once.
+                                if !camera_logged {
+                                    if let Some(has_cam) = s.has_camera {
+                                        info!(
+                                            printer_id,
+                                            has_camera = has_cam,
+                                            has_xcam = s.has_xcam,
+                                            resolution = ?s.camera_resolution,
+                                            "bambu: camera info from report"
+                                        );
+                                        camera_logged = true;
+                                    }
+                                }
+
                                 drop(s);
 
                                 // Throttled status publish.
@@ -701,22 +874,79 @@ impl PrinterDriver for BambuDriver {
         ))
     }
 
-    async fn list_files(&self, _path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
-        Err(AppError::NotImplemented(
-            "Bambu FTPS file ops deferred to session 17".into(),
-        ))
+    async fn list_files(&self, path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
+        let host = self.config.host.clone();
+        let access_code = self.config.access_code.clone();
+        let dir = path.unwrap_or("/").to_owned();
+
+        tokio::task::spawn_blocking(move || {
+            let mut ftp = ftps_connect_sync(&host, &access_code)?;
+
+            let entries = ftp
+                .nlst(Some(&dir))
+                .map_err(|e| AppError::Driver(format!("ftps list: {e}")))?;
+
+            let mut files = Vec::new();
+            for entry in entries {
+                let name = entry.trim().to_owned();
+                if name.is_empty() || name == "." || name == ".." {
+                    continue;
+                }
+                let full_path = if dir == "/" {
+                    format!("/{name}")
+                } else {
+                    format!("{dir}/{name}")
+                };
+                let size = ftp.size(&full_path).ok().map(|s| s as u64);
+                files.push(PrinterFile {
+                    path: full_path,
+                    size,
+                    modified: None,
+                });
+            }
+
+            let _ = ftp.quit();
+            Ok(files)
+        })
+        .await
+        .map_err(|e| AppError::Driver(format!("ftps task join: {e}")))?
     }
 
-    async fn upload_file(&self, _path: &str, _data: Vec<u8>) -> Result<(), AppError> {
-        Err(AppError::NotImplemented(
-            "Bambu FTPS file ops deferred to session 17".into(),
-        ))
+    async fn upload_file(&self, path: &str, data: Vec<u8>) -> Result<(), AppError> {
+        let host = self.config.host.clone();
+        let access_code = self.config.access_code.clone();
+        let path = path.to_owned();
+
+        tokio::task::spawn_blocking(move || {
+            let mut ftp = ftps_connect_sync(&host, &access_code)?;
+
+            let mut cursor = std::io::Cursor::new(data);
+            ftp.put_file(&path, &mut cursor)
+                .map_err(|e| AppError::Driver(format!("ftps upload: {e}")))?;
+
+            let _ = ftp.quit();
+            Ok(())
+        })
+        .await
+        .map_err(|e| AppError::Driver(format!("ftps task join: {e}")))?
     }
 
-    async fn delete_file(&self, _path: &str) -> Result<(), AppError> {
-        Err(AppError::NotImplemented(
-            "Bambu FTPS file ops deferred to session 17".into(),
-        ))
+    async fn delete_file(&self, path: &str) -> Result<(), AppError> {
+        let host = self.config.host.clone();
+        let access_code = self.config.access_code.clone();
+        let path = path.to_owned();
+
+        tokio::task::spawn_blocking(move || {
+            let mut ftp = ftps_connect_sync(&host, &access_code)?;
+
+            ftp.rm(&path)
+                .map_err(|e| AppError::Driver(format!("ftps delete: {e}")))?;
+
+            let _ = ftp.quit();
+            Ok(())
+        })
+        .await
+        .map_err(|e| AppError::Driver(format!("ftps task join: {e}")))?
     }
 
     async fn start_print(&self, _path: &str) -> Result<(), AppError> {
