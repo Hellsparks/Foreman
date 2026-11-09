@@ -159,12 +159,27 @@ impl CachedStatus {
 
     /// Merge a partial `print` report payload into this cached status.
     fn merge_report(&mut self, print: &Value) {
-        // State.
+        // HMS error codes — parse before gcode_state so FAILED can check them.
+        if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
+            self.hms_codes = hms
+                .iter()
+                .filter_map(|entry| {
+                    let attr = entry.get("attr").and_then(|v| v.as_u64())? as u32;
+                    let code = entry.get("code").and_then(|v| v.as_u64())? as u32;
+                    Some(HmsCode { attr, code })
+                })
+                .collect();
+        }
+
+        // State.  "FAILED" is the stale gcode_state after a print failure;
+        // it does NOT mean the printer is currently faulted.  Only treat it
+        // as Error when there are active HMS codes.
         if let Some(s) = print.get("gcode_state").and_then(|v| v.as_str()) {
             self.state = match s {
                 "RUNNING" | "PREPARE" => PrinterState::Printing,
                 "PAUSE" => PrinterState::Paused,
                 "FINISH" | "IDLE" | "CREATED" | "SLICING" => PrinterState::Idle,
+                "FAILED" if self.hms_codes.is_empty() => PrinterState::Idle,
                 "FAILED" => PrinterState::Error,
                 _ => self.state.clone(),
             };
@@ -234,17 +249,7 @@ impl CachedStatus {
             self.merge_ams(ams);
         }
 
-        // HMS error codes.
-        if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
-            self.hms_codes = hms
-                .iter()
-                .filter_map(|entry| {
-                    let attr = entry.get("attr").and_then(|v| v.as_u64())? as u32;
-                    let code = entry.get("code").and_then(|v| v.as_u64())? as u32;
-                    Some(HmsCode { attr, code })
-                })
-                .collect();
-        }
+        // (HMS error codes are parsed at the top of merge_report.)
 
         // Nozzle diameter.
         if let Some(d) = print.get("nozzle_diameter").and_then(|v| v.as_str()) {

@@ -109,6 +109,41 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
             "/api/printers/{id}/trust-new-cert",
             post(api::printers::trust_new_cert),
         )
+        // Printer commands + status + capabilities
+        .route(
+            "/api/printers/{id}/commands/{kind}",
+            post(api::printer_commands::send_command),
+        )
+        .route(
+            "/api/printers/{id}/confirm-cancel",
+            post(api::printer_commands::confirm_cancel),
+        )
+        .route(
+            "/api/printers/{id}/capabilities",
+            get(api::printer_commands::get_capabilities),
+        )
+        .route(
+            "/api/printers/{id}/status",
+            get(api::printer_commands::get_status),
+        )
+        // Temp presets
+        .route(
+            "/api/printers/{id}/presets",
+            get(api::printer_commands::list_presets).post(api::printer_commands::create_preset),
+        )
+        .route(
+            "/api/printers/{id}/presets/{pid}",
+            delete(api::printer_commands::delete_preset),
+        )
+        // Macro favourites
+        .route(
+            "/api/printers/{id}/macro-favourites",
+            get(api::printer_commands::list_favourites).post(api::printer_commands::add_favourite),
+        )
+        .route(
+            "/api/printers/{id}/macro-favourites/{fid}",
+            delete(api::printer_commands::remove_favourite),
+        )
         .route("/api/attention", get(api::attention::list_attention))
         .route("/api/attention/count", get(api::attention::attention_count))
         .route(

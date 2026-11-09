@@ -74,6 +74,14 @@ pub enum PrinterCommand {
         z: Option<f64>,
         speed: Option<f64>,
     },
+    /// Babystep Z offset (SET_GCODE_OFFSET Z_ADJUST=N MOVE=1).
+    BabyStep { offset: f64 },
+    /// Motors off (M84).
+    MotorsOff,
+    /// Extrude or retract filament (relative E move).
+    Extrude { length: f64, speed: f64 },
+    /// Toggle light (output_pin or LED named "light").
+    SetLight { brightness: f64 },
     /// Execute a named macro.
     Macro { name: String },
     /// Send raw G-code.

@@ -5,7 +5,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { PrinterWithStatus, AttentionItem } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
@@ -130,6 +130,7 @@ function attentionSymbol(kind: string): string {
 // ── Fleet page ───────────────────────────────────────────────────────────────
 
 export default function Fleet() {
+  const navigate = useNavigate();
   const {
     statuses,
     connections,
@@ -413,6 +414,7 @@ export default function Fleet() {
             printer={selectedPrinter}
             status={liveStatus(selectedPrinter)}
             onClose={deselectPrinter}
+            onOpenPage={() => navigate(`/printer/${selectedPrinter.id}`)}
           />,
           portalTarget
         )
@@ -588,10 +590,12 @@ function PrinterInspector({
   printer,
   status,
   onClose,
+  onOpenPage,
 }: {
   printer: PrinterWithStatus;
   status: PrinterStatus | null;
   onClose: () => void;
+  onOpenPage: () => void;
 }) {
   const state = status?.state ?? "offline";
   const tone = statusTone(state);
@@ -671,6 +675,7 @@ function PrinterInspector({
         <button
           type="button"
           className="fleet-insp__btn fleet-insp__btn--primary"
+          onClick={onOpenPage}
         >
           Open printer page
         </button>

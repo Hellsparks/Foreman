@@ -14,11 +14,12 @@ use std::time::{Duration, Instant};
 
 use foreman_core::{
     domain::{FirmwareKind, Printer},
-    driver::{PrinterCapabilities, PrinterDriver},
+    driver::{PrinterCapabilities, PrinterCommand, PrinterDriver},
     drivers::{
         bambu::{BambuConfig, BambuDriver},
         moonraker::{MoonrakerConfig, MoonrakerDriver},
     },
+    error::AppError,
     events::{AttentionItemEvent, PrinterState, PrinterStatus, ServerEvent},
 };
 use sqlx::SqlitePool;
@@ -41,8 +42,12 @@ pub struct DriverManager {
     capabilities_cache: RwLock<HashMap<i64, PrinterCapabilities>>,
     /// When the last status event was received for each printer.
     last_status_at: RwLock<HashMap<i64, Instant>>,
+    /// When each driver was started (used for 60 s offline grace period).
+    driver_started_at: RwLock<HashMap<i64, Instant>>,
     /// Map of (printer_id, kind) → attention_item_id for live items we raised.
     open_attention: RwLock<HashMap<(i64, String), i64>>,
+    /// Cancel confirm tokens: printer_id → (token, expiry).
+    cancel_tokens: RwLock<HashMap<i64, (String, Instant)>>,
 }
 
 impl DriverManager {
@@ -54,7 +59,9 @@ impl DriverManager {
             status_cache: RwLock::new(HashMap::new()),
             capabilities_cache: RwLock::new(HashMap::new()),
             last_status_at: RwLock::new(HashMap::new()),
+            driver_started_at: RwLock::new(HashMap::new()),
             open_attention: RwLock::new(HashMap::new()),
+            cancel_tokens: RwLock::new(HashMap::new()),
         });
 
         // ── Task 1: status event listener ────────────────────────────────────
@@ -197,12 +204,20 @@ impl DriverManager {
                             continue;
                         }
 
-                        // Check if status is overdue (>60 s).
+                        // Check if status is overdue (>60 s since last status,
+                        // or >60 s since driver start if no status ever received).
                         let overdue = {
                             let at = mgr3.last_status_at.read().await;
                             match at.get(&printer_id) {
-                                None => true, // never received a status
                                 Some(t) => t.elapsed() > Duration::from_secs(60),
+                                None => {
+                                    // No status yet — use driver start time as baseline.
+                                    mgr3.driver_started_at
+                                        .read()
+                                        .await
+                                        .get(&printer_id)
+                                        .is_some_and(|t| t.elapsed() > Duration::from_secs(60))
+                                }
                             }
                         };
 
@@ -346,6 +361,10 @@ impl DriverManager {
             }
         }
 
+        self.driver_started_at
+            .write()
+            .await
+            .insert(printer.id, Instant::now());
         self.drivers
             .write()
             .await
@@ -365,6 +384,7 @@ impl DriverManager {
         self.status_cache.write().await.remove(&printer_id);
         self.capabilities_cache.write().await.remove(&printer_id);
         self.last_status_at.write().await.remove(&printer_id);
+        self.driver_started_at.write().await.remove(&printer_id);
 
         // Clear any auto-raised attention items for this printer.
         for kind in &["offline", "error"] {
@@ -378,7 +398,6 @@ impl DriverManager {
     }
 
     /// Get the last-known status for a printer.
-    #[allow(dead_code)]
     pub async fn get_status(&self, printer_id: i64) -> Option<PrinterStatus> {
         self.status_cache.read().await.get(&printer_id).cloned()
     }
@@ -389,7 +408,6 @@ impl DriverManager {
     }
 
     /// Get cached capabilities for a printer.
-    #[allow(dead_code)]
     pub async fn get_capabilities(&self, printer_id: i64) -> Option<PrinterCapabilities> {
         self.capabilities_cache
             .read()
@@ -404,6 +422,102 @@ impl DriverManager {
         caps.get(&printer_id)
             .and_then(|c| c.webcams.iter().find_map(|w| w.snapshot_url.clone()))
     }
+
+    // ── Command dispatch with safety checks ──────────────────────────────
+
+    /// Check whether a command is blocked while the printer is printing.
+    /// Movement, homing, motors-off are refused. BabyStep is allowed.
+    fn is_blocked_while_printing(cmd: &PrinterCommand) -> bool {
+        matches!(
+            cmd,
+            PrinterCommand::Home { .. }
+                | PrinterCommand::Jog { .. }
+                | PrinterCommand::MotorsOff
+                | PrinterCommand::Extrude { .. }
+        )
+    }
+
+    /// Request a cancel-confirm token for a printer. Returns the token string.
+    /// The caller must send this token back with the actual cancel command
+    /// within 30 seconds.
+    pub async fn request_cancel_token(&self, printer_id: i64) -> String {
+        let token = uuid::Uuid::new_v4().to_string();
+        let expiry = Instant::now() + Duration::from_secs(30);
+        self.cancel_tokens
+            .write()
+            .await
+            .insert(printer_id, (token.clone(), expiry));
+        token
+    }
+
+    /// Validate and consume a cancel token.
+    async fn validate_cancel_token(&self, printer_id: i64, token: &str) -> Result<(), AppError> {
+        let mut tokens = self.cancel_tokens.write().await;
+        match tokens.remove(&printer_id) {
+            Some((stored, expiry)) if stored == token && Instant::now() < expiry => Ok(()),
+            Some(_) => Err(AppError::InvalidInput(
+                "cancel token expired or invalid".into(),
+            )),
+            None => Err(AppError::InvalidInput(
+                "no cancel token issued — request one first".into(),
+            )),
+        }
+    }
+
+    /// Send a command to a printer with safety checks and audit logging.
+    ///
+    /// `confirm_token` is required for Cancel commands. Pass `None` for all others.
+    pub async fn send_command(
+        &self,
+        printer_id: i64,
+        cmd: PrinterCommand,
+        confirm_token: Option<&str>,
+    ) -> Result<(), AppError> {
+        // Look up the driver.
+        let driver = {
+            let drivers = self.drivers.read().await;
+            drivers
+                .get(&printer_id)
+                .map(|h| Arc::clone(&h.driver))
+                .ok_or_else(|| AppError::NotFound(format!("no driver for printer {printer_id}")))?
+        };
+
+        // Safety: refuse movement commands while printing.
+        if Self::is_blocked_while_printing(&cmd) {
+            let status = self.status_cache.read().await;
+            if let Some(s) = status.get(&printer_id) {
+                if s.state == PrinterState::Printing || s.state == PrinterState::Paused {
+                    return Err(AppError::InvalidInput(
+                        "command blocked: printer is printing".into(),
+                    ));
+                }
+            }
+        }
+
+        // Cancel requires a confirm token.
+        if matches!(cmd, PrinterCommand::Cancel) {
+            match confirm_token {
+                Some(tok) => self.validate_cancel_token(printer_id, tok).await?,
+                None => {
+                    return Err(AppError::InvalidInput(
+                        "cancel requires a confirm_token — POST to /confirm-cancel first".into(),
+                    ))
+                }
+            }
+        }
+
+        // Audit log.
+        let cmd_desc = format!("{cmd:?}");
+        if let Err(e) =
+            foreman_core::repo::audit_log::insert(&self.pool, Some(printer_id), None, &cmd_desc)
+                .await
+        {
+            warn!(printer_id, "audit_log insert failed: {e}");
+        }
+
+        // Dispatch.
+        driver.send_command(cmd).await
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -413,12 +527,59 @@ impl DriverManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use foreman_core::{
         db::ForemanDb,
+        driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile},
         events::{PrinterState, PrinterStatus, ServerEvent},
     };
     use tempfile::TempDir;
     use tokio::sync::broadcast;
+
+    /// Mock driver that records commands it receives.
+    struct MockDriver {
+        commands: tokio::sync::Mutex<Vec<String>>,
+    }
+
+    impl MockDriver {
+        fn new() -> Self {
+            Self {
+                commands: tokio::sync::Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl PrinterDriver for MockDriver {
+        async fn connect(&self) -> Result<PrinterCapabilities, AppError> {
+            Ok(PrinterCapabilities::default())
+        }
+        async fn disconnect(&self) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn probe_capabilities(&self) -> Result<PrinterCapabilities, AppError> {
+            Ok(PrinterCapabilities::default())
+        }
+        async fn send_command(&self, cmd: PrinterCommand) -> Result<(), AppError> {
+            self.commands.lock().await.push(format!("{cmd:?}"));
+            Ok(())
+        }
+        async fn list_files(&self, _path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
+            Ok(vec![])
+        }
+        async fn upload_file(&self, _path: &str, _data: Vec<u8>) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn delete_file(&self, _path: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn start_print(&self, _path: &str) -> Result<(), AppError> {
+            Ok(())
+        }
+        async fn current_status(&self) -> Result<PrinterStatus, AppError> {
+            Ok(make_status(PrinterState::Idle))
+        }
+    }
 
     fn make_status(state: PrinterState) -> PrinterStatus {
         PrinterStatus {
@@ -497,5 +658,205 @@ mod tests {
                 .any(|i| i.printer_id == Some(999) && i.kind == "error"),
             "error attention should have been cleared after recovery"
         );
+    }
+
+    // ── Safety tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn blocked_while_printing_covers_movement() {
+        // These should be blocked while printing:
+        assert!(DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Home { axes: vec![] }
+        ));
+        assert!(DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Jog {
+                x: Some(10.0),
+                y: None,
+                z: None,
+                speed: None
+            }
+        ));
+        assert!(DriverManager::is_blocked_while_printing(
+            &PrinterCommand::MotorsOff
+        ));
+        assert!(DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Extrude {
+                length: 10.0,
+                speed: 300.0
+            }
+        ));
+
+        // These should be allowed while printing:
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Pause
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Resume
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Cancel
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::BabyStep { offset: 0.01 }
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::SetNozzleTemp { target: 200.0 }
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::SetBedTemp { target: 60.0 }
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Gcode {
+                command: "M117 test".to_owned()
+            }
+        ));
+        assert!(!DriverManager::is_blocked_while_printing(
+            &PrinterCommand::Macro {
+                name: "TEST".to_owned()
+            }
+        ));
+    }
+
+    /// Helper: create a DriverManager with a mock driver pre-inserted.
+    async fn setup_with_mock() -> (Arc<DriverManager>, Arc<MockDriver>, TempDir) {
+        let tmp = TempDir::new().unwrap();
+        let db = ForemanDb::connect(&tmp.path().join("test.db"))
+            .await
+            .unwrap();
+
+        let (tx, _) = broadcast::channel::<ServerEvent>(256);
+        let tx = Arc::new(tx);
+        let mgr = DriverManager::new(Arc::clone(&tx), db.pool.clone());
+
+        // Insert a printer row.
+        sqlx::query(
+            "INSERT INTO printer (id, name, firmware, tags, created_at, updated_at) \
+             VALUES (1, 'test-printer', 'moonraker', '[]', '2026-01-01', '2026-01-01')",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        // Insert mock driver directly.
+        let mock = Arc::new(MockDriver::new());
+        mgr.drivers.write().await.insert(
+            1,
+            DriverHandle {
+                driver: Arc::clone(&mock) as Arc<dyn PrinterDriver>,
+            },
+        );
+
+        (mgr, mock, tmp)
+    }
+
+    #[tokio::test]
+    async fn send_command_dispatches_to_driver() {
+        let (mgr, mock, _tmp) = setup_with_mock().await;
+
+        mgr.send_command(1, PrinterCommand::SetNozzleTemp { target: 200.0 }, None)
+            .await
+            .unwrap();
+
+        let cmds = mock.commands.lock().await;
+        assert_eq!(cmds.len(), 1);
+        assert!(cmds[0].contains("SetNozzleTemp"));
+    }
+
+    #[tokio::test]
+    async fn movement_refused_while_printing() {
+        let (mgr, _mock, _tmp) = setup_with_mock().await;
+
+        // Set printing state.
+        mgr.status_cache
+            .write()
+            .await
+            .insert(1, make_status(PrinterState::Printing));
+
+        let err = mgr
+            .send_command(
+                1,
+                PrinterCommand::Jog {
+                    x: Some(10.0),
+                    y: None,
+                    z: None,
+                    speed: None,
+                },
+                None,
+            )
+            .await;
+        assert!(err.is_err(), "jog should be refused while printing");
+        assert!(
+            err.unwrap_err().to_string().contains("printing"),
+            "error should mention printing"
+        );
+    }
+
+    #[tokio::test]
+    async fn babystep_allowed_while_printing() {
+        let (mgr, mock, _tmp) = setup_with_mock().await;
+
+        mgr.status_cache
+            .write()
+            .await
+            .insert(1, make_status(PrinterState::Printing));
+
+        mgr.send_command(1, PrinterCommand::BabyStep { offset: 0.01 }, None)
+            .await
+            .unwrap();
+
+        let cmds = mock.commands.lock().await;
+        assert_eq!(cmds.len(), 1);
+        assert!(cmds[0].contains("BabyStep"));
+    }
+
+    #[tokio::test]
+    async fn cancel_requires_confirm_token() {
+        let (mgr, _mock, _tmp) = setup_with_mock().await;
+
+        // Cancel without token should fail.
+        let err = mgr.send_command(1, PrinterCommand::Cancel, None).await;
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("confirm_token"));
+
+        // Cancel with correct token should succeed.
+        let token = mgr.request_cancel_token(1).await;
+        mgr.send_command(1, PrinterCommand::Cancel, Some(&token))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancel_token_is_single_use() {
+        let (mgr, _mock, _tmp) = setup_with_mock().await;
+
+        let token = mgr.request_cancel_token(1).await;
+        // First use succeeds.
+        mgr.send_command(1, PrinterCommand::Cancel, Some(&token))
+            .await
+            .unwrap();
+        // Second use fails (consumed).
+        let err = mgr
+            .send_command(1, PrinterCommand::Cancel, Some(&token))
+            .await;
+        assert!(err.is_err());
+    }
+
+    #[tokio::test]
+    async fn send_command_logs_to_audit() {
+        let (mgr, _mock, tmp) = setup_with_mock().await;
+
+        mgr.send_command(1, PrinterCommand::Pause, None)
+            .await
+            .unwrap();
+
+        // Check audit_log table.
+        let pool = &mgr.pool;
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM audit_log WHERE printer_id = 1")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        assert!(count >= 1, "audit log should have an entry");
+
+        drop(tmp);
     }
 }
