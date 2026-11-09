@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Fleet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1080px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+
+<nav aria-label="Main" style="flex: 0 0 auto; width: {{railW}}px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px; min-height: 28px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="flex: none; color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<sc-if value="{{expanded}}" hint-placeholder-val="{{ true }}"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span></sc-if>
+</div>
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="8">
+<a href="#" aria-current="{{n.current}}" aria-label="{{n.label}}" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid {{n.marker}}; background: {{n.bg}}; font-weight: {{n.weight}}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="{{n.d}}"></path></svg>
+<sc-if value="{{expanded}}" hint-placeholder-val="{{ true }}"><span>{{n.label}}</span></sc-if>
+</a>
+</sc-for>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{toggleRail}}" aria-expanded="{{expanded}}" aria-label="Collapse navigation" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 18px; background: none; border: 0; cursor: pointer; color: var(--fw-muted); text-align: left">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="{{railIcon}}"></path></svg>
+<sc-if value="{{expanded}}" hint-placeholder-val="{{ true }}"><span style="font-size: 13px">Collapse</span></sc-if>
+</button>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 32px; border-bottom: 1px solid var(--fw-border); background: var(--fw-background)">
+<label style="flex: 1 1 320px; max-width: 560px; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: var(--fw-raised); box-sizing: border-box; border-radius: 2px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="color: var(--fw-muted)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search or run a command</span>
+<input type="search" placeholder="Search printers, files, spools… or type a command" style="flex: 1; min-width: 0; border: 0; background: transparent; outline-offset: 6px; font-size: 14px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border: 1px solid var(--fw-border); padding: 2px 6px">Ctrl K</span>
+</label>
+<div style="flex: 1 1 0"></div>
+<button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; display: flex; align-items: center; gap: 8px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10"></path></svg>Scan</button>
+<button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; display: flex; align-items: center; gap: 8px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg>Send</button>
+<button type="button" onClick="{{toggleAttn}}" aria-label="Attention, {{attnCount}} items" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-accent); background: transparent; border-radius: 2px; cursor: pointer; display: flex; align-items: center; gap: 8px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2zM10 21h4"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{attnCount}}</span></button>
+</header>
+
+<main style="padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Fleet</h1>
+<p style="margin: 4px 0 0; color: var(--fw-muted)">8 printers · 2 printing · 1 needs plate clear · 1 paused · 1 error · 1 offline</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<a href="FleetEmpty.dc.html" style="min-width: 120px; min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center; justify-content: center">Add printer</a>
+</div>
+</div>
+
+<section aria-label="Attention" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--fw-border)">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Attention · {{attnCount}}</h2>
+<div style="flex: 1"></div>
+<a href="Attention.dc.html" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">View all</a>
+<button type="button" onClick="{{toggleAttn}}" aria-expanded="{{attnOpen}}" style="min-width: 96px; min-height: 36px; padding: 0 10px; background: none; border: 1px solid var(--fw-muted); color: var(--fw-text); cursor: pointer; font-size: 13px; border-radius: 2px">{{attnToggleLabel}}</button>
+</div>
+<sc-if value="{{attnOpen}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{attnEmpty}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; padding: 16px; color: var(--fw-muted)">✓ Nothing needs you right now.</p>
+</sc-if>
+<sc-for list="{{attn}}" as="a" hint-placeholder-count="4">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 12px 16px; border-bottom: 1px solid var(--fw-border)">
+<span style="flex: 0 0 auto; min-width: 104px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 4px 8px; color: {{a.fg}}; background: {{a.bg}}">{{a.sym}} {{a.word}}</span>
+<div style="flex: 1 1 280px; min-width: 0">
+<div style="font-weight: bold">{{a.text}}</div>
+<div style="font-size: 12px; color: var(--fw-muted)">{{a.meta}}</div>
+</div>
+<div style="flex: 0 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 148px; justify-content: end; gap: 8px">
+<sc-for list="{{a.actions}}" as="b" hint-placeholder-count="2">
+<button type="button" onClick="{{b.run}}" style="width: 148px; min-height: 40px; padding: 4px 10px; line-height: 1.2; text-align: center; border-radius: 2px; cursor: pointer; font-size: 13px; border: 1px solid {{b.border}}; background: {{b.bg}}; color: {{b.fg}}; font-weight: {{b.weight}}">{{b.label}}</button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</sc-if>
+</section>
+
+<section aria-label="Printers" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px">
+<sc-for list="{{printers}}" as="p" hint-placeholder-count="8">
+<article style="position: relative; display: flex; flex-direction: column; gap: 10px; height: 252px; box-sizing: border-box; padding: 16px; background: var(--fw-raised); border: 1px solid {{p.border}}; outline: {{p.outline}}">
+<div style="display: flex; align-items: center; gap: 8px">
+<button type="button" onClick="{{p.open}}" style="padding: 0; background: none; border: 0; cursor: pointer; font-weight: bold; font-size: 15px; text-align: left; min-height: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{p.name}}</button>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted); border: 1px solid var(--fw-border); padding: 1px 6px; flex: none">{{p.fw}}</span>
+<div style="flex: 1"></div>
+<button type="button" onClick="{{p.menu}}" aria-label="Actions for {{p.name}}" aria-expanded="{{p.menuOpen}}" style="width: 36px; height: 36px; background: none; border: 1px solid var(--fw-border); border-radius: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: none">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>
+</button>
+</div>
+<div style="display: flex; gap: 12px; align-items: flex-start">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<span style="align-self: flex-start; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{p.fg}}; background: {{p.bg}}">{{p.sym}} {{p.state}}</span>
+<div style="font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{p.job}}</div>
+<div style="font-size: 12px; color: var(--fw-muted)">{{p.sub}}</div>
+</div>
+<div aria-hidden="true" style="flex: none; width: 104px; height: 72px; background: var(--fw-surface); border: 1px solid var(--fw-border); display: flex; align-items: flex-end; justify-content: space-between; padding: 6px; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; color: var(--fw-muted)">
+<span>{{p.cam}}</span><span style="color: {{p.camDot}}">●</span>
+</div>
+</div>
+<sc-if value="{{p.hasProgress}}" hint-placeholder-val="{{ true }}">
+<div role="progressbar" aria-label="Progress" aria-valuenow="{{p.pct}}" aria-valuemin="0" aria-valuemax="100" style="height: 6px; background: var(--fw-surface); border: 1px solid var(--fw-border)">
+<div style="height: 100%; width: {{p.pct}}%; background: {{p.fg}}"></div>
+</div>
+</sc-if>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{p.temps}}</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto">
+<sc-for list="{{p.chips}}" as="c" hint-placeholder-count="2">
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 8px 2px 4px; border: 1px solid var(--fw-border); background: var(--fw-surface)">
+<span aria-hidden="true" style="width: 14px; height: 14px; background: {{c.hex}}; border: 1px solid var(--fw-muted); border-style: {{c.edge}}"></span>{{c.label}}</span>
+</sc-for>
+</div>
+<sc-if value="{{p.menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="group" aria-label="Actions for {{p.name}}" style="position: absolute; top: 56px; right: 16px; z-index: 5; min-width: 200px; background: var(--fw-raised); border: 1px solid var(--fw-muted); box-shadow: var(--fw-shadow-overlay); display: flex; flex-direction: column; padding: 4px 0">
+<sc-for list="{{p.menuItems}}" as="m" hint-placeholder-count="4">
+<button type="button" onClick="{{m.run}}" style="min-height: 40px; padding: 0 14px; text-align: left; background: none; border: 0; cursor: pointer; font-size: 13px">{{m.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</article>
+</sc-for>
+</section>
+</main>
+</div>
+
+<sc-if value="{{inspOpen}}" hint-placeholder-val="{{ false }}">
+<aside aria-label="Inspector" style="flex: 1 1 380px; max-width: 440px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1; min-width: 0">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Printer · {{sel.fw}}</div>
+<h2 style="margin: 2px 0 6px; font-size: 24px; letter-spacing: -0.02em">{{sel.name}}</h2>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{sel.fg}}; background: {{sel.bg}}">{{sel.sym}} {{sel.state}}</span>
+</div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close inspector" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Current job</div>
+<div style="font-weight: bold">{{sel.job}}</div>
+<div style="font-size: 13px; color: var(--fw-muted)">{{sel.sub}}</div>
+<sc-if value="{{sel.hasProgress}}" hint-placeholder-val="{{ true }}">
+<div style="height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="height: 100%; width: {{sel.pct}}%; background: {{sel.fg}}"></div></div>
+</sc-if>
+</div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 16px">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted); margin-bottom: 6px">Temperatures</div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{sel.temps}}</div>
+</div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Loaded filament</div>
+<sc-for list="{{sel.chips}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 40px">
+<span aria-hidden="true" style="width: 20px; height: 20px; background: {{c.hex}}; border: 1px solid var(--fw-muted); border-style: {{c.edge}}"></span>
+<span style="flex: 1">{{c.label}}</span>
+<button type="button" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">Change…</button>
+</div>
+</sc-for>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 16px">
+<button type="button" style="flex: 1 1 auto; min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Open printer page</button>
+<button type="button" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Native UI<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"></path></svg></button>
+</div>
+</aside>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+<button type="button" onClick="{{t.dismiss}}" aria-label="Dismiss" style="width: 36px; height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { collapsed: false, attnOpen: true, resolved: {}, toasts: [], menuFor: null, sel: 'x1c', inspOpen: true, paused: {} };
+    this.tid = 0;
+  }
+  toast(text, undo) {
+    const id = ++this.tid;
+    const t = { id, text, undoFn: undo };
+    this.setState({ toasts: [...this.state.toasts, t].slice(-2) });
+  }
+  dropToast(id) { this.setState({ toasts: this.state.toasts.filter(x => x.id !== id) }); }
+  resolve(key, msg) {
+    this.setState({ resolved: { ...this.state.resolved, [key]: true } });
+    this.toast(msg, () => { const r = { ...this.state.resolved }; delete r[key]; this.setState({ resolved: r }); });
+  }
+  renderVals() {
+    const s = this.state;
+    const tone = {
+      info: ['var(--fw-info)', 'var(--fw-info-bg)'],
+      warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'],
+      bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'],
+      ok: ['var(--fw-success)', 'var(--fw-success-bg)'],
+      off: ['var(--fw-muted)', 'var(--fw-surface)']
+    };
+    const navDefs = [
+      ['Fleet', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+      ['Jobs', 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01'],
+      ['Library', 'M3 6h6l2 2h10v11H3z'],
+      ['Projects', 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5'],
+      ['Filament', 'M12 3a9 9 0 100 18 9 9 0 000-18zM12 9a3 3 0 100 6 3 3 0 000-6z'],
+      ['Service', 'M14 7a4 4 0 00-5 5l-6 6 3 3 6-6a4 4 0 005-5l-3 3-3-3z'],
+      ['Tools', 'M4 20l6-6M14 4l6 6-8 8-6-6zM9 9l6 6'],
+      ['Settings', 'M12 9a3 3 0 100 6 3 3 0 000-6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4']
+    ];
+    const hrefs = { Fleet: 'Main.dc.html', Jobs: 'Jobs.dc.html', Library: 'Library.dc.html', Projects: 'Projects.dc.html', Filament: 'Filament.dc.html', Service: 'Service.dc.html', Tools: 'Tools.dc.html', Settings: 'Settings.dc.html' };
+    const nav = navDefs.map(([label, d], i) => ({
+      label, d, href: hrefs[label] || '#', current: i === 0 ? 'page' : 'false',
+      marker: i === 0 ? 'var(--fw-accent)' : 'transparent',
+      bg: i === 0 ? 'var(--fw-raised)' : 'transparent',
+      weight: i === 0 ? 'bold' : 'normal'
+    }));
+    const chip = (hex, label, empty) => ({ hex: empty ? 'transparent' : hex, label, edge: empty ? 'dashed' : 'solid' });
+    const P = [
+      { id: 'v24', name: 'Voron 2.4 350', fw: 'KLIPPER', t: 'info', sym: '▶', state: 'Printing 63%', job: 'enclosure_lid_v3.gcode', sub: '1 h 12 m left · ends 14:52', pct: 63, temps: 'Nozzle 245/245 °C · Bed 85/85 °C', cam: 'LIVE', chips: [chip('#1d1d22', '#42 PETG Galaxy Black')] },
+      { id: 'x1c', name: 'Bambu X1C', fw: 'BAMBU', t: 'warn', sym: '✓', state: 'Finished · clear plate', job: 'chess_plate_2.3mf', sub: 'Done 4 min ago · 2 h 18 m', pct: 100, temps: 'Nozzle 38 °C · Bed 41 °C', cam: 'LIVE', chips: [chip('#1f8a8a', 'AMS1 PLA Teal'), chip('#f4f4ef', 'AMS2 PLA White'), chip('#1d1d22', 'AMS3 PETG Black'), chip('', 'AMS4 empty', true)] },
+      { id: 'mk4', name: 'Prusa MK4', fw: 'OCTOPRINT', t: 'ok', sym: '●', state: 'Idle', job: 'Ready for next job', sub: 'Plate cleared 1 h ago', pct: 0, temps: 'Nozzle 24 °C · Bed 23 °C', cam: 'LIVE', chips: [chip('#f4f4ef', '#61 PLA White')] },
+      { id: 'rr', name: 'RatRig V-Core 4', fw: 'DUET', t: 'warn', sym: '‖', state: 'Paused · filament runout', job: 'bracket_x4.gcode', sub: '41% · paused 6 min', pct: 41, temps: 'Nozzle 215/215 °C · Bed 60/60 °C', cam: 'LIVE', chips: [chip('', 'T0 empty', true)] },
+      { id: 'e3', name: 'Ender 3 S1', fw: 'KLIPPER', t: 'off', sym: '○', state: 'Offline', job: 'Not reachable', sub: 'Last seen 2 h ago · 192.168.1.47', pct: 0, temps: '—', cam: 'NO SIGNAL', chips: [] },
+      { id: 'tri', name: 'Voron Trident', fw: 'KLIPPER', t: 'bad', sym: '✖', state: 'Error', job: 'Thermal runaway: extruder', sub: 'Klipper shutdown 12 min ago', pct: 0, temps: 'Nozzle 0 °C · Bed 22 °C', cam: 'LIVE', chips: [chip('#8a8f94', '#63 ABS+ Grey')] },
+      { id: 'p1s', name: 'Bambu P1S', fw: 'BAMBU', t: 'ok', sym: '●', state: 'Idle', job: 'Ready for next job', sub: 'Plate cleared 3 h ago', pct: 0, temps: 'Nozzle 26 °C · Bed 25 °C', cam: 'LIVE', chips: [chip('#8a8f94', 'AMS1 ABS+ Grey'), chip('#f4f4ef', 'AMS2 PLA White')] },
+      { id: 'sv', name: 'Sovol SV08', fw: 'KLIPPER', t: 'info', sym: '▶', state: 'Printing 12%', job: 'fan_duct_v2.gcode', sub: '3 h 40 m left · ends 17:20', pct: 12, temps: 'Nozzle 210/210 °C · Bed 60/60 °C', cam: 'LIVE', chips: [chip('#1f8a8a', '#57 PLA Teal · 120 g')] }
+    ];
+    const printers = P.map(p => {
+      const paused = s.paused[p.id];
+      const st = paused ? { t: 'warn', sym: '‖', state: 'Paused' } : p;
+      const [fg, bg] = tone[st.t];
+      const selected = s.inspOpen && s.sel === p.id;
+      const run = (label, msg, extra) => ({ label, run: () => { this.setState({ menuFor: null }); if (extra) extra(); if (msg) this.toast(msg, extra ? () => { const q = { ...this.state.paused }; delete q[p.id]; this.setState({ paused: q }); } : null); } });
+      const menuItems = [];
+      if (p.t === 'info' && !paused) menuItems.push(run('Pause', 'Paused ' + p.name, () => this.setState({ paused: { ...this.state.paused, [p.id]: true } })));
+      if (paused) menuItems.push({ label: 'Resume', run: () => { const q = { ...this.state.paused }; delete q[p.id]; this.setState({ paused: q, menuFor: null }); } });
+      menuItems.push({ label: 'Light on', run: () => this.setState({ menuFor: null }) });
+      menuItems.push({ label: 'Open printer', run: () => this.setState({ menuFor: null, sel: p.id, inspOpen: true }) });
+      menuItems.push({ label: 'Open native UI ↗', run: () => this.setState({ menuFor: null }) });
+      return {
+        ...p, ...st, fg, bg,
+        hasProgress: p.pct > 0 && p.pct < 100,
+        camDot: p.t === 'off' ? 'var(--fw-muted)' : 'var(--fw-danger)',
+        border: selected ? 'var(--fw-focus)' : 'var(--fw-border)',
+        outline: selected ? '1px solid var(--fw-focus)' : 'none',
+        open: () => this.setState({ sel: p.id, inspOpen: true, menuFor: null }),
+        menu: () => this.setState({ menuFor: s.menuFor === p.id ? null : p.id }),
+        menuOpen: s.menuFor === p.id,
+        menuItems
+      };
+    });
+    const btn = (label, run, primary) => ({ label, run, border: primary ? 'transparent' : 'var(--fw-muted)', bg: primary ? 'var(--fw-accent-hover)' : 'transparent', fg: primary ? 'var(--fw-on-accent)' : 'var(--fw-text)', weight: primary ? 'bold' : 'normal' });
+    const A = [
+      { key: 'fin', t: 'warn', sym: '✓', word: 'Finished', text: 'chess_plate_2 finished on Bambu X1C', meta: '4 min ago · Chess set — walnut/maple · plate 2 of 6',
+        actions: [btn('✓ Good', () => this.resolve('fin', 'Marked Good · Bambu X1C waiting for plate clear')), btn('✖ Failed…', () => this.resolve('fin', 'Marked Failed · choose a reason in History')), btn('Plate cleared · start next', () => this.resolve('fin', 'Plate cleared · chess_plate_3 starting on Bambu X1C'), true)] },
+      { key: 'err', t: 'bad', sym: '✖', word: 'Error', text: 'Thermal runaway on Voron Trident', meta: '12 min ago · extruder heater · printer shut down',
+        actions: [btn('Open printer', () => this.setState({ sel: 'tri', inspOpen: true })), btn('Dismiss', () => this.resolve('err', 'Dismissed error on Voron Trident'))] },
+      { key: 'run', t: 'warn', sym: '‖', word: 'Paused', text: 'Filament runout on RatRig V-Core 4 · T0', meta: '6 min ago · bracket_x4 at 41%',
+        actions: [btn('Load spool…', () => this.resolve('run', 'Loaded #61 PLA White on RatRig T0 · resume when ready'), true), btn('Open printer', () => this.setState({ sel: 'rr', inspOpen: true }))] },
+      { key: 'svc', t: 'warn', sym: '!', word: 'Service', text: 'Belt tension overdue on Voron 2.4 350', meta: '212 / 200 print hours',
+        actions: [btn('Done', () => this.resolve('svc', 'Belt tension marked done · counter reset')), btn('Snooze 10 h', () => this.resolve('svc', 'Belt tension snoozed 10 h'))] },
+      { key: 'low', t: 'info', sym: '◐', word: 'Low spool', text: 'Spool #57 PolyLite PLA Teal is low', meta: '120 g left · loaded on Sovol SV08 · job needs ~95 g',
+        actions: [btn('Weigh', () => this.resolve('low', 'Spool #57 weighed · 118 g'))] }
+    ];
+    const attn = A.filter(a => !s.resolved[a.key]).map(a => ({ ...a, fg: tone[a.t][0], bg: tone[a.t][1] }));
+    const sel = printers.find(p => p.id === s.sel) || printers[0];
+    return {
+      scheme: this.props.scheme ?? 'fieldwork',
+      mode: this.props.mode ?? 'dark',
+      expanded: !s.collapsed,
+      railW: s.collapsed ? 56 : 176,
+      railIcon: s.collapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6',
+      toggleRail: () => this.setState({ collapsed: !s.collapsed }),
+      nav,
+      attn,
+      attnCount: attn.length,
+      attnEmpty: attn.length === 0,
+      attnOpen: s.attnOpen,
+      attnToggleLabel: s.attnOpen ? 'Collapse' : 'Expand',
+      toggleAttn: () => this.setState({ attnOpen: !s.attnOpen }),
+      printers,
+      inspOpen: s.inspOpen,
+      sel,
+      closeInsp: () => this.setState({ inspOpen: false }),
+      toasts: s.toasts.map(t => ({
+        text: t.text,
+        undo: () => { if (t.undoFn) t.undoFn(); this.dropToast(t.id); },
+        dismiss: () => this.dropToast(t.id)
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Fleet on phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; width: 390px; height: 844px; overflow: hidden; display: flex; flex-direction: column; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.45">
+
+<header style="flex: none; display: flex; align-items: center; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid var(--fw-border)">
+<h1 style="margin: 0; font-size: 28px; letter-spacing: -0.02em; flex: 1">Fleet</h1>
+<button type="button" aria-label="Search" style="width: 44px; height: 44px; border: 1px solid var(--fw-border); background: var(--fw-raised); border-radius: 2px; display: flex; align-items: center; justify-content: center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+</button>
+</header>
+
+<div style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Attention" style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Attention · {{attnCount}}</div>
+<sc-for list="{{attn}}" as="a" hint-placeholder-count="2">
+<div style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 10px; align-items: flex-start">
+<span style="flex: none; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 3px 6px; color: {{a.fg}}; background: {{a.bg}}">{{a.sym}} {{a.word}}</span>
+<div style="min-width: 0"><div style="font-weight: bold; font-size: 14px">{{a.text}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{a.meta}}</div></div>
+</div>
+<div style="display: flex; gap: 8px">
+<sc-for list="{{a.actions}}" as="b" hint-placeholder-count="2">
+<button type="button" onClick="{{b.run}}" style="flex: 1 1 0; min-height: 44px; padding: 0 10px; border-radius: 2px; font-size: 14px; border: 1px solid {{b.border}}; background: {{b.bg}}; color: {{b.fg}}; font-weight: {{b.weight}}">{{b.label}}</button>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<a href="Attention.dc.html" style="min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--fw-border); color: var(--fw-text); text-decoration: none; font-size: 14px">See all attention items</a>
+</section>
+
+<section aria-label="Printers" style="display: flex; flex-direction: column; gap: 0; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<sc-for list="{{printers}}" as="p" hint-placeholder-count="8">
+<a href="#" style="display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; border-bottom: 1px solid var(--fw-border); text-decoration: none; color: var(--fw-text)">
+<div style="flex: 1; min-width: 0">
+<div style="font-weight: bold; font-size: 15px">{{p.name}}</div>
+<div style="font-size: 12px; color: var(--fw-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{p.sub}}</div>
+</div>
+<span style="flex: none; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 3px 6px; color: {{p.fg}}; background: {{p.bg}}">{{p.sym}} {{p.state}}</span>
+</a>
+</sc-for>
+</section>
+</div>
+
+<div role="status" aria-live="polite" style="position: absolute; left: 12px; right: 12px; bottom: 96px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; font-weight: bold; font-size: 13px; border-radius: 2px">Undo</button>
+</div>
+</sc-for>
+</div>
+
+<nav aria-label="Main" style="flex: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--fw-border); background: var(--fw-surface); padding: 6px 4px 18px">
+<a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; text-decoration: none; color: var(--fw-text); font-size: 11px; font-weight: bold; border-top: 3px solid var(--fw-accent)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>Fleet</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; text-decoration: none; color: var(--fw-muted); font-size: 11px; border-top: 3px solid transparent">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"></path></svg>Jobs</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; text-decoration: none; color: var(--fw-on-accent); background: var(--fw-accent-hover); font-size: 11px; font-weight: bold; margin: 0 4px; border-radius: 2px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10"></path></svg>Scan</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; text-decoration: none; color: var(--fw-muted); font-size: 11px; border-top: 3px solid transparent">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zM12 9a3 3 0 100 6 3 3 0 000-6z"></path></svg>Filament</a>
+<a href="#" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; text-decoration: none; color: var(--fw-muted); font-size: 11px; border-top: 3px solid transparent">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { resolved: {}, toasts: [] };
+    this.tid = 0;
+  }
+  resolve(key, text) {
+    const id = ++this.tid;
+    this.setState({ resolved: { ...this.state.resolved, [key]: true }, toasts: [{ id, key, text }] });
+  }
+  renderVals() {
+    const s = this.state;
+    const tone = {
+      info: ['var(--fw-info)', 'var(--fw-info-bg)'],
+      warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'],
+      bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'],
+      ok: ['var(--fw-success)', 'var(--fw-success-bg)'],
+      off: ['var(--fw-muted)', 'var(--fw-surface)']
+    };
+    const btn = (label, run, primary) => ({ label, run, border: primary ? 'transparent' : 'var(--fw-muted)', bg: primary ? 'var(--fw-accent-hover)' : 'transparent', fg: primary ? 'var(--fw-on-accent)' : 'var(--fw-text)', weight: primary ? 'bold' : 'normal' });
+    const A = [
+      { key: 'fin', t: 'warn', sym: '✓', word: 'Done', text: 'chess_plate_2 on Bambu X1C', meta: '4 min ago · plate 2 of 6',
+        actions: [btn('✖ Failed', () => this.resolve('fin', 'Marked Failed')), btn('Plate cleared', () => this.resolve('fin', 'Plate cleared · next plate starting'), true)] },
+      { key: 'run', t: 'warn', sym: '‖', word: 'Runout', text: 'RatRig V-Core 4 · T0 empty', meta: '6 min ago · bracket_x4 at 41%',
+        actions: [btn('Scan spool to load', () => this.resolve('run', 'Loaded #61 PLA White on T0'), true)] },
+      { key: 'err', t: 'bad', sym: '✖', word: 'Error', text: 'Thermal runaway · Voron Trident', meta: '12 min ago',
+        actions: [btn('Open printer', () => this.resolve('err', 'Opened Voron Trident'))] }
+    ];
+    const attn = A.filter(a => !s.resolved[a.key]).map(a => ({ ...a, fg: tone[a.t][0], bg: tone[a.t][1] }));
+    const P = [
+      ['Voron 2.4 350', 'info', '▶', '63%', 'enclosure_lid_v3 · 1 h 12 m left'],
+      ['Bambu X1C', 'warn', '✓', 'Clear plate', 'chess_plate_2 · done 4 min ago'],
+      ['Prusa MK4', 'ok', '●', 'Idle', 'Ready · PLA White'],
+      ['RatRig V-Core 4', 'warn', '‖', 'Paused', 'Filament runout · 41%'],
+      ['Ender 3 S1', 'off', '○', 'Offline', 'Last seen 2 h ago'],
+      ['Voron Trident', 'bad', '✖', 'Error', 'Thermal runaway'],
+      ['Bambu P1S', 'ok', '●', 'Idle', 'Ready · ABS+ Grey, PLA White'],
+      ['Sovol SV08', 'info', '▶', '12%', 'fan_duct_v2 · 3 h 40 m left']
+    ];
+    const printers = P.map(([name, t, sym, state, sub]) => ({ name, sym, state, sub, fg: tone[t][0], bg: tone[t][1] }));
+    return {
+      scheme: this.props.scheme ?? 'fieldwork',
+      mode: this.props.mode ?? 'dark',
+      attn, attnCount: attn.length, printers,
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => { const r = { ...this.state.resolved }; delete r[t.key]; this.setState({ resolved: r, toasts: [] }); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

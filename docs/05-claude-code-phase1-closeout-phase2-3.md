@@ -85,14 +85,15 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 
 ### 2.5 SSH / SFTP / terminal (W2)
 
-(`[~]` = implemented + tested against a local SSH server / mocks; HellV0 read-only check pending SSH credentials — see session 19 log.)
-- [~] Per-printer SSH settings: user, port, auth = Foreman ed25519 key (generated once, public key shown for copy) or password (stored encrypted). Host key pinned on first connect (TOFU); refuse on change until approved in the UI.
-- [~] SFTP API (pick the crate — `russh` + `russh-sftp` were the plan; justify in the corrections log): list, read, write (writes a `.bak` first), upload, mkdir, rename, delete. Logs read-only.
-- [~] "Save + FIRMWARE_RESTART" for Klipper `.cfg`: deferred while printing.
-- [~] Terminal: WebSocket bridge to an SSH PTY (frontend uses xterm.js). Multi-line paste is confirmed in the UI before it is sent.
-- [~] Shell macros: name, multi-line command, scope (this printer / all SSH printers), ask-before-run (auto on for `sudo|rm|reboot|shutdown|dd|mkfs`). Stored in Foreman.
-- [~] Every terminal command and macro run goes to `audit_log` (printer, user, command, time).
+(Verified read-only on HellV0 in session 19: list config/gcodes/logs, open `printer.cfg`, terminal `uptime` + klipper status, audit entries. Writes are owner-tested.)
+- [x] Per-printer SSH settings: user, port, auth = Foreman ed25519 key (generated once, public key shown for copy) or password (stored encrypted). Host key pinned on first connect (TOFU); refuse on change until approved in the UI.
+- [x] SFTP API (pick the crate — `russh` + `russh-sftp` were the plan; justify in the corrections log): list, read, write (writes a `.bak` first), upload, mkdir, rename, delete. Logs read-only.
+- [x] "Save + FIRMWARE_RESTART" for Klipper `.cfg`: deferred while printing.
+- [x] Terminal: WebSocket bridge to an SSH PTY (frontend uses xterm.js). Multi-line paste is confirmed in the UI before it is sent.
+- [x] Shell macros: name, multi-line command, scope (this printer / all SSH printers), ask-before-run (auto on for `sudo|rm|reboot|shutdown|dd|mkfs`). Stored in Foreman.
+- [x] Every terminal command and macro run goes to `audit_log` (printer, user, command, time).
 - [x] Bambu: none of this (no SSH). Its files go through FTPS (2.3b).
+- [ ] Backlog: Live MJPEG webcam stream via proxy (currently 10 s snapshot).
 
 ### 2.6 Printer page API (W6)
 - [ ] Status (state, job, progress, ETA, layer), temperatures with **editable targets** + presets per printer, fan, light.

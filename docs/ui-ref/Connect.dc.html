@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Connect + sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.cap{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--fw-muted)}
+.btn{min-height:44px;min-width:120px;padding:0 16px;border:1px solid var(--fw-muted);background:transparent;color:var(--fw-text);border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box}
+.btn.pri{border-color:transparent;background:var(--fw-accent-hover);color:var(--fw-on-accent);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:bold}
+.btn.pri:hover{background:var(--fw-button-hover)}
+.btn.sm{min-height:36px;min-width:96px;font-size:13px;padding:0 12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span{font-size:13px;font-weight:bold}
+.field input[type=text],.field input[type=password]{min-height:44px;border:1px solid var(--fw-muted);background:var(--fw-raised);padding:0 12px;border-radius:2px;box-sizing:border-box;width:100%}
+.hint{font-size:12px;color:var(--fw-muted)}
+.wc{width:46px;height:36px;border:0;background:transparent;color:var(--fw-muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wc:hover{background:var(--fw-surface);color:var(--fw-text)}
+.wc.x:hover{background:var(--fw-danger);color:var(--fw-background)}
+.choice{display:flex;gap:16px;align-items:flex-start;text-align:left;padding:20px;border:1px solid var(--fw-border);background:var(--fw-raised);cursor:pointer;border-radius:2px;width:100%;box-sizing:border-box}
+.choice:hover{border-color:var(--fw-muted)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;padding:12px 14px;border:1px solid var(--fw-border);background:var(--fw-surface)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="min-height: 900px; display: flex; flex-direction: column; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+
+<!-- Custom window frame: the whole strip is a drag region except the buttons -->
+<div data-tauri-drag-region style="display: flex; align-items: center; height: 36px; border-bottom: 1px solid var(--fw-border); background: var(--fw-surface); user-select: none">
+<div style="display: flex; align-items: center; gap: 8px; padding: 0 12px; flex: 1">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span class="mono" style="font-weight: bold; letter-spacing: .12em; font-size: 12px">FOREMAN</span>
+<span class="hint" style="margin-left: 8px">{{frameLabel}}</span>
+</div>
+<button type="button" class="wc" aria-label="Minimize"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+<button type="button" class="wc" aria-label="Maximize"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1.4"></rect></svg></button>
+<button type="button" class="wc x" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.4"></path></svg></button>
+</div>
+
+<div style="flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 64px 24px">
+<main style="width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 24px">
+
+<!-- step crumb -->
+<div class="cap">{{crumb}}</div>
+
+<!-- ===== WELCOME ===== -->
+<sc-if value="{{isWelcome}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 24px">
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Where is your Foreman server?</h1>
+<p style="margin: 6px 0 0; color: var(--fw-muted)">The server runs the queue, logs jobs and talks to the printers. This app is a window onto it.</p>
+</div>
+
+<sc-if value="{{hasSaved}}" hint-placeholder-val="{{ true }}">
+<section aria-label="Saved servers" style="display: flex; flex-direction: column; gap: 8px">
+<div class="cap">Recent servers</div>
+<sc-for list="{{saved}}" as="s" hint-placeholder-count="2">
+<div class="row">
+<span style="width: 10px; height: 10px; border-radius: 50%; background: {{s.dot}}; flex: none" aria-hidden="true"></span>
+<div style="flex: 1 1 220px; min-width: 0"><b>{{s.name}}</b><div class="hint mono">{{s.addr}} · {{s.meta}}</div><div class="hint">{{s.routesLabel}}</div></div>
+<button type="button" class="btn sm" onClick="{{s.edit}}">Edit</button>
+<button type="button" class="btn sm pri" onClick="{{s.open}}">Connect</button>
+</div>
+</sc-for>
+</section>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<button type="button" class="choice" onClick="{{pickRemote}}">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="flex: none; color: var(--fw-accent)"><rect x="3" y="4" width="18" height="6"></rect><rect x="3" y="14" width="18" height="6"></rect><path d="M7 7h.01M7 17h.01"></path></svg>
+<span style="flex: 1"><b style="font-size: 16px">Another computer</b> <span class="mono" style="font-size: 11px; padding: 2px 6px; margin-left: 6px; color: var(--fw-success); background: var(--fw-success-bg)">Recommended</span><br><span style="color: var(--fw-muted)">A Pi, NAS or PC running foreman-server. Keeps printing, queueing and logging when this app is closed.</span></span>
+</button>
+<button type="button" class="choice" onClick="{{pickLocal}}">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="flex: none; color: var(--fw-accent)"><rect x="3" y="4" width="18" height="12"></rect><path d="M8 20h8M12 16v4"></path></svg>
+<span style="flex: 1"><b style="font-size: 16px">This computer</b><br><span style="color: var(--fw-muted)">Runs the server inside this app. Good for trying Foreman. Queue and job logging stop when you close it.</span></span>
+</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===== LOCAL ===== -->
+<sc-if value="{{isLocal}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Run the server here</h1>
+<p style="margin: 6px 0 0; color: var(--fw-muted)">Foreman and the built-in Spoolman start with this app.</p>
+</div>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--fw-border)"><span>Foreman</span><span class="mono">port 9090</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--fw-border)"><span>Spoolman (built in)</span><span class="mono">port 7912</span></div>
+<div style="display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px"><span>Data folder</span><span class="mono" style="font-size: 13px">~/.local/share/foreman</span></div>
+</section>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--fw-border); background: var(--fw-surface); cursor: pointer">
+<input type="checkbox" checked="{{lanOn}}" onChange="{{toggleLan}}" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--fw-accent-hover)">
+<span><b>Let other devices connect</b><br><span class="hint">Phone, the Fusion PC, Tailscale. Needs an admin password; without it the server only answers this computer.</span></span>
+</label>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn" onClick="{{back}}">Back</button>
+<button type="button" class="btn pri" onClick="{{startLocal}}">{{localCta}}</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===== CONNECT ===== -->
+<sc-if value="{{isConnect}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Connect to a server</h1>
+<p style="margin: 6px 0 0; color: var(--fw-muted)">Pick one found on your network, or type its address.</p>
+</div>
+
+<section aria-label="Found on your network" style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 12px"><span class="cap" style="flex: 1">Found on your network</span><button type="button" class="btn sm" onClick="{{rescan}}">{{scanLabel}}</button></div>
+<sc-for list="{{found}}" as="f" hint-placeholder-count="2">
+<button type="button" class="row" onClick="{{f.pick}}" style="cursor: pointer; text-align: left; border-color: {{f.border}}; color: var(--fw-text)">
+<div style="flex: 1 1 220px; min-width: 0"><b>{{f.name}}</b><div class="hint mono">{{f.addr}} · {{f.meta}}</div></div>
+<span class="mono" style="font-size: 12px; padding: 3px 8px; color: {{f.fg}}; background: {{f.bg}}">{{f.tag}}</span>
+</button>
+</sc-for>
+</section>
+
+<label class="field"><span>Server address</span>
+<input type="text" value="{{addr}}" onInput="{{setAddr}}" placeholder="10.0.0.20  ·  foreman.local  ·  my-pi.tail1234.ts.net:9090" class="mono">
+<span class="hint">Port 9090 is added if you leave it out. https is used automatically when the server has a certificate.</span>
+</label>
+
+<sc-if value="{{hasResult}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 14px 16px; border: 1px solid {{res.fg}}; background: {{res.bg}}">
+<div style="font-weight: bold; color: {{res.fg}}">{{res.title}}</div>
+<div style="font-size: 13px; margin-top: 4px">{{res.body}}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{canContinue}}" hint-placeholder-val="{{ false }}">
+<section aria-label="Backup addresses" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="padding: 10px 16px; border-bottom: 1px solid var(--fw-border)"><div class="cap">Backup addresses · tried in order when the one above stops answering</div></div>
+<sc-for list="{{routes}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--fw-border)">
+<span class="mono" style="width: 22px; color: var(--fw-muted)">{{r.n}}</span>
+<div style="flex: 1 1 240px; min-width: 0"><span class="mono" style="font-size: 13px">{{r.addr}}</span><div class="hint">{{r.kind}} · {{r.src}}</div></div>
+<button type="button" class="btn sm" onClick="{{r.up}}" aria-label="Move up" style="min-width: 44px">↑</button>
+<button type="button" class="btn sm" onClick="{{r.remove}}" style="min-width: 80px">Remove</button>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px">
+<input type="text" class="mono" value="{{newRoute}}" onInput="{{setNewRoute}}" placeholder="Add address, e.g. 192.168.50.20 or vpn name" style="flex: 1 1 260px; min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px">
+<button type="button" class="btn sm" onClick="{{addRoute}}">Add</button>
+</div>
+<div class="hint" style="padding: 0 16px 12px">Same server, same sign-in: the app checks the server's ID on every address, so a different machine on a backup address is refused.</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isKnown}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn pri" onClick="{{addKnownAsBackup}}">Add as backup route for Workshop Pi</button>
+<button type="button" class="btn" onClick="{{openKnown}}">Just connect</button>
+</div>
+</sc-if>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn" onClick="{{back}}">Back</button>
+<button type="button" class="btn" onClick="{{test}}">{{testLabel}}</button>
+<sc-if value="{{canContinue}}" hint-placeholder-val="{{ false }}">
+<button type="button" class="btn pri" onClick="{{toLogin}}">Continue</button>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- ===== EDIT SAVED SERVER ===== -->
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Edit server</h1>
+<p style="margin: 6px 0 0; color: var(--fw-muted)">All addresses below reach the same server. The app tries them top to bottom and uses the first that answers.</p>
+</div>
+<label class="field"><span>Name</span><input type="text" value="{{edName}}" onInput="{{setEdName}}"><span class="hint mono">Server ID {{srvId}} · checked on every address</span></label>
+<section aria-label="Addresses" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="padding: 10px 16px; border-bottom: 1px solid var(--fw-border)" class="cap">Addresses · in order</div>
+<sc-for list="{{edRoutes}}" as="r" hint-placeholder-count="3">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 16px; border-bottom: 1px solid var(--fw-border)">
+<span class="mono" style="width: 64px; font-size: 12px; color: var(--fw-muted)">{{r.role}}</span>
+<div style="flex: 1 1 220px; min-width: 0"><span class="mono" style="font-size: 13px">{{r.addr}}</span><div class="hint">{{r.kind}}</div></div>
+<span class="mono" style="font-size: 12px; padding: 3px 8px; color: {{r.fg}}; background: {{r.bg}}">{{r.state}}</span>
+<button type="button" class="btn sm" onClick="{{r.test}}" style="min-width: 64px">Test</button>
+<button type="button" class="btn sm" onClick="{{r.up}}" aria-label="Move up" style="min-width: 44px">↑</button>
+<button type="button" class="btn sm" onClick="{{r.remove}}" style="min-width: 80px">Remove</button>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px">
+<input type="text" class="mono" value="{{newRoute}}" onInput="{{setNewRoute}}" placeholder="Add address · try 100.101.5.7 or 10.0.0.31" style="flex: 1 1 260px; min-height: 36px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px">
+<button type="button" class="btn sm" onClick="{{testAdd}}">Test and add</button>
+</div>
+<sc-if value="{{hasAddMsg}}" hint-placeholder-val="{{ false }}">
+<div style="margin: 0 16px 12px; padding: 10px 14px; border: 1px solid {{addMsg.fg}}; background: {{addMsg.bg}}; color: {{addMsg.fg}}; font-size: 13px">{{addMsg.text}}</div>
+</sc-if>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn pri" onClick="{{back}}">Done</button>
+<button type="button" class="btn" onClick="{{forgetEdited}}" style="border-color: var(--fw-danger); color: var(--fw-danger)">Forget this server</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===== SETUP (fresh server, claim with setup code) ===== -->
+<sc-if value="{{isSetup}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div class="row" style="background: var(--fw-raised)"><div style="flex: 1"><b>{{srv.name}}</b><div class="hint mono">{{srv.addr}} · Foreman 0.3.0 · new server</div></div><button type="button" class="btn sm" onClick="{{toConnect}}">Change</button></div>
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Set up the admin account</h1>
+<p style="margin: 6px 0 0; color: var(--fw-muted)">This server has no admin yet. To prove you own it, enter the setup code it printed when it started.</p>
+</div>
+<div style="padding: 12px 14px; border: 1px solid var(--fw-border); background: var(--fw-surface); font-size: 13px">
+Find it in the server's log: <span class="mono" style="padding: 2px 6px; background: var(--fw-raised)">journalctl -u foreman-server | grep "setup code"</span><br><span class="hint">The code works once and expires after 24 h. Restarting the server prints a new one.</span>
+</div>
+<label class="field"><span>Setup code</span><input type="text" class="mono" value="{{code}}" onInput="{{setCode}}" placeholder="XXXX-XXXX" style="letter-spacing: .2em; max-width: 240px"></label>
+<label class="field"><span>Username</span><input type="text" value="admin" onInput="{{noop}}"></label>
+<label class="field"><span>Password</span><input type="password" value="{{pw}}" onInput="{{setPw}}"><span class="hint" style="color: {{pwHintFg}}">{{pwHint}}</span></label>
+<label class="field"><span>Repeat password</span><input type="password" value="{{pw2}}" onInput="{{setPw2}}"><span class="hint" style="color: {{pw2HintFg}}">{{pw2Hint}}</span></label>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn" onClick="{{toConnect}}">Back</button>
+<button type="button" class="btn pri" onClick="{{finishSetup}}" disabled="{{setupBlocked}}" style="opacity: {{setupOpacity}}">Create admin and sign in</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===== LOGIN ===== -->
+<sc-if value="{{isLogin}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div class="row" style="background: var(--fw-raised)"><span style="width: 10px; height: 10px; border-radius: 50%; background: var(--fw-success); flex: none" aria-hidden="true"></span><div style="flex: 1"><b>{{srv.name}}</b><div class="hint mono">{{srv.addr}} · Foreman 0.3.0 · {{srv.printers}}</div><div class="hint">{{routesSummary}}</div></div><button type="button" class="btn sm" onClick="{{toConnect}}">Change</button></div>
+<div>
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Sign in</h1>
+</div>
+<label class="field"><span>Username</span><input type="text" value="{{user}}" onInput="{{setUser}}"></label>
+<label class="field"><span>Password</span>
+<div style="display: flex; gap: 8px"><input type="{{pwType}}" value="{{pw}}" onInput="{{setPw}}" style="flex: 1; min-height: 44px; border: 1px solid {{pwBorder}}; background: var(--fw-raised); padding: 0 12px; border-radius: 2px"><button type="button" class="btn sm" onClick="{{togglePw}}" style="min-height: 44px">{{pwToggle}}</button></div>
+</label>
+<sc-if value="{{hasLoginErr}}" hint-placeholder-val="{{ false }}">
+<div role="alert" style="padding: 10px 14px; border: 1px solid var(--fw-danger); background: var(--fw-danger-bg); color: var(--fw-danger); font-size: 13px">{{loginErr}}</div>
+</sc-if>
+<label style="display: flex; gap: 10px; align-items: center; cursor: pointer"><input type="checkbox" checked="{{remember}}" onChange="{{toggleRemember}}" style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"><span>Keep me signed in on this device</span></label>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<button type="button" class="btn pri" onClick="{{signIn}}">Sign in</button>
+<span class="hint" style="flex: 1 1 240px">Forgot it? On the server run <span class="mono">foreman-server reset-admin</span></span>
+</div>
+<div class="hint">Demo: any password works except <span class="mono">wrong</span>.</div>
+</div>
+</sc-if>
+
+<!-- ===== LOST CONNECTION ===== -->
+<sc-if value="{{isLost}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; gap: 14px; align-items: flex-start; padding: 16px; border: 1px solid {{lostFg}}; background: {{lostBg}}">
+<span class="mono" style="font-weight: bold; color: {{lostFg}}">{{lostSym}}</span>
+<div style="flex: 1"><b>{{lostTitle}}</b><div style="font-size: 13px; margin-top: 4px">{{lostBody}}</div></div>
+</div>
+<section aria-label="Routes" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="padding: 10px 16px; border-bottom: 1px solid var(--fw-border)" class="cap">Routes to {{srv.name}}</div>
+<sc-for list="{{routeStatus}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 16px; border-bottom: 1px solid var(--fw-border)">
+<span class="mono" style="min-width: 110px; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{r.fg}}; background: {{r.bg}}">{{r.state}}</span>
+<div style="flex: 1 1 240px; min-width: 0"><span class="mono" style="font-size: 13px">{{r.addr}}</span><div class="hint">{{r.kind}}</div></div>
+</div>
+</sc-for>
+</section>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" class="btn pri" onClick="{{retry}}">{{retryLabel}}</button>
+<button type="button" class="btn" onClick="{{switchServer}}">Switch server</button>
+</div>
+<div class="hint">In the app this is a banner over the last screen. A switch to a backup route is silent apart from a small "via Tailscale" tag in the title bar; this full panel only appears when every route is down. Moves back to the first route once it has answered for 60 s.</div>
+</div>
+</sc-if>
+
+<!-- ===== DONE ===== -->
+<sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="padding: 16px; border: 1px solid var(--fw-success); background: var(--fw-success-bg); color: var(--fw-success)"><b>✓ {{doneText}}</b></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<a href="Main.dc.html" class="btn pri">Open Fleet</a>
+<button type="button" class="btn" onClick="{{reset}}">Start the demo again</button>
+</div>
+</div>
+</sc-if>
+
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"start":{"editor":"enum","options":["welcome","login","setup","lost"],"default":"welcome","section":"Demo"},"returning":{"editor":"boolean","default":true,"section":"Demo"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = this.fresh();
+  }
+  fresh() {
+    const start = this.props.start ?? 'welcome';
+    return {
+      view: start, addr: start === 'welcome' ? '' : '10.0.0.20:9090', result: null, scanning: false, testing: false,
+      user: 'admin', pw: '', pw2: '', code: '', showPw: false, remember: true, loginErr: '', fails: 0,
+      edName: 'Workshop Pi', addMsg: null, rtest: {},
+      lan: false, retryIn: 4, attempt: 3, forgotten: {}, doneText: '', lostStage: 0, newRoute: '',
+      routes: [{ addr: 'workshop-pi.local:9090', kind: 'LAN name', src: 'reported by server' }, { addr: 'workshop-pi.tail1234.ts.net:9090', kind: 'Tailscale', src: 'reported by server' }],
+      srv: { name: 'Workshop Pi', addr: '10.0.0.20:9090', printers: '2 printers', fresh: start === 'setup' }
+    };
+  }
+  probe(raw) {
+    const a = raw.trim();
+    if (!a) return { ok: false, t: 'bad', title: '✖ Enter an address', body: 'An IP address, a hostname, or a Tailscale name.' };
+    const withPort = /:\d+$/.test(a) ? a : a + ':9090';
+    if (/:7912$/.test(withPort)) return { ok: false, t: 'warn', title: '⚠ That is the Spoolman port', body: 'Port 7912 is the built-in Spoolman API that Moonraker and slicers use. Foreman itself listens on 9090. Try ' + withPort.replace(/:7912$/, ':9090') + '.' };
+    if (/^10\.0\.0\.20(:9090)?$/.test(a) || /^foreman\.local/.test(a)) return { ok: true, fresh: false, addr: withPort, name: 'Workshop Pi', printers: '2 printers', t: 'ok', title: '✓ Foreman 0.3.0 found', body: 'Workshop Pi · Spoolman built-in OK · 2 printers · sign-in required.' };
+    if (/^100\.101\.5\.7/.test(a)) return { ok: false, known: true, addr: withPort, t: 'ok', title: '✓ This is Workshop Pi, which you already have saved', body: 'Same server ID as the saved Workshop Pi, just a different address (Tailscale IP). Add it as a backup route so the app can fall back to it.' };
+    if (/^10\.0\.0\.31/.test(a)) return { ok: true, fresh: true, addr: withPort, name: 'fusion-pc', printers: 'no printers yet', t: 'ok', title: '✓ Foreman 0.3.0 found, not set up yet', body: 'fusion-pc has no admin account. Next you set one up with the setup code from its log.' };
+    if (/^10\.0\.0\.177/.test(a)) return { ok: false, t: 'warn', title: '⚠ That is a printer, not a Foreman server', body: 'HellV0 answers as Moonraker. Add it as a printer after you connect; here you need the machine that runs foreman-server.' };
+    return { ok: false, t: 'bad', title: '✖ No answer from ' + withPort, body: 'Check the address, that foreman-server is running, and that port 9090 is open in the server firewall. On Tailscale, check both devices are online.' };
+  }
+  renderVals() {
+    const s = this.state;
+    const set = (o) => this.setState(o);
+    const tone = { ok: ['var(--fw-success)', 'var(--fw-success-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'] };
+    const go = (view, extra) => set({ view, result: null, loginErr: '', ...(extra || {}) });
+
+    const savedAll = [
+      { id: 'pi', name: 'Workshop Pi', addr: '10.0.0.20:9090', meta: 'last used 2 h ago', dot: 'var(--fw-success)', routesLabel: '+ ' + s.routes.length + ' backup routes: ' + s.routes.map(x => x.kind).join(', '), srv: { name: 'Workshop Pi', addr: '10.0.0.20:9090', printers: '2 printers' } },
+      { id: 'lab', name: 'Lab server', addr: '192.168.50.4:9090', meta: 'last used 3 weeks ago', dot: 'var(--fw-muted)', routesLabel: 'no backup routes', srv: { name: 'Lab server', addr: '192.168.50.4:9090', printers: '1 printer' } }
+    ];
+    const routes = s.routes.map((x, i) => ({ ...x, n: (i + 2) + '.',
+      up: () => { if (i === 0) return; const a = [...this.state.routes]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; set({ routes: a }); },
+      remove: () => set({ routes: this.state.routes.filter((_, j) => j !== i) }) }));
+    const lostRoutes = [
+      { addr: s.srv.addr, kind: 'Primary · LAN IP', st: s.lostStage === 0 ? 'down' : (s.lostStage === 1 ? 'down' : 'ok') },
+      ...s.routes.map((x, i) => ({ addr: x.addr, kind: x.kind, st: s.lostStage === 0 ? (i === s.routes.length - 1 ? 'trying' : 'down') : (s.lostStage === 1 ? (i === s.routes.length - 1 ? 'ok' : 'down') : 'standby') }))
+    ];
+    // Edit view: one ordered list = primary + backups
+    const L = [{ addr: s.srv.addr, kind: 'LAN IP' }, ...s.routes];
+    const writeL = (list, extra) => set({ srv: { ...this.state.srv, addr: list[0].addr }, routes: list.slice(1), ...(extra || {}) });
+    const rt = { ok: ['✓ Same server', 'var(--fw-success)', 'var(--fw-success-bg)'], down: ['✖ No answer', 'var(--fw-danger)', 'var(--fw-danger-bg)'], none: ['not tested', 'var(--fw-muted)', 'var(--fw-surface)'] };
+    const edRoutes = L.map((x, i) => { const st = s.rtest[x.addr] || 'none'; return { addr: x.addr, kind: x.kind, role: i === 0 ? 'Primary' : 'Backup ' + i,
+      state: rt[st][0], fg: rt[st][1], bg: rt[st][2],
+      test: () => set({ rtest: { ...this.state.rtest, [x.addr]: /tail|local|^10\.0\.0\.20|^100\./.test(x.addr) ? 'ok' : 'down' } }),
+      up: () => { if (i === 0) return; const a = [...L]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; writeL(a); },
+      remove: () => { if (L.length === 1) return; writeL(L.filter((_, j) => j !== i)); } }; });
+    const testAdd = () => {
+      const v = this.state.newRoute.trim(); if (!v) return;
+      const r = this.probe(v);
+      if (L.some(x => x.addr === (r.addr || v))) return set({ addMsg: { t: 'warn', text: '⚠ ' + (r.addr || v) + ' is already in the list.' } });
+      if (r.known) return writeL([...L, { addr: r.addr, kind: 'Tailscale IP' }], { newRoute: '', rtest: { ...this.state.rtest, [r.addr]: 'ok' }, addMsg: { t: 'ok', text: '✓ ' + r.addr + ' answered with the same server ID. Added as backup ' + L.length + '.' } });
+      if (r.ok) return set({ addMsg: { t: 'bad', text: '✖ ' + r.addr + ' is a different Foreman server (' + r.name + '). Not added. Save it as its own server from the start screen instead.' } });
+      set({ addMsg: { t: 'warn', text: r.title.replace(/^. /, '⚠ ') + '. Not added. Fix the address, or add it anyway only if the server is off right now.' } });
+    };
+    const stTone = { down: ['✖ No answer', 'var(--fw-danger)', 'var(--fw-danger-bg)'], trying: ['… Trying', 'var(--fw-warning)', 'var(--fw-warning-bg)'], ok: ['✓ Connected', 'var(--fw-success)', 'var(--fw-success-bg)'], standby: ['○ Standby', 'var(--fw-muted)', 'var(--fw-surface)'] };
+    const routeStatus = lostRoutes.map(x => ({ addr: x.addr, kind: x.kind, state: stTone[x.st][0], fg: stTone[x.st][1], bg: stTone[x.st][2] }));
+    const lastKind = s.routes.length ? s.routes[s.routes.length - 1].kind : 'backup';
+    const lostCopy = s.lostStage === 0
+      ? ['○', 'var(--fw-warning)', 'var(--fw-warning-bg)', s.srv.name + ' stopped answering on ' + s.srv.addr, '3 checks failed. Trying the backup routes in order, using the same sign-in. Printers and the queue keep running on the server.', 'Retry now']
+      : s.lostStage === 1
+      ? ['✓', 'var(--fw-success)', 'var(--fw-success-bg)', 'Connected via ' + lastKind + ' (backup)', 'No sign-in needed. Foreman keeps checking the LAN address and moves back when it has answered for 60 s.', 'Simulate LAN back']
+      : ['✓', 'var(--fw-success)', 'var(--fw-success-bg)', 'Back on the LAN address', 'Moved back to ' + s.srv.addr + ' after 60 s of good checks.', 'Simulate LAN drop'];
+    const saved = (this.props.returning ?? true) ? savedAll.filter(x => !s.forgotten[x.id]).map(x => ({ ...x,
+      edit: () => go('edit', { srv: { ...x.srv }, edName: x.name, addMsg: null, rtest: {}, newRoute: '', editId: x.id }),
+      open: () => go('login', { srv: x.srv, pw: '' }) })) : [];
+
+    const foundDefs = [
+      { name: 'Workshop Pi', addr: '10.0.0.20:9090', meta: 'Foreman 0.3.0 · 2 printers', tag: 'Sign-in', t: 'ok' },
+      { name: 'fusion-pc', addr: '10.0.0.31:9090', meta: 'Foreman 0.3.0 · new', tag: 'Not set up', t: 'warn' }
+    ];
+    const found = s.scanning ? [] : foundDefs.map(f => ({ ...f, fg: tone[f.t][0], bg: tone[f.t][1],
+      border: s.addr === f.addr ? 'var(--fw-accent)' : 'var(--fw-border)',
+      pick: () => { const r = this.probe(f.addr); set({ addr: f.addr, result: r }); } }));
+
+    const r = s.result;
+    const pwLen = s.pw.length;
+    const pwOk = pwLen >= 10;
+    const codeOk = /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/i.test(s.code.trim());
+    const crumbs = { welcome: 'Step 1 of 2 · Choose a server', local: 'Step 2 of 2 · This computer', connect: 'Step 1 of 2 · Server address', setup: 'Step 2 of 2 · Claim the server', login: 'Step 2 of 2 · Sign in', lost: 'Connection', done: 'Ready', edit: 'Saved server' };
+    const frames = { edit: 'Not connected', welcome: 'Not connected', local: 'Not connected', connect: 'Not connected', setup: s.srv.addr, login: s.srv.addr, lost: s.lostStage === 1 ? s.srv.name + ' · via ' + (s.routes.length ? s.routes[s.routes.length - 1].kind : 'backup') : (s.lostStage === 0 ? s.srv.addr + ' · reconnecting' : s.srv.addr), done: s.srv.addr };
+
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      crumb: crumbs[s.view], frameLabel: frames[s.view],
+      isWelcome: s.view === 'welcome', isLocal: s.view === 'local', isConnect: s.view === 'connect', isSetup: s.view === 'setup', isLogin: s.view === 'login', isLost: s.view === 'lost', isDone: s.view === 'done',
+      saved, hasSaved: saved.length > 0,
+      pickRemote: () => go('connect'), pickLocal: () => go('local'), back: () => go('welcome'), toConnect: () => go('connect'),
+      lanOn: s.lan, toggleLan: () => set({ lan: !this.state.lan }),
+      localCta: s.lan ? 'Start and set admin password' : 'Start server here',
+      startLocal: () => s.lan ? go('setup', { srv: { name: 'This computer', addr: '127.0.0.1:9090', printers: 'no printers yet', fresh: true }, code: 'K7QD-2MXP' }) : go('done', { srv: { name: 'This computer', addr: '127.0.0.1:9090' }, doneText: 'Server running on this computer · only this app can reach it' }),
+      found, scanLabel: s.scanning ? 'Scanning…' : 'Scan again',
+      rescan: () => { set({ scanning: true }); setTimeout(() => this.setState({ scanning: false }), 900); },
+      addr: s.addr, setAddr: (e) => set({ addr: e.target.value, result: null }),
+      testLabel: s.testing ? 'Testing…' : 'Test',
+      test: () => { set({ testing: true, result: null }); setTimeout(() => this.setState({ testing: false, result: this.probe(this.state.addr) }), 600); },
+      hasResult: !!r, res: r ? { title: r.title, body: r.body, fg: tone[r.t][0], bg: tone[r.t][1] } : { title: '', body: '', fg: '', bg: '' },
+      canContinue: !!(r && r.ok),
+      toLogin: () => r && r.ok && (r.fresh ? go('setup', { srv: { name: r.name, addr: r.addr, printers: r.printers, fresh: true }, pw: '', pw2: '', code: '' }) : go('login', { srv: { name: r.name, addr: r.addr, printers: r.printers }, pw: '' })),
+      srv: s.srv,
+      code: s.code, setCode: (e) => set({ code: e.target.value.toUpperCase() }),
+      pw: s.pw, setPw: (e) => set({ pw: e.target.value, loginErr: '' }),
+      pw2: s.pw2, setPw2: (e) => set({ pw2: e.target.value }),
+      pwHint: pwLen === 0 ? 'At least 10 characters. A passphrase is fine.' : (pwOk ? '✓ Long enough' : (10 - pwLen) + ' more characters'),
+      pwHintFg: pwLen === 0 ? 'var(--fw-muted)' : (pwOk ? 'var(--fw-success)' : 'var(--fw-warning)'),
+      pw2Hint: s.pw2.length === 0 ? ' ' : (s.pw2 === s.pw ? '✓ Matches' : 'Does not match yet'),
+      pw2HintFg: s.pw2 === s.pw ? 'var(--fw-success)' : 'var(--fw-warning)',
+      setupBlocked: !(codeOk && pwOk && s.pw === s.pw2), setupOpacity: (codeOk && pwOk && s.pw === s.pw2) ? '1' : '.45',
+      finishSetup: () => (codeOk && pwOk && s.pw === s.pw2) && go('done', { doneText: 'Admin created on ' + this.state.srv.name + ' · signed in' }),
+      noop: () => {},
+      user: s.user, setUser: (e) => set({ user: e.target.value }),
+      pwType: s.showPw ? 'text' : 'password', pwToggle: s.showPw ? 'Hide' : 'Show', togglePw: () => set({ showPw: !this.state.showPw }),
+      pwBorder: s.loginErr ? 'var(--fw-danger)' : 'var(--fw-muted)',
+      hasLoginErr: !!s.loginErr, loginErr: s.loginErr,
+      remember: s.remember, toggleRemember: () => set({ remember: !this.state.remember }),
+      signIn: () => {
+        if (!this.state.pw) return set({ loginErr: 'Enter your password.' });
+        if (this.state.pw === 'wrong') { const f = this.state.fails + 1; return set({ fails: f, loginErr: f >= 5 ? 'Too many tries. Wait 60 s before trying again.' : 'Wrong username or password. ' + (5 - f) + ' tries left before a 60 s pause.' }); }
+        go('done', { doneText: 'Signed in to ' + this.state.srv.name + (this.state.remember ? ' · remembered on this device' : '') });
+      },
+      isEdit: s.view === 'edit', edName: s.edName, setEdName: (e) => set({ edName: e.target.value }), srvId: 'fm-7c2e…91ad',
+      edRoutes, testAdd, hasAddMsg: !!s.addMsg, addMsg: s.addMsg ? { text: s.addMsg.text, fg: tone[s.addMsg.t][0], bg: tone[s.addMsg.t][1] } : { text: '', fg: '', bg: '' },
+      forgetEdited: () => go('welcome', { forgotten: { ...this.state.forgotten, [this.state.editId]: true } }),
+      isKnown: !!(r && r.known),
+      addKnownAsBackup: () => go('edit', { srv: { name: 'Workshop Pi', addr: '10.0.0.20:9090', printers: '2 printers' }, edName: 'Workshop Pi', editId: 'pi', routes: this.state.routes.some(x => x.addr === r.addr) ? this.state.routes : [...this.state.routes, { addr: r.addr, kind: 'Tailscale IP' }], rtest: { [r.addr]: 'ok' }, addMsg: { t: 'ok', text: '✓ Added ' + r.addr + ' as a backup route.' }, newRoute: '' }),
+      openKnown: () => go('login', { srv: { name: 'Workshop Pi', addr: r.addr, printers: '2 printers' }, pw: '' }),
+      routes, newRoute: s.newRoute, setNewRoute: (e) => set({ newRoute: e.target.value }),
+      addRoute: () => { const v = this.state.newRoute.trim(); if (!v) return; set({ routes: [...this.state.routes, { addr: /:\d+$/.test(v) ? v : v + ':9090', kind: 'Added by you', src: 'not tested yet' }], newRoute: '' }); },
+      routesSummary: s.routes.length ? 'Backups: ' + s.routes.map(x => x.kind).join(' → ') : 'No backup routes',
+      routeStatus, lostSym: lostCopy[0], lostFg: lostCopy[1], lostBg: lostCopy[2], lostTitle: lostCopy[3], lostBody: lostCopy[4], retryLabel: lostCopy[5],
+      retry: () => set({ lostStage: (this.state.lostStage + 1) % 3 }),
+      switchServer: () => go('welcome'),
+      doneText: s.doneText,
+      reset: () => this.setState(this.fresh())
+    };
+  }
+}
+</script>
+</body>
+</html>
