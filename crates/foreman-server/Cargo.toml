@@ -51,3 +51,6 @@ sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio"] }
 
 # HTTP client (snapshot proxy)
 reqwest = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

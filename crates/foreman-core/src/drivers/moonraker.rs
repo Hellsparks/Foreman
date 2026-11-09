@@ -41,6 +41,7 @@ use crate::events::{
 struct JsonRpcRequest {
     jsonrpc: &'static str,
     method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     params: Option<Value>,
     id: u64,
 }
@@ -304,6 +305,7 @@ impl MoonrakerDriver {
         };
         let printer_id = self.config.printer_id;
         let api_key = self.config.api_key.clone();
+        let http_base = self.config.url.clone();
         let bus_tx = Arc::clone(&self.bus_tx);
         let status = Arc::clone(&self.status);
         let capabilities = Arc::clone(&self.capabilities);
@@ -324,6 +326,7 @@ impl MoonrakerDriver {
                 match Self::run_connection(
                     printer_id,
                     &ws_url,
+                    &http_base,
                     api_key.as_deref(),
                     &bus_tx,
                     &status,
@@ -379,9 +382,11 @@ impl MoonrakerDriver {
 
     /// Run a single WebSocket connection session. Returns Ok(()) on clean
     /// shutdown, Err on connection loss.
+    #[allow(clippy::too_many_arguments)]
     async fn run_connection(
         printer_id: i64,
         ws_url: &str,
+        http_base: &str,
         api_key: Option<&str>,
         bus_tx: &broadcast::Sender<ServerEvent>,
         status: &RwLock<CachedStatus>,
@@ -574,7 +579,7 @@ impl MoonrakerDriver {
                         Self::parse_config_capabilities(&result, capabilities).await;
                     } else if id == webcams_id {
                         // Parse webcam list.
-                        Self::parse_webcams(&result, capabilities).await;
+                        Self::parse_webcams(&result, capabilities, http_base).await;
                     } else if id == macros_id {
                         // Parse macro names from printer.objects.list.
                         Self::parse_macros(&result, capabilities).await;
@@ -635,10 +640,39 @@ impl MoonrakerDriver {
         }
     }
 
-    async fn parse_webcams(result: &Value, capabilities: &RwLock<Option<PrinterCapabilities>>) {
+    async fn parse_webcams(
+        result: &Value,
+        capabilities: &RwLock<Option<PrinterCapabilities>>,
+        http_base: &str,
+    ) {
         let webcams_arr = match result.get("webcams").and_then(|v| v.as_array()) {
             Some(a) => a,
             None => return,
+        };
+
+        // Derive an absolute base for resolving relative URLs (e.g. /webcam/...).
+        // Strip any path from http_base so we get just scheme://host[:port].
+        let origin = {
+            let s = http_base
+                .replace("ws://", "http://")
+                .replace("wss://", "https://");
+            if let Some(pos) = s.find("://") {
+                let after = &s[pos + 3..];
+                let end = after.find('/').map(|i| pos + 3 + i).unwrap_or(s.len());
+                s[..end].to_owned()
+            } else {
+                s
+            }
+        };
+
+        let resolve = |raw: &str| -> String {
+            if raw.starts_with("http://") || raw.starts_with("https://") {
+                raw.to_owned()
+            } else if raw.starts_with('/') {
+                format!("{origin}{raw}")
+            } else {
+                raw.to_owned()
+            }
         };
 
         let mut caps = capabilities.write().await;
@@ -654,11 +688,11 @@ impl MoonrakerDriver {
             let stream_url = wc
                 .get("stream_url")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_owned());
+                .map(resolve);
             let snapshot_url = wc
                 .get("snapshot_url")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_owned());
+                .map(resolve);
             c.webcams.push(WebcamInfo {
                 name,
                 stream_url,

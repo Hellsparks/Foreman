@@ -69,16 +69,27 @@ impl DriverManager {
                                 .write()
                                 .await
                                 .insert(printer_id, status.clone());
-                            mgr2.last_status_at
-                                .write()
-                                .await
-                                .insert(printer_id, Instant::now());
+                            // Only refresh the heartbeat timer when the printer is
+                            // actually reachable. Offline events are self-published
+                            // by the driver on disconnect — counting them would
+                            // prevent the offline watcher from ever triggering.
+                            if status.state != PrinterState::Offline {
+                                mgr2.last_status_at
+                                    .write()
+                                    .await
+                                    .insert(printer_id, Instant::now());
+                            }
 
                             // ── Clear offline attention if printer is back ───────
+                            // Only clear when the printer is genuinely reachable
+                            // (not when the driver itself reports Offline on disconnect).
                             let offline_key = (printer_id, "offline".to_owned());
-                            if let Some(att_id) =
+                            let offline_att_id = if status.state != PrinterState::Offline {
                                 mgr2.open_attention.read().await.get(&offline_key).copied()
-                            {
+                            } else {
+                                None
+                            };
+                            if let Some(att_id) = offline_att_id {
                                 if let Err(e) =
                                     foreman_core::repo::attention::dismiss(&mgr2.pool, att_id).await
                                 {
@@ -392,5 +403,99 @@ impl DriverManager {
         let caps = self.capabilities_cache.read().await;
         caps.get(&printer_id)
             .and_then(|c| c.webcams.iter().find_map(|w| w.snapshot_url.clone()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use foreman_core::{
+        db::ForemanDb,
+        events::{PrinterState, PrinterStatus, ServerEvent},
+    };
+    use tempfile::TempDir;
+    use tokio::sync::broadcast;
+
+    fn make_status(state: PrinterState) -> PrinterStatus {
+        PrinterStatus {
+            state,
+            nozzle: None,
+            bed: None,
+            progress: None,
+            filename: None,
+            print_duration: None,
+            display_message: None,
+            layer: None,
+            total_layers: None,
+            remaining_time: None,
+            fans: None,
+            ams_trays: vec![],
+            hms_codes: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_error_attention_raised_and_cleared() {
+        let tmp = TempDir::new().unwrap();
+        let db = ForemanDb::connect(&tmp.path().join("test.db"))
+            .await
+            .unwrap();
+
+        let (tx, _) = broadcast::channel::<ServerEvent>(256);
+        let tx = Arc::new(tx);
+
+        // Insert a minimal printer row so the FK constraint in attention_item is satisfied.
+        sqlx::query(
+            "INSERT INTO printer (id, name, firmware, tags, created_at, updated_at) \
+             VALUES (999, 'test-printer', 'moonraker', '[]', '2026-01-01', '2026-01-01')",
+        )
+        .execute(&db.pool)
+        .await
+        .unwrap();
+
+        let _mgr = DriverManager::new(Arc::clone(&tx), db.pool.clone());
+
+        // Trigger an error state.
+        tx.send(ServerEvent::PrinterStatus {
+            printer_id: 999,
+            status: make_status(PrinterState::Error),
+        })
+        .unwrap();
+
+        // Let the event listener task process it.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let items = foreman_core::repo::attention::list_active(&db.pool)
+            .await
+            .unwrap();
+        assert!(
+            items
+                .iter()
+                .any(|i| i.printer_id == Some(999) && i.kind == "error"),
+            "error attention should have been raised"
+        );
+
+        // Send a non-error state to clear the attention.
+        tx.send(ServerEvent::PrinterStatus {
+            printer_id: 999,
+            status: make_status(PrinterState::Idle),
+        })
+        .unwrap();
+
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let items = foreman_core::repo::attention::list_active(&db.pool)
+            .await
+            .unwrap();
+        assert!(
+            !items
+                .iter()
+                .any(|i| i.printer_id == Some(999) && i.kind == "error"),
+            "error attention should have been cleared after recovery"
+        );
     }
 }
