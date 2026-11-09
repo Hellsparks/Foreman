@@ -53,6 +53,9 @@ sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio"] }
 # HTTP client (snapshot proxy)
 reqwest = { workspace = true }
 
+# URL parsing (path failover health checks)
+url = "2"
+
 [dev-dependencies]
 tempfile = "3"
 async-trait = { workspace = true }

@@ -5,4 +5,4 @@ import type { FirmwareKind } from "./FirmwareKind";
  * Fields that may be updated on an existing printer.
  * `None` = leave unchanged.
  */
-export type UpdatePrinter = { name: string | null, firmware: FirmwareKind | null, primary_url: string | null, api_key: string | null, serial_number: string | null, access_code: string | null, tags: Array<string> | null, hardened_nozzle: boolean | null, sort_order: bigint | null, };
+export type UpdatePrinter = { name: string | null, firmware: FirmwareKind | null, primary_url: string | null, api_key: string | null, serial_number: string | null, access_code: string | null, tags: Array<string> | null, hardened_nozzle: boolean | null, sort_order: bigint | null, fail_after_checks: bigint | null, return_after_secs: bigint | null, };

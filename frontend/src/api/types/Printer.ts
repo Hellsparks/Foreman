@@ -24,4 +24,12 @@ tls_fingerprint: string | null,
 /**
  * User-defined labels.
  */
-tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint, created_at: string, updated_at: string, };
+tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint, 
+/**
+ * Consecutive health-check failures before switching to next path.
+ */
+fail_after_checks: bigint, 
+/**
+ * Seconds a higher-priority path must be healthy before returning to it.
+ */
+return_after_secs: bigint, created_at: string, updated_at: string, };

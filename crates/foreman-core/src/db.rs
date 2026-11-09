@@ -25,6 +25,9 @@ const SCHEMA_SQL: &str = include_str!("../migrations/0001_initial.sql");
 const MIGRATIONS: &[&str] = &[
     // 0002: TLS fingerprint pinning for Bambu printers.
     "ALTER TABLE printer ADD COLUMN tls_fingerprint TEXT",
+    // 0003: Path failover timing settings.
+    "ALTER TABLE printer ADD COLUMN fail_after_checks INTEGER NOT NULL DEFAULT 3",
+    "ALTER TABLE printer ADD COLUMN return_after_secs  INTEGER NOT NULL DEFAULT 60",
 ];
 
 /// Foreman-native database handle.

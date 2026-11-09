@@ -19,12 +19,16 @@ use serde::Serialize;
 
 use crate::state::AppState;
 
-/// A printer record enriched with live status.
+/// A printer record enriched with live status and active path info.
 #[derive(Debug, Serialize)]
 pub struct PrinterWithStatus {
     #[serde(flatten)]
     pub printer: Printer,
     pub status: Option<PrinterStatus>,
+    /// Index of the currently active connection path (0 = primary).
+    pub active_path_index: Option<i64>,
+    /// Display name of the currently active connection path.
+    pub active_path_name: Option<String>,
 }
 
 /// `GET /api/printers`
@@ -33,13 +37,19 @@ pub async fn list_printers(State(state): State<AppState>) -> impl IntoResponse {
     match foreman_core::repo::printer::list(pool).await {
         Ok(printers) => {
             let statuses = state.driver_manager.get_all_statuses().await;
-            let result: Vec<PrinterWithStatus> = printers
-                .into_iter()
-                .map(|p| {
-                    let status = statuses.get(&p.id).cloned();
-                    PrinterWithStatus { printer: p, status }
-                })
-                .collect();
+            let mut result: Vec<PrinterWithStatus> = Vec::with_capacity(printers.len());
+            for p in printers {
+                let status = statuses.get(&p.id).cloned();
+                let active = state.driver_manager.get_active_path(p.id).await;
+                let active_path_index = active.as_ref().map(|(i, _)| *i as i64);
+                let active_path_name = active.map(|(_, path)| path.name);
+                result.push(PrinterWithStatus {
+                    printer: p,
+                    status,
+                    active_path_index,
+                    active_path_name,
+                });
+            }
             (
                 StatusCode::OK,
                 Json(serde_json::to_value(result).unwrap_or_default()),
