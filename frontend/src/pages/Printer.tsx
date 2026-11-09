@@ -4,8 +4,11 @@ import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
-import { BackButton, StatusChip, SectionLabel, Button } from "../ui";
+import { StatusChip, SectionLabel, Button } from "../ui";
+import { createPortal } from "react-dom";
+import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
+import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import "./Printer.css";
 
@@ -74,6 +77,9 @@ export default function Printer() {
 
   // Tab
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Live");
+
+  const [topbarSlot, setTopbarSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setTopbarSlot(document.getElementById(TOPBAR_SLOT_ID)), []);
 
   // Live status: prefer streaming from shell context, fall back to fetched
   const liveStatus: PrinterStatus | null = statuses[printerId] ?? printer?.status ?? null;
@@ -217,23 +223,47 @@ export default function Printer() {
   return (
     <>
       {/* ── Header ─────────────────────────────────────────────── */}
+      {topbarSlot &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              className="printer-title__back"
+              aria-label="Back to Fleet"
+              title="Back to Fleet"
+              onClick={() => navigate("/fleet")}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+            <h1 className="printer-title__name">{printer.name}</h1>
+            {fwTag && <span className="printer-header__fw">{fwTag}</span>}
+            {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+              <span style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}>
+                via {printer.active_path_name}
+              </span>
+            )}
+            <StatusChip tone={statusTone(state)} symbol={statusSymbol(state)} word={statusWord(state)} />
+          </>,
+          topbarSlot,
+        )}
       <header className="printer-header">
-        <BackButton label="Fleet" onClick={() => navigate("/fleet")} />
-        <div className="printer-header__top">
-          <h1 className="printer-header__name">{printer.name}</h1>
-          {fwTag && <span className="printer-header__fw">{fwTag}</span>}
-          {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
-            <span className="printer-header__path-badge" style={{ color: "var(--fw-warning)", fontSize: 12 }}>
-              via {printer.active_path_name}
-            </span>
-          )}
-          <StatusChip
-            tone={statusTone(state)}
-            symbol={statusSymbol(state)}
-            word={statusWord(state)}
-          />
-          <div className="printer-header__spacer" />
-          <div className="printer-header__actions">
+        <div className="printer-tabs" role="tablist" aria-label="Printer sections">
+          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={t === activeTab}
+              className={`printer-tab${t === activeTab ? " printer-tab--active" : ""}`}
+              onClick={() => setActiveTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="printer-header__spacer" />
+        <div className="printer-header__actions">
             {isPrinting && (
               <>
                 <Button
@@ -267,22 +297,6 @@ export default function Printer() {
                 </svg>
               </a>
             )}
-          </div>
-        </div>
-
-        {/* Tab bar */}
-        <div className="printer-tabs" role="tablist" aria-label="Printer sections">
-          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
-            <button
-              key={t}
-              role="tab"
-              aria-selected={t === activeTab}
-              className={`printer-tab${t === activeTab ? " printer-tab--active" : ""}`}
-              onClick={() => setActiveTab(t)}
-            >
-              {t}
-            </button>
-          ))}
         </div>
       </header>
 
@@ -736,6 +750,7 @@ function PrinterConfigTab({
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [activePath, setActivePath] = useState<{ index: number; path: PrinterPath } | null>(null);
+  const sshRef = useRef<SshSettingsHandle>(null);
 
   useEffect(() => {
     api.listPaths(printerId).then((list) => {
@@ -871,6 +886,8 @@ function PrinterConfigTab({
         }))
       );
 
+      await sshRef.current?.save();
+
       setSavedMsg("Saved");
       setTimeout(() => setSavedMsg(""), 3000);
     } catch (e: unknown) {
@@ -922,11 +939,26 @@ function PrinterConfigTab({
   ];
 
   return (
-    <div
-      role="tabpanel"
-      aria-label="Config"
-      style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 20, padding: "20px 24px" }}
-    >
+    <div role="tabpanel" aria-label="Config" className="printer-config">
+      <div className="printer-config__bar">
+        <h2 className="printer-config__title">Printer settings</h2>
+        {savedMsg && (
+          <span
+            role="status"
+            style={{
+              fontSize: 13,
+              color: savedMsg.startsWith("Error") ? "var(--fw-danger)" : "var(--fw-success)",
+            }}
+          >
+            {savedMsg}
+          </span>
+        )}
+        <button type="button" className="printer-config__save" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+
+      <div className="printer-config__cols">
       {/* ── Connection section ───────────────────────────────────── */}
       <section
         style={{
@@ -1257,7 +1289,7 @@ function PrinterConfigTab({
         </label>
       </section>
 
-      <SshSettings printerId={printerId} firmware={printer.firmware} />
+      <SshSettings ref={sshRef} printerId={printerId} firmware={printer.firmware} />
 
       {/* ── Capabilities section ─────────────────────────────────── */}
       <section
@@ -1305,38 +1337,6 @@ function PrinterConfigTab({
           Hardened nozzle (abrasive filaments allowed)
         </label>
       </section>
-
-      {/* ── Save + Remove ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          style={{
-            minHeight: 44,
-            padding: "0 20px",
-            border: "1px solid transparent",
-            background: "var(--fw-accent-hover)",
-            color: "var(--fw-on-accent)",
-            borderRadius: 2,
-            cursor: "pointer",
-            fontFamily: "var(--fw-mono)",
-            fontWeight: "bold",
-          }}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-        {savedMsg && (
-          <span
-            role="status"
-            style={{
-              fontSize: 13,
-              color: savedMsg.startsWith("Error") ? "var(--fw-danger)" : "var(--fw-success)",
-            }}
-          >
-            {savedMsg}
-          </span>
-        )}
       </div>
 
       {/* ── Remove printer ───────────────────────────────────────── */}

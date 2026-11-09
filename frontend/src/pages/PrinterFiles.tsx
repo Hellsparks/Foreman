@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { Ref } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -905,9 +906,25 @@ function SshTerminal({ printerId, info }: { printerId: number; info: FilesInfo }
 // SSH settings (Config tab)
 // ---------------------------------------------------------------------------
 
-export function SshSettings({ printerId, firmware }: { printerId: number; firmware: string }) {
+export interface SshSettingsHandle {
+  /** Persist SSH settings if the user changed anything. Throws on failure. */
+  save(): Promise<void>;
+}
+
+export function SshSettings({
+  printerId,
+  firmware,
+  className,
+  ref,
+}: {
+  printerId: number;
+  firmware: string;
+  className?: string;
+  ref?: Ref<SshSettingsHandle>;
+}) {
   const [cfg, setCfg] = useState<PrinterSsh | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [touched, setTouched] = useState(false);
   const [user, setUser] = useState("pi");
   const [port, setPort] = useState(22);
   const [auth, setAuth] = useState<"key" | "password">("key");
@@ -936,26 +953,32 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
       .catch(() => {});
   }, [printerId, firmware]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: async () => {
+        if (!touched || firmware === "bambu") return;
+        if (!user.trim()) throw new Error("SSH user is required");
+        const c = await api.upsertSsh(printerId, {
+          ssh_user: user.trim(),
+          ssh_port: port,
+          auth_type: auth,
+          password: auth === "password" && password ? password : null,
+        });
+        apply(c);
+        setPassword("");
+        setTouched(false);
+        setMsg(null);
+      },
+    }),
+    [touched, firmware, user, port, auth, password, printerId],
+  );
+
   if (firmware === "bambu") return null;
 
-  const save = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const c = await api.upsertSsh(printerId, {
-        ssh_user: user.trim(),
-        ssh_port: port,
-        auth_type: auth,
-        password: auth === "password" && password ? password : null,
-      });
-      apply(c);
-      setPassword("");
-      setMsg({ ok: true, text: "SSH settings saved" });
-    } catch (e) {
-      setMsg({ ok: false, text: errText(e) });
-    } finally {
-      setBusy(false);
-    }
+  const change = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setTouched(true);
   };
 
   const test = async () => {
@@ -1004,7 +1027,7 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
   };
 
   return (
-    <section className="pf-ssh" aria-label="SSH">
+    <section className={`pf-ssh${className ? ` ${className}` : ""}`} aria-label="SSH">
       <h2>SSH</h2>
       <span className="pf-hint">
         Used for the Files tab (SFTP) and the terminal. Connects to the active connection path's host.
@@ -1026,7 +1049,7 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
       <div className="pf-ssh__grid">
         <label>
           User
-          <input className="pf-ssh__field" value={user} onChange={(e) => setUser(e.target.value)} spellCheck={false} />
+          <input className="pf-ssh__field" value={user} onChange={(e) => change(setUser)(e.target.value)} spellCheck={false} />
         </label>
         <label>
           Port
@@ -1036,18 +1059,18 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
             min={1}
             max={65535}
             value={port}
-            onChange={(e) => setPort(Number(e.target.value))}
+            onChange={(e) => change(setPort)(Number(e.target.value))}
           />
         </label>
       </div>
 
       <div role="radiogroup" aria-label="Authentication" className="pf-ssh__row">
         <label className="pf-ssh__radio">
-          <input type="radio" checked={auth === "key"} onChange={() => setAuth("key")} />
+          <input type="radio" checked={auth === "key"} onChange={() => change(setAuth)("key")} />
           Foreman key (recommended)
         </label>
         <label className="pf-ssh__radio">
-          <input type="radio" checked={auth === "password"} onChange={() => setAuth("password")} />
+          <input type="radio" checked={auth === "password"} onChange={() => change(setAuth)("password")} />
           Password
         </label>
       </div>
@@ -1073,7 +1096,7 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
             autoComplete="new-password"
             value={password}
             placeholder={cfg?.has_password ? "•••••• stored (encrypted) — type to replace" : ""}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => change(setPassword)(e.target.value)}
           />
         </label>
       )}
@@ -1086,10 +1109,13 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
       </div>
 
       <div className="pf-ssh__row">
-        <button type="button" className="pf-btn--primary" onClick={() => void save()} disabled={busy || !user.trim()}>
-          {cfg ? "Save SSH" : "Set up SSH"}
-        </button>
-        <button type="button" className="pf-btn" onClick={() => void test()} disabled={busy || !cfg}>
+        <button
+          type="button"
+          className="pf-btn"
+          onClick={() => void test()}
+          disabled={busy || !cfg || touched}
+          title={touched ? "Save changes first" : undefined}
+        >
           Test connection
         </button>
         {cfg && (
@@ -1097,6 +1123,8 @@ export function SshSettings({ printerId, firmware }: { printerId: number; firmwa
             Remove SSH
           </button>
         )}
+        {!cfg && loaded && !touched && <span className="pf-hint">Not set up — fill in and press Save changes.</span>}
+        {touched && <span className="pf-hint">Unsaved — press Save changes.</span>}
         {msg && (
           <span role="status" className={msg.ok ? "pf-ok" : "pf-err"}>
             {msg.text}

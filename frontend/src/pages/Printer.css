@@ -1,25 +1,41 @@
 /* Printer page — header, tabs, live tab layout */
 
+/* Tabs left, actions right, one row under the shell top bar. */
 .printer-header {
-  padding: 16px 32px 0;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
   border-bottom: 1px solid var(--fw-border);
 }
 
-.printer-header__top {
-  display: flex;
-  flex-wrap: wrap;
+/* Title block portaled into the shell top bar. */
+.printer-title__back {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  gap: 12px 16px;
+  justify-content: center;
+  border: 1px solid var(--fw-muted);
+  background: transparent;
+  color: var(--fw-text);
+  border-radius: 2px;
+  cursor: pointer;
 }
 
-.printer-header__name {
+.printer-title__back:hover {
+  background: var(--fw-raised);
+}
+
+.printer-title__name {
   margin: 0;
-  font-size: 32px;
+  font-size: 20px;
   line-height: 1.15;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .printer-header__fw {
@@ -28,6 +44,7 @@
   color: var(--fw-muted);
   border: 1px solid var(--fw-border);
   padding: 1px 6px;
+  white-space: nowrap;
 }
 
 .printer-header__spacer { flex: 1; }
@@ -36,6 +53,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 6px;
 }
 
 /* Tab bar */
@@ -47,8 +65,8 @@
 }
 
 .printer-tab {
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 40px;
+  padding: 0 14px;
   margin-right: -1px;
   border: 1px solid var(--fw-border);
   border-bottom-color: var(--fw-border);
@@ -66,7 +84,7 @@
 
 /* Live tab main area */
 .printer-live {
-  padding: 24px 32px 48px;
+  padding: 20px 0 32px;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -457,4 +475,58 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* Config tab: sticky save bar + sections flowing into as many columns as fit */
+.printer-config {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 0 32px;
+}
+
+.printer-config__bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  background: var(--fw-background);
+  border-bottom: 1px solid var(--fw-border);
+}
+
+.printer-config__title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+}
+
+.printer-config__save {
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--fw-mono);
+  font-weight: bold;
+}
+
+.printer-config__save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.printer-config__cols {
+  column-width: 460px;
+  column-gap: 20px;
+}
+
+.printer-config__cols > * {
+  break-inside: avoid;
+  width: 100%;
+  margin: 0 0 20px;
 }

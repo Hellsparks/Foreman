@@ -4,6 +4,9 @@ import type { ConnectionState } from "../hooks/useEventStream";
 /** True only when running inside the Tauri shell. */
 const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** Pages portal their title/status into this element. */
+export const TOPBAR_SLOT_ID = "topbar-page-slot";
+
 function WindowControls() {
   const win = getCurrentWindow();
 
@@ -59,6 +62,8 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
 
   return (
     <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
+      <div id={TOPBAR_SLOT_ID} className="topbar__page" />
+
       {/* Search field */}
       <label className="topbar__search" aria-label="Search or run a command">
         <svg
@@ -101,26 +106,6 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
         }
         onDoubleClick={win ? () => win.toggleMaximize() : undefined}
       />
-
-      {/* Scan — secondary */}
-      <button
-        type="button"
-        className="topbar__btn"
-        aria-label="Scan for printers on the network"
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          aria-hidden="true"
-        >
-          <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10" />
-        </svg>
-        Scan
-      </button>
 
       {/* Send — primary */}
       <button
