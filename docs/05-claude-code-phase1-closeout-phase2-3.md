@@ -78,10 +78,10 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] Use a reference implementation for message formats (e.g. OpenBambuAPI docs, ha-bambulab) — read, don't copy; note sources in the corrections log.
 
 ### 2.4 Tiered connection paths (W2)
-- [ ] Each printer has an ordered list of paths (name + URL). Health check on the active path; after N failed checks (default 3, ≈6 s) switch to the next; move back up when a higher path is healthy for a set time (default 60 s, or manual). Running jobs are never touched.
-- [ ] A switch emits `printer.connection` and raises an Attention item ("Using backup path: Tailscale").
-- [ ] SSH, webcam proxy and uploads use the active path's host.
-- [ ] API: CRUD + reorder + test-all for paths.
+- [x] Each printer has an ordered list of paths (name + URL). Health check on the active path; after N failed checks (default 3, ≈6 s) switch to the next; move back up when a higher path is healthy for a set time (default 60 s, or manual). Running jobs are never touched.
+- [x] A switch emits `printer.connection` and raises an Attention item ("Using backup path: <label>").
+- [ ] SSH, webcam proxy and uploads use the active path's host. (SSH deferred to 2.5; webcam/uploads deferred to later phase)
+- [x] API: CRUD + reorder + test-all for paths.
 
 ### 2.5 SSH / SFTP / terminal (W2)
 - [ ] Per-printer SSH settings: user, port, auth = Foreman ed25519 key (generated once, public key shown for copy) or password (stored encrypted). Host key pinned on first connect (TOFU); refuse on change until approved in the UI.
@@ -104,7 +104,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [ ] Attention items: print finished (clear plate), error/paused, runout, spool low, maintenance due, offline, path switched, failed upload. Each has actions (e.g. Plate cleared · start next, Rate outcome, Open printer). Actions return what changed so the UI can offer undo where reversible.
 
 ### 2.8 Settings → Printers
-- [ ] Same printer settings as the printer page's Config tab, editable from Settings (inline per printer): name, auth (Moonraker key / Bambu access code / API key), tags, connection paths, SSH, hardened nozzle, sort order (drag order = Fleet order).
+- [x] Same printer settings as the printer page's Config tab, editable from Settings (inline per printer): name, auth (Moonraker key / Bambu access code / API key), connection paths, hardened nozzle, fail/return timing. (Tags, SSH, sort-order drag deferred to later.)
 
 ### 2.9 Connect screen + auth (moved up from Phase 6) — design in UI demo first; build before remote access.
 
@@ -174,6 +174,16 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 18 — 2026-11-09 (2.4 connection paths + Config tab)
+
+**Health-check protocol:** Brief said "driver manager health-checks the active path." Implemented as TCP connect (not HTTP GET) to the host+port parsed from the path URL. This is protocol-agnostic — works for Moonraker (`http://host:7125` → port 7125), Bambu bare IPs, and mDNS hostnames. `reqwest` was considered but dropped in favour of `tokio::net::TcpStream` to avoid HTTP semantics.
+
+**`primary_url` overload during path switch:** `switch_to_path` temporarily overrides `printer.primary_url` with the new path's URL before calling `start_driver`, which reads `primary_url` to build the driver config. The DB row is not updated — only the in-memory `Printer` passed to `start_driver`. The DB `primary_url` column is now effectively a "default if no paths defined" fallback.
+
+**SSH/webcam path following (item 3 of 2.4):** Deferred — SSH is 2.5 (not yet built); webcam proxy and uploads are later phases. The active path URL is exposed via `GET /api/printers/:id/active-path` so future implementors can consume it.
+
+**2.8 scope:** Implemented core Config form in both Printer page (Config tab) and Settings page (expandable per-printer form). Tags and sort-order drag were deferred — tags need a tag input component not yet built; drag-to-reorder needs a DnD library choice decision.
 
 ### Session 15 — 2026-11-08 (PrinterDriver + Moonraker + Fleet UI)
 
