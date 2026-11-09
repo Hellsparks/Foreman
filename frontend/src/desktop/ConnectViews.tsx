@@ -6,6 +6,8 @@ import type { AddrState } from "./failover";
 
 type Tone = "ok" | "warn" | "bad";
 
+const LOCAL_ADDRESS = "127.0.0.1:9090";
+
 function Notice({ tone, title, body }: { tone: Tone; title: string; body?: string }) {
   return (
     <div className={`connect__notice connect--${tone}`} role={tone === "bad" ? "alert" : "status"}>
@@ -290,7 +292,21 @@ export function ConnectView({
   const scan = async () => {
     setScanning(true);
     try {
-      const list = await desktop.discover();
+      // An unclaimed server only listens on 127.0.0.1 and isn't announced, so look here too.
+      const [list, local] = await Promise.all([
+        desktop.discover().catch(() => [] as Found[]),
+        desktop.probe(LOCAL_ADDRESS).catch(() => null),
+      ]);
+      if (local?.kind === "foreman" && !list.some((f) => f.id === local.server_id)) {
+        list.unshift({
+          id: local.server_id,
+          name: local.name,
+          version: local.version,
+          host: "This computer",
+          addresses: [local.address],
+          needsSetup: local.needs_setup,
+        } as Found & { needsSetup?: boolean });
+      }
       setFound(list);
       for (const f of list) {
         if (!f.addresses[0]) continue;
@@ -300,8 +316,6 @@ export function ConnectView({
           }
         });
       }
-    } catch {
-      setFound([]);
     } finally {
       setScanning(false);
     }
