@@ -28,6 +28,8 @@ struct PrinterRow {
     tags: String,
     hardened_nozzle: i64,
     sort_order: i64,
+    fail_after_checks: i64,
+    return_after_secs: i64,
     created_at: String,
     updated_at: String,
 }
@@ -83,6 +85,8 @@ impl PrinterRow {
             tags: parse_tags(&self.tags),
             hardened_nozzle: self.hardened_nozzle != 0,
             sort_order: self.sort_order,
+            fail_after_checks: self.fail_after_checks,
+            return_after_secs: self.return_after_secs,
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         })
@@ -95,12 +99,14 @@ impl PrinterRow {
 
 const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tls_fingerprint, tags, hardened_nozzle, sort_order, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, sort_order, fail_after_checks, \
+     return_after_secs, created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tls_fingerprint, tags, hardened_nozzle, sort_order, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, sort_order, fail_after_checks, \
+     return_after_secs, created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.
@@ -132,12 +138,15 @@ pub async fn create(pool: &SqlitePool, req: CreatePrinter) -> Result<Printer, Ap
     let tags = tags_json(&req.tags);
     let hardened: i64 = req.hardened_nozzle as i64;
     let sort_order = req.sort_order.unwrap_or(0);
+    let fail_after_checks = req.fail_after_checks.unwrap_or(3);
+    let return_after_secs = req.return_after_secs.unwrap_or(60);
 
     let id = sqlx::query(
         "INSERT INTO printer \
          (name, firmware, primary_url, api_key, serial_number, access_code, \
-          tags, hardened_nozzle, sort_order, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          tags, hardened_nozzle, sort_order, fail_after_checks, return_after_secs, \
+          created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&req.name)
     .bind(&firmware)
@@ -148,6 +157,8 @@ pub async fn create(pool: &SqlitePool, req: CreatePrinter) -> Result<Printer, Ap
     .bind(&tags)
     .bind(hardened)
     .bind(sort_order)
+    .bind(fail_after_checks)
+    .bind(return_after_secs)
     .bind(&now)
     .bind(&now)
     .execute(pool)
@@ -171,12 +182,15 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     let tags = tags_json(&req.tags.unwrap_or(current.tags));
     let hardened: i64 = req.hardened_nozzle.unwrap_or(current.hardened_nozzle) as i64;
     let sort_order = req.sort_order.unwrap_or(current.sort_order);
+    let fail_after_checks = req.fail_after_checks.unwrap_or(current.fail_after_checks);
+    let return_after_secs = req.return_after_secs.unwrap_or(current.return_after_secs);
     let now = Utc::now().to_rfc3339();
 
     sqlx::query(
         "UPDATE printer \
          SET name=?, firmware=?, primary_url=?, api_key=?, serial_number=?, \
-             access_code=?, tags=?, hardened_nozzle=?, sort_order=?, updated_at=? \
+             access_code=?, tags=?, hardened_nozzle=?, sort_order=?, \
+             fail_after_checks=?, return_after_secs=?, updated_at=? \
          WHERE id=?",
     )
     .bind(&name)
@@ -188,6 +202,8 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     .bind(&tags)
     .bind(hardened)
     .bind(sort_order)
+    .bind(fail_after_checks)
+    .bind(return_after_secs)
     .bind(&now)
     .bind(id)
     .execute(pool)
@@ -271,6 +287,8 @@ mod tests {
             tags: vec!["klipper".to_owned()],
             hardened_nozzle: false,
             sort_order: Some(0),
+            fail_after_checks: None,
+            return_after_secs: None,
         }
     }
 
@@ -319,6 +337,8 @@ mod tests {
                 access_code: None,
                 hardened_nozzle: None,
                 sort_order: None,
+                fail_after_checks: None,
+                return_after_secs: None,
             },
         )
         .await

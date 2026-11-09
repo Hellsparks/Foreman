@@ -4,4 +4,4 @@ import type { FirmwareKind } from "./FirmwareKind";
 /**
  * Fields required to create a new printer.
  */
-export type CreatePrinter = { name: string, firmware: FirmwareKind, primary_url: string | null, api_key: string | null, serial_number: string | null, access_code: string | null, tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint | null, };
+export type CreatePrinter = { name: string, firmware: FirmwareKind, primary_url: string | null, api_key: string | null, serial_number: string | null, access_code: string | null, tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint | null, fail_after_checks: bigint | null, return_after_secs: bigint | null, };

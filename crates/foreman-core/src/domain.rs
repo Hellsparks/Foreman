@@ -48,8 +48,24 @@ pub struct Printer {
     pub tags: Vec<String>,
     pub hardened_nozzle: bool,
     pub sort_order: i64,
+    /// Consecutive health-check failures before switching to next path.
+    pub fail_after_checks: i64,
+    /// Seconds a higher-priority path must be healthy before returning to it.
+    pub return_after_secs: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// A printer record enriched with active path info (from the driver manager).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PrinterWithStatus {
+    #[serde(flatten)]
+    pub printer: Printer,
+    /// Index of the currently active connection path (0 = primary).
+    pub active_path_index: Option<i64>,
+    /// Display name of the currently active connection path.
+    pub active_path_name: Option<String>,
 }
 
 /// Fields required to create a new printer.
@@ -67,6 +83,10 @@ pub struct CreatePrinter {
     #[serde(default)]
     pub hardened_nozzle: bool,
     pub sort_order: Option<i64>,
+    #[serde(default)]
+    pub fail_after_checks: Option<i64>,
+    #[serde(default)]
+    pub return_after_secs: Option<i64>,
 }
 
 /// Fields that may be updated on an existing printer.
@@ -83,6 +103,8 @@ pub struct UpdatePrinter {
     pub tags: Option<Vec<String>>,
     pub hardened_nozzle: Option<bool>,
     pub sort_order: Option<i64>,
+    pub fail_after_checks: Option<i64>,
+    pub return_after_secs: Option<i64>,
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ mod driver_manager;
 mod state;
 
 use axum::{
-    routing::{delete, get, get_service, post},
+    routing::{delete, get, get_service, post, put},
     Router,
 };
 use foreman_core::{db::ForemanDb, events::ServerEvent};
@@ -104,10 +104,39 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         .route("/api/printers", get(api::printers::list_printers))
         .route("/api/printers", post(api::printers::create_printer))
         .route("/api/printers/{id}", delete(api::printers::delete_printer))
+        .route(
+            "/api/printers/{id}",
+            put(api::printer_paths::update_printer),
+        )
         .route("/api/printers/{id}/snapshot", get(api::printers::snapshot))
         .route(
             "/api/printers/{id}/trust-new-cert",
             post(api::printers::trust_new_cert),
+        )
+        // Printer paths
+        .route(
+            "/api/printers/{id}/paths",
+            get(api::printer_paths::list_paths).post(api::printer_paths::create_path),
+        )
+        .route(
+            "/api/printers/{id}/paths/{pid}",
+            put(api::printer_paths::update_path).delete(api::printer_paths::delete_path),
+        )
+        .route(
+            "/api/printers/{id}/paths/reorder",
+            post(api::printer_paths::reorder_paths),
+        )
+        .route(
+            "/api/printers/{id}/paths/test-all",
+            post(api::printer_paths::test_all_paths),
+        )
+        .route(
+            "/api/printers/{id}/active-path",
+            get(api::printer_paths::get_active_path),
+        )
+        .route(
+            "/api/printers/{id}/paths/switch-back",
+            post(api::printer_paths::switch_back),
         )
         // Printer commands + status + capabilities
         .route(

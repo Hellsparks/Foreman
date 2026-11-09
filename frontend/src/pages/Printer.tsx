@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { api } from "../api/client";
-import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite } from "../api/client";
+import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
 import { BackButton, StatusChip, SectionLabel, Button } from "../ui";
@@ -221,6 +221,11 @@ export default function Printer() {
         <div className="printer-header__top">
           <h1 className="printer-header__name">{printer.name}</h1>
           {fwTag && <span className="printer-header__fw">{fwTag}</span>}
+          {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+            <span className="printer-header__path-badge" style={{ color: "var(--fw-warning)", fontSize: 12 }}>
+              via {printer.active_path_name}
+            </span>
+          )}
           <StatusChip
             tone={statusTone(state)}
             symbol={statusSymbol(state)}
@@ -652,12 +657,16 @@ export default function Printer() {
             </section>
           </div>
         </div>
+      ) : activeTab === "Config" ? (
+        <PrinterConfigTab printerId={printerId} printer={printer} caps={caps} />
       ) : (
         <div className="printer-placeholder" role="tabpanel" aria-label={activeTab}>
           <p>{activeTab} — coming soon</p>
           <p style={{ fontSize: 13 }}>This tab will be implemented in a future phase.</p>
         </div>
       )}
+
+      {/* ── Config tab rendered outside the main layout ── */}
 
       {/* Cancel confirmation dialog */}
       {cancelOpen && (
@@ -682,5 +691,686 @@ export default function Printer() {
         </div>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PrinterConfigTab
+// ---------------------------------------------------------------------------
+
+interface LocalPath {
+  /** undefined = new (not yet saved) */
+  id?: number;
+  name: string;
+  url: string;
+  priority: number;
+  /** null = unknown, true/false = last test result */
+  healthy: boolean | null;
+  latency_ms: number | null;
+  deleted?: boolean;
+}
+
+function PrinterConfigTab({
+  printerId,
+  printer,
+  caps,
+}: {
+  printerId: number;
+  printer: PrinterWithStatus;
+  caps: PrinterCapabilities | null;
+}) {
+  const [paths, setPaths] = useState<LocalPath[]>([]);
+  const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
+  const [returnAfter, setReturnAfter] = useState(printer.return_after_secs ?? 60);
+  const [hardenedNozzle, setHardenedNozzle] = useState(printer.hardened_nozzle);
+  const [authValue, setAuthValue] = useState(
+    printer.firmware === "bambu" ? (printer.access_code ?? "") : (printer.api_key ?? "")
+  );
+  const [testMsg, setTestMsg] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [activePath, setActivePath] = useState<{ index: number; path: PrinterPath } | null>(null);
+
+  useEffect(() => {
+    api.listPaths(printerId).then((list) => {
+      setPaths(
+        list.map((p) => ({
+          id: p.id,
+          name: p.name,
+          url: p.url,
+          priority: p.priority,
+          healthy: null,
+          latency_ms: null,
+        }))
+      );
+    }).catch(() => {});
+    api.getActivePath(printerId).then(setActivePath).catch(() => {});
+  }, [printerId]);
+
+  const activePaths = paths.filter((p) => !p.deleted);
+
+  const addPath = () => {
+    setPaths((prev) => [
+      ...prev,
+      {
+        name: `Path ${prev.filter((p) => !p.deleted).length + 1}`,
+        url: "",
+        priority: prev.filter((p) => !p.deleted).length * 10,
+        healthy: null,
+        latency_ms: null,
+      },
+    ]);
+  };
+
+  const removePath = (idx: number) => {
+    setPaths((prev) =>
+      prev.map((p, i) => (i === idx ? { ...p, deleted: true } : p))
+    );
+  };
+
+  const movePath = (idx: number, dir: -1 | 1) => {
+    // Reorder within activePaths
+    const active = activePaths;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= active.length) return;
+    // Swap priorities
+    const updated = [...activePaths];
+    const tmp = updated[idx].priority;
+    updated[idx] = { ...updated[idx], priority: updated[newIdx].priority };
+    updated[newIdx] = { ...updated[newIdx], priority: tmp };
+    // Map back
+    setPaths((prev) => {
+      let ai = 0;
+      return prev.map((p) => {
+        if (p.deleted) return p;
+        const up = updated[ai++];
+        return { ...p, priority: up.priority };
+      });
+    });
+  };
+
+  const testAll = async () => {
+    setTesting(true);
+    setTestMsg("Testing…");
+    try {
+      const results: PathTestResult[] = await api.testAllPaths(printerId);
+      const resultMap = new Map(results.map((r) => [r.id, r]));
+      setPaths((prev) =>
+        prev.map((p) => {
+          if (p.id == null) return p;
+          const r = resultMap.get(p.id);
+          if (!r) return p;
+          return { ...p, healthy: r.reachable, latency_ms: r.latency_ms };
+        })
+      );
+      const ok = results.filter((r) => r.reachable).length;
+      setTestMsg(`${ok}/${results.length} paths reachable`);
+    } catch {
+      setTestMsg("Test failed");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const switchBack = async () => {
+    try {
+      await api.switchBackToPath0(printerId);
+      const ap = await api.getActivePath(printerId);
+      setActivePath(ap);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSavedMsg(`Switch failed: ${msg}`);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSavedMsg("");
+    try {
+      // Update printer settings.
+      await api.updatePrinter(printerId, {
+        fail_after_checks: failAfter,
+        return_after_secs: returnAfter,
+        hardened_nozzle: hardenedNozzle,
+        ...(printer.firmware === "bambu"
+          ? { access_code: authValue }
+          : { api_key: authValue }),
+      });
+
+      // Sync paths: delete removed, update changed, create new.
+      for (const p of paths) {
+        if (p.deleted && p.id != null) {
+          await api.deletePath(printerId, p.id);
+        } else if (!p.deleted && p.id == null) {
+          await api.createPath(printerId, { name: p.name, url: p.url, priority: p.priority });
+        } else if (!p.deleted && p.id != null) {
+          await api.updatePath(printerId, p.id, {
+            name: p.name,
+            url: p.url,
+            priority: p.priority,
+          });
+        }
+      }
+
+      // Reload paths from server.
+      const updated = await api.listPaths(printerId);
+      setPaths(
+        updated.map((p) => ({
+          id: p.id,
+          name: p.name,
+          url: p.url,
+          priority: p.priority,
+          healthy: null,
+          latency_ms: null,
+        }))
+      );
+
+      setSavedMsg("Saved");
+      setTimeout(() => setSavedMsg(""), 3000);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSavedMsg(`Error: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Summary chip label + colour.
+  const activeIdx = activePath?.index ?? 0;
+  const isOnPrimary = activeIdx === 0;
+  const allDown = activePaths.length > 0 && activePaths.every((p) => p.healthy === false);
+  let summaryLabel = isOnPrimary ? `on primary${activePath ? ` · ${activePath.path.name}` : ""}` : `on backup ${activeIdx + 1}${activePath ? ` · ${activePath.path.name}` : ""}`;
+  if (allDown) summaryLabel = "all paths down";
+  const summaryColor = allDown
+    ? "var(--fw-danger)"
+    : isOnPrimary
+      ? "var(--fw-success)"
+      : "var(--fw-warning)";
+
+  const authLabel = printer.firmware === "bambu" ? "Access code" : "API key (optional)";
+  const authHelp = printer.firmware === "bambu"
+    ? "8-digit LAN access code from the printer's settings."
+    : "Moonraker API key. Leave blank if no auth is configured.";
+
+  const capsList: { k: string; v: string }[] = caps
+    ? [
+        caps.firmware_version ? { k: "Firmware", v: caps.firmware_version } : null,
+        caps.hostname ? { k: "Hostname", v: caps.hostname } : null,
+        caps.bed_size ? { k: "Bed", v: `${caps.bed_size[0]} × ${caps.bed_size[1]} mm` } : null,
+        { k: "Extruders", v: String(caps.extruder_count) },
+        caps.nozzle_diameter ? { k: "Nozzle", v: `${caps.nozzle_diameter} mm` } : null,
+        caps.printer_model ? { k: "Model", v: caps.printer_model } : null,
+      ].filter(Boolean) as { k: string; v: string }[]
+    : [];
+
+  const FAIL_OPTIONS = [
+    { label: "1 failed check (≈2 s)", value: 1 },
+    { label: "3 failed checks (≈6 s)", value: 3 },
+    { label: "5 failed checks (≈10 s)", value: 5 },
+  ];
+  const RETURN_OPTIONS = [
+    { label: "healthy for 10 s", value: 10 },
+    { label: "healthy for 60 s", value: 60 },
+    { label: "healthy for 10 min", value: 600 },
+    { label: "never (manual only)", value: 999999 },
+  ];
+
+  return (
+    <div
+      role="tabpanel"
+      aria-label="Config"
+      style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 20, padding: "20px 24px" }}
+    >
+      {/* ── Connection section ───────────────────────────────────── */}
+      <section
+        style={{
+          border: "1px solid var(--fw-border)",
+          background: "var(--fw-raised)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 18 }}>Connection</h2>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Header row */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: "bold" }}>
+              Connection paths{" "}
+              <span style={{ fontWeight: "normal", color: "var(--fw-muted)" }}>
+                · tried top to bottom
+              </span>
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--fw-mono)",
+                fontSize: 11,
+                color: summaryColor,
+              }}
+            >
+              ● {summaryLabel}
+            </span>
+          </div>
+
+          {/* Path rows */}
+          {activePaths.map((p, i) => {
+            const pathIdx = paths.indexOf(p);
+            const statusLabel =
+              p.healthy === null
+                ? "STANDBY"
+                : p.healthy
+                  ? `ACTIVE · ${p.latency_ms ?? "?"}ms`
+                  : "DOWN";
+            const statusFg =
+              p.healthy === null
+                ? "var(--fw-muted)"
+                : p.healthy
+                  ? "var(--fw-success)"
+                  : "var(--fw-danger)";
+            const statusBg =
+              p.healthy === null
+                ? "var(--fw-surface)"
+                : p.healthy
+                  ? "color-mix(in srgb, var(--fw-success) 12%, transparent)"
+                  : "color-mix(in srgb, var(--fw-danger) 12%, transparent)";
+
+            return (
+              <div
+                key={pathIdx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "26px minmax(90px, 0.8fr) minmax(0, 1.6fr) 100px auto",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 8px",
+                  border: "1px solid var(--fw-border)",
+                  background: "var(--fw-surface)",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "var(--fw-mono)",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    color: "var(--fw-muted)",
+                    textAlign: "center",
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <input
+                  type="text"
+                  value={p.name}
+                  onChange={(e) =>
+                    setPaths((prev) =>
+                      prev.map((x, xi) => xi === pathIdx ? { ...x, name: e.target.value } : x)
+                    )
+                  }
+                  aria-label={`Path ${i + 1} name`}
+                  style={{
+                    minHeight: 36,
+                    border: "1px solid var(--fw-muted)",
+                    background: "var(--fw-raised)",
+                    padding: "0 8px",
+                    borderRadius: 2,
+                    boxSizing: "border-box",
+                    width: "100%",
+                    fontSize: 13,
+                  }}
+                />
+                <input
+                  type="text"
+                  value={p.url}
+                  onChange={(e) =>
+                    setPaths((prev) =>
+                      prev.map((x, xi) => xi === pathIdx ? { ...x, url: e.target.value } : x)
+                    )
+                  }
+                  spellCheck={false}
+                  aria-label={`Path ${i + 1} address`}
+                  style={{
+                    minHeight: 36,
+                    border: "1px solid var(--fw-muted)",
+                    background: "var(--fw-raised)",
+                    padding: "0 8px",
+                    borderRadius: 2,
+                    boxSizing: "border-box",
+                    width: "100%",
+                    fontFamily: "var(--fw-mono)",
+                    fontSize: 12,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "var(--fw-mono)",
+                    fontSize: 11,
+                    fontWeight: "bold",
+                    padding: "3px 6px",
+                    textAlign: "center",
+                    color: statusFg,
+                    background: statusBg,
+                  }}
+                >
+                  {statusLabel}
+                </span>
+                <span style={{ display: "flex", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => movePath(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Move up"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid var(--fw-border)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      color: "var(--fw-text)",
+                    }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => movePath(i, 1)}
+                    disabled={i === activePaths.length - 1}
+                    aria-label="Move down"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid var(--fw-border)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      color: "var(--fw-text)",
+                    }}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removePath(pathIdx)}
+                    disabled={activePaths.length <= 1}
+                    aria-label={`Remove path ${i + 1}`}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      border: "1px solid var(--fw-border)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      color: "var(--fw-text)",
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+
+          {/* Add + Test all */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={addPath}
+              style={{
+                minHeight: 36,
+                padding: "0 12px",
+                border: "1px dashed var(--fw-muted)",
+                background: "transparent",
+                color: "var(--fw-text)",
+                borderRadius: 2,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              + Add backup path
+            </button>
+            <button
+              type="button"
+              onClick={testAll}
+              disabled={testing}
+              style={{
+                minHeight: 36,
+                padding: "0 12px",
+                border: "1px solid var(--fw-muted)",
+                background: "transparent",
+                color: "var(--fw-text)",
+                borderRadius: 2,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              {testing ? "Testing…" : "Test all"}
+            </button>
+            {testMsg && (
+              <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>{testMsg}</span>
+            )}
+          </div>
+
+          {/* Failover settings */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 8,
+            }}
+          >
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: "bold" }}>
+                Switch to the next path after
+              </span>
+              <select
+                value={failAfter}
+                onChange={(e) => setFailAfter(Number(e.target.value))}
+                style={{
+                  minHeight: 36,
+                  border: "1px solid var(--fw-muted)",
+                  background: "var(--fw-raised)",
+                  padding: "0 8px",
+                  borderRadius: 2,
+                }}
+              >
+                {FAIL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: "bold" }}>
+                Go back up when a higher path is
+              </span>
+              <select
+                value={returnAfter}
+                onChange={(e) => setReturnAfter(Number(e.target.value))}
+                style={{
+                  minHeight: 36,
+                  border: "1px solid var(--fw-muted)",
+                  background: "var(--fw-raised)",
+                  padding: "0 8px",
+                  borderRadius: 2,
+                }}
+              >
+                {RETURN_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {/* Switch back now button */}
+          {activePath != null && activePath.index > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button
+                type="button"
+                onClick={switchBack}
+                style={{
+                  minHeight: 36,
+                  padding: "0 12px",
+                  border: "1px solid var(--fw-muted)",
+                  background: "transparent",
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                Switch back to primary now
+              </button>
+            </div>
+          )}
+
+          <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>
+            A switch shows on the printer card and in Attention. Running jobs keep going; only Foreman's connection moves.
+          </span>
+        </div>
+
+        {/* Auth field */}
+        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: "bold" }}>{authLabel}</span>
+          <input
+            type="password"
+            value={authValue}
+            onChange={(e) => setAuthValue(e.target.value)}
+            style={{
+              minHeight: 44,
+              border: "1px solid var(--fw-muted)",
+              background: "var(--fw-raised)",
+              padding: "0 12px",
+              borderRadius: 2,
+            }}
+          />
+          <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>{authHelp}</span>
+        </label>
+      </section>
+
+      {/* ── Capabilities section ─────────────────────────────────── */}
+      <section
+        style={{
+          border: "1px solid var(--fw-border)",
+          background: "var(--fw-raised)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h2 style={{ flex: 1, margin: 0, fontSize: 18 }}>Capabilities</h2>
+        </div>
+        {capsList.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--fw-muted)" }}>
+            Capabilities not yet probed.
+          </p>
+        ) : (
+          capsList.map((c) => (
+            <div
+              key={c.k}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                minHeight: 40,
+                alignItems: "center",
+                borderBottom: "1px solid var(--fw-border)",
+              }}
+            >
+              <span>{c.k}</span>
+              <span style={{ fontFamily: "var(--fw-mono)" }}>{c.v}</span>
+            </div>
+          ))
+        )}
+        <label style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44 }}>
+          <input
+            type="checkbox"
+            checked={hardenedNozzle}
+            onChange={(e) => setHardenedNozzle(e.target.checked)}
+            style={{ width: 20, height: 20, accentColor: "var(--fw-accent-hover)" }}
+          />
+          Hardened nozzle (abrasive filaments allowed)
+        </label>
+      </section>
+
+      {/* ── Save + Remove ────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          style={{
+            minHeight: 44,
+            padding: "0 20px",
+            border: "1px solid transparent",
+            background: "var(--fw-accent-hover)",
+            color: "var(--fw-on-accent)",
+            borderRadius: 2,
+            cursor: "pointer",
+            fontFamily: "var(--fw-mono)",
+            fontWeight: "bold",
+          }}
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+        {savedMsg && (
+          <span
+            role="status"
+            style={{
+              fontSize: 13,
+              color: savedMsg.startsWith("Error") ? "var(--fw-danger)" : "var(--fw-success)",
+            }}
+          >
+            {savedMsg}
+          </span>
+        )}
+      </div>
+
+      {/* ── Remove printer ───────────────────────────────────────── */}
+      <section
+        style={{
+          border: "1px solid var(--fw-danger)",
+          background: "var(--fw-raised)",
+          padding: 20,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <div style={{ flex: "1 1 260px" }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Remove printer</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--fw-muted)" }}>
+            Removes it from Foreman. Job history is kept.
+          </p>
+        </div>
+        <button
+          type="button"
+          style={{
+            minHeight: 44,
+            padding: "0 16px",
+            border: "1px solid var(--fw-danger)",
+            color: "var(--fw-danger)",
+            background: "transparent",
+            borderRadius: 2,
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            if (confirm(`Remove "${printer.name}" from Foreman?`)) {
+              api.deletePrinter(printerId).catch(() => {});
+              window.history.back();
+            }
+          }}
+        >
+          Remove printer…
+        </button>
+      </section>
+    </div>
   );
 }

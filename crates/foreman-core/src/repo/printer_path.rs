@@ -176,6 +176,8 @@ mod tests {
                 tags: vec![],
                 hardened_nozzle: false,
                 sort_order: None,
+                fail_after_checks: None,
+                return_after_secs: None,
             },
         )
         .await

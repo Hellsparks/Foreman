@@ -42,6 +42,21 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function put<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, `PUT ${path} → ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 async function del(path: string): Promise<void> {
   const res = await fetch(`${BASE}${path}`, {
     method: "DELETE",
@@ -49,6 +64,26 @@ async function del(path: string): Promise<void> {
   if (!res.ok) {
     throw new ApiError(res.status, `DELETE ${path} → ${res.status}`);
   }
+}
+
+/** A tiered connection path for a printer. */
+export interface PrinterPath {
+  id: number;
+  printer_id: number;
+  name: string;
+  url: string;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Result of a single-path TCP reachability test. */
+export interface PathTestResult {
+  id: number;
+  name: string;
+  url: string;
+  reachable: boolean;
+  latency_ms: number | null;
 }
 
 /** Printer record enriched with live status from the server. */
@@ -63,9 +98,13 @@ export interface PrinterWithStatus {
   tags: string[];
   hardened_nozzle: boolean;
   sort_order: number;
+  fail_after_checks: number;
+  return_after_secs: number;
   created_at: string;
   updated_at: string;
   status: PrinterStatus | null;
+  active_path_index?: number | null;
+  active_path_name?: string | null;
 }
 
 /** An active attention item. */
@@ -132,6 +171,20 @@ export const api = {
   createPrinter: (req: CreatePrinter) =>
     post<Printer>("/api/printers", req),
   deletePrinter: (id: number) => del(`/api/printers/${id}`),
+  /** Update printer fields (name, fail_after_checks, return_after_secs, etc.). */
+  updatePrinter: (
+    id: number,
+    body: Partial<{
+      name: string;
+      fail_after_checks: number;
+      return_after_secs: number;
+      hardened_nozzle: boolean;
+      tags: string[];
+      sort_order: number;
+      primary_url: string | null;
+      api_key: string | null;
+    }>,
+  ) => put<PrinterWithStatus>(`/api/printers/${id}`, body),
   /** URL for the camera snapshot proxy — use as <img src>. */
   snapshotUrl: (id: number) => `/api/printers/${id}/snapshot`,
   /** List active (uncleared) attention items. */
@@ -168,6 +221,33 @@ export const api = {
   /** Remove a macro favourite. */
   removeFavourite: (printerId: number, favId: number) =>
     del(`/api/printers/${printerId}/macro-favourites/${favId}`),
+  // ── Path management ───────────────────────────────────────────────────
+  /** List connection paths for a printer (priority order). */
+  listPaths: (id: number) => get<PrinterPath[]>(`/api/printers/${id}/paths`),
+  /** Create a new connection path. */
+  createPath: (id: number, body: { name: string; url: string; priority?: number }) =>
+    post<PrinterPath>(`/api/printers/${id}/paths`, body),
+  /** Update an existing connection path. */
+  updatePath: (
+    printerId: number,
+    pathId: number,
+    body: { name?: string; url?: string; priority?: number },
+  ) => put<PrinterPath>(`/api/printers/${printerId}/paths/${pathId}`, body),
+  /** Delete a connection path. */
+  deletePath: (printerId: number, pathId: number) =>
+    del(`/api/printers/${printerId}/paths/${pathId}`),
+  /** Bulk-update path priorities (reorder). */
+  reorderPaths: (id: number, items: { id: number; priority: number }[]) =>
+    post<PrinterPath[]>(`/api/printers/${id}/paths/reorder`, items),
+  /** TCP-ping all paths for a printer. */
+  testAllPaths: (id: number) =>
+    post<PathTestResult[]>(`/api/printers/${id}/paths/test-all`),
+  /** Get the currently active path index + record. */
+  getActivePath: (id: number) =>
+    get<{ index: number; path: PrinterPath }>(`/api/printers/${id}/active-path`),
+  /** Manually switch back to path 0 (only if path 0 is healthy). */
+  switchBackToPath0: (id: number) =>
+    postNoContent(`/api/printers/${id}/paths/switch-back`),
 };
 
 export { ApiError };

@@ -258,6 +258,8 @@ export default function Fleet() {
         tags: [],
         hardened_nozzle: false,
         sort_order: null,
+        fail_after_checks: null,
+        return_after_secs: null,
       });
       setShowAddPanel(false);
       loadPrinters();
@@ -467,7 +469,7 @@ function PrinterCard({
     <article
       className={`fleet-card${selected ? " fleet-card--selected" : ""}${isOffline ? " fleet-card--offline" : ""}`}
     >
-      {/* Row 1: name + firmware tag + menu */}
+      {/* Row 1: name + firmware tag + backup path label + menu */}
       <div className="fleet-card__toprow">
         <button
           type="button"
@@ -477,6 +479,15 @@ function PrinterCard({
           {printer.name}
         </button>
         <span className="fleet-card__fw">{fwLabel(printer.firmware)}</span>
+        {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+          <span
+            className="fleet-card__path-label"
+            title={`Connected via backup path: ${printer.active_path_name}`}
+            style={{ fontSize: 11, color: "var(--fw-warning)", fontFamily: "var(--fw-mono)" }}
+          >
+            via {printer.active_path_name}
+          </span>
+        )}
         <div style={{ flex: 1 }} />
         <button
           type="button"
