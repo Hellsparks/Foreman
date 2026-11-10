@@ -120,7 +120,13 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] `foreman-server reset-admin` CLI.
 - [x] Spoolman API (7912) stays unauthenticated — logged at startup.
 - [x] Frontend Setup + Sign-in screens (Connect.dc.html), sign-in on 401, Settings → Security (log out, API keys, LAN toggle). Audit user = admin username.
-- [ ] 2.9b — server picker, saved servers, mDNS, connection-lost view.
+- [x] 2.9b — server picker, saved servers, mDNS, connection-lost view (session 20b):
+  - [x] Stable `server_id` + editable server name (`PUT /api/settings/server`); `/api/info` adds `addresses[]` (LAN IPs, `hostname.local`, Tailscale IP + MagicDNS name when a 100.64.0.0/10 interface exists).
+  - [x] mDNS announce `_foreman._tcp` (TXT id, name, version) only while bound to the LAN.
+  - [x] Desktop Connect screens: welcome (saved servers, Another computer / This computer), connect (mDNS list, manual address, Test cases: Foreman needs sign-in / needs setup / Spoolman port / Moonraker printer / no answer, backups prefilled from `/api/info`), edit (reorder, test, remove, Test and add with same-id check, Forget), "Add as backup route" for a known server id.
+  - [x] Saved servers + bearer tokens in the app data folder (`servers.json`, 0600), not localStorage.
+  - [x] Failover: 3 failed checks → next address with the same token (server id must match), "via …" tag in the title bar, back to the primary after 60 s healthy, lost-connection panel only when all addresses are down.
+  - [x] Mode A ("This computer") starts the embedded server on demand; "Let other devices connect" goes through setup with the code prefilled. Browser keeps login only.
 **Phase 2 done =** mock printers + the owner's real Klipper printer + real Bambu live on Fleet (temps, AMS, camera); killing the primary path fails over and back; SSH tab browses and edits `printer.cfg`; a file uploads to the Bambu over FTPS; Attention shows a finished print on both.
 
 ---
@@ -187,6 +193,23 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 20c — 2026-11-10 (Phase 2 finish: unclaimed servers on the LAN, scoped URL tokens)
+
+- **Decision — unclaimed servers listen on the LAN** (replaces the 2.9a "no admin → 127.0.0.1 only" rule): a headless server binds its configured host before setup, but answers only `GET /api/health`, `GET /api/info` and `POST /api/auth/setup`; every other `/api/*` and `/ws/*` route returns **403 `{code: "setup_required", error: "server not set up"}`** (login included). Setup shares the per-IP limiter: 5 wrong codes → 60 s pause (429 + `Retry-After`). mDNS TXT gains `needs_setup=1|0` and is re-announced right after setup, so the Connect list shows "Not set up" for a fresh Pi. The static frontend is still served (it holds no data) so a browser can reach the setup page. Exceptions: desktop Mode A stays loopback-only until an admin exists and "Let other devices connect" is on, and its in-process app session still works before setup (it can't be obtained over the network). Bind-rule unit test and router tests updated.
+- **Decision — scoped URL tokens replace session tokens in URLs** (replaces the 20b `?token=<session>` note): `POST /api/auth/url-token {path}` (any authenticated caller) returns a `fmu_…` token valid **60 s for that exact path only**, allowed for `/api/printers/{id}/snapshot`, `/api/printers/{id}/files/download`, `/ws/events` and `/ws/printers/{id}/terminal`. Grants live in memory, stored hashed, purged on issue. Session tokens in a URL are refused everywhere. The desktop app fetches URL tokens on demand (reused for 45 s, refreshed every 40 s for open download links); the browser keeps using its cookie. Request spans log the URI with `token=REDACTED` (verified with `RUST_LOG=foreman_server=debug,tower_http=debug`).
+
+### Session 20b — 2026-11-09 (2.9b connect screen + Mode B)
+
+- **Branch base:** `phase2-connect` is stacked on `phase2-auth` (PR #3 not merged yet); its PR shows the auth commits until #3 lands.
+- **Listener moves without a restart** (replaces the 20a "applies on restart" note): the bind host is a `watch` value; creating the admin, the LAN toggle and a rename re-evaluate the bind rule and re-bind the listener in place (drivers and open connections untouched). A headless server configured for `0.0.0.0` therefore goes on the LAN right after setup. The default `host` is still `127.0.0.1`, so a headless server needs `FOREMAN__HOST=0.0.0.0` to be reachable/announced.
+- **mDNS** via `mdns-sd`, announced only when not bound to loopback, re-announced on rename. Container/VM bridges (`docker*`, `br-*`, `veth*`, `virbr*`, …) are left out of the announced and reported addresses. MagicDNS name comes from `tailscale status --json` at startup (skipped when the CLI is missing).
+- **`/api/info` `addresses`** are objects `{ address: "host:port", kind: lan_ip | lan_name | tailscale_ip | tailscale_name | loopback }` so the app can label routes.
+- **Desktop calls the server directly** (CORS is already permissive) with `Authorization: Bearer`. `<img src>`/`<a href>` and WebSockets can't send headers, so `?token=` is accepted on `/ws/*` and on `GET /api/printers/{id}/snapshot` and `/files/download` only (REST still refuses it).
+- **Probing and health checks run in Rust** (Tauri commands `probe_address`, `check_address`, `discover_servers`) to avoid CORS/mixed-content limits on non-Foreman hosts. A bare address tries `:9090`; when that fails it also looks for Moonraker on `:7125` and `:80`. `https://` is kept when typed; no automatic https upgrade yet (the server has no TLS).
+- **Mode A sessions:** the app mints a session in-process (`LocalHandle::app_token`), so "This computer" works without a password while localhost-only (audit user `local`). The embedded server now starts only when Mode A is chosen, and keeps running if the user switches to a remote server (no in-process shutdown of drivers).
+- **Unreachable backups:** Edit → "Test and add" refuses a different server id; a silent address can still be added with "Add anyway" (as the reference text suggests) and is only used once it answers with the right id.
+- **Frontend tests:** added `vitest` (failover + address helpers); `npm test` now runs them.
 
 ### Session 20a — 2026-11-09 (2.9a auth)
 

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { Ref } from "react";
+import type { CSSProperties, Ref } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { api, ApiError } from "../api/client";
 import type { FilesInfo, PrinterSsh, SftpEntry, ShellMacro, TextFile } from "../api/client";
 import { ToastStack, useToasts } from "../ui";
+import { useSignedUrl } from "../hooks/useSignedUrl";
 import "./PrinterFiles.css";
 
 // ---------------------------------------------------------------------------
@@ -34,7 +35,59 @@ function fmtSize(n: number | null): string {
 function fmtDate(secs: number | null): string {
   if (secs == null) return "";
   const d = new Date(secs * 1000);
-  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+const SPLIT_KEY = "fw-files-split";
+const SPLIT_MIN = 20;
+const SPLIT_MAX = 80;
+
+/** Draggable divider between the file list and the preview; width % remembered per browser. */
+function useSplitter() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pct, setPct] = useState(() => {
+    const v = Number(localStorage.getItem(SPLIT_KEY));
+    return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : 50;
+  });
+  useEffect(() => {
+    localStorage.setItem(SPLIT_KEY, String(Math.round(pct)));
+  }, [pct]);
+  const clamp = (v: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, v));
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const box = ref.current?.getBoundingClientRect();
+    if (!box || e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => setPct(clamp(((ev.clientX - box.left) / box.width) * 100));
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 10 : 2;
+    if (e.key === "ArrowLeft") setPct((p) => clamp(p - step));
+    else if (e.key === "ArrowRight") setPct((p) => clamp(p + step));
+    else if (e.key === "Home") setPct(SPLIT_MIN);
+    else if (e.key === "End") setPct(SPLIT_MAX);
+    else return;
+    e.preventDefault();
+  };
+
+  return { ref, pct, onPointerDown, onKeyDown, reset: () => setPct(50) };
 }
 
 function parentOf(p: string): string {
@@ -209,6 +262,7 @@ function FileBrowser({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [newFolder, setNewFolder] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const split = useSplitter();
 
   const load = useCallback(
     (p: string) => {
@@ -275,6 +329,8 @@ function FileBrowser({
   ];
 
   const isText = !!sel && TEXT_RE.test(sel.name);
+  const downloadHref = useSignedUrl(sel ? api.downloadPath(printerId, sel.path) : null);
+  const previewSrc = useSignedUrl(sel && IMAGE_RE.test(sel.name) ? api.previewPath(printerId, sel.path) : null);
   const original = file?.content ?? "";
   const text = edit ?? original;
   const dirty = edit !== null && edit !== original;
@@ -398,7 +454,7 @@ function FileBrowser({
       : "Save + FIRMWARE_RESTART";
 
   return (
-    <div className="pf-split">
+    <div className="pf-split" ref={split.ref} style={{ "--pf-split": `${split.pct}%` } as CSSProperties}>
       <section aria-label="File browser" className="pf-panel pf-panel--browser">
         <div className="pf-bar">
           {crumbs.map((c) => (
@@ -478,6 +534,20 @@ function FileBrowser({
         </div>
       </section>
 
+      <div
+        className="pf-divider"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize file list and preview (double-click to reset)"
+        aria-valuemin={SPLIT_MIN}
+        aria-valuemax={SPLIT_MAX}
+        aria-valuenow={Math.round(split.pct)}
+        tabIndex={0}
+        onPointerDown={split.onPointerDown}
+        onKeyDown={split.onKeyDown}
+        onDoubleClick={split.reset}
+      />
+
       <section aria-label="File" className={`pf-panel pf-panel--file${dirty ? " pf-panel--dirty" : ""}`}>
         {!sel ? (
           <div className="pf-empty">
@@ -505,7 +575,7 @@ function FileBrowser({
               {isText && file && (
                 <span className={`pf-state${dirty ? " pf-state--dirty" : ""}`}>{stateLabel}</span>
               )}
-              <a className="pf-btn" href={api.downloadUrl(printerId, sel.path)} download={sel.name}>
+              <a className="pf-btn" href={downloadHref ?? undefined} download={sel.name}>
                 Download
               </a>
               {renaming === null ? (
@@ -565,8 +635,8 @@ function FileBrowser({
               </>
             ) : IMAGE_RE.test(sel.name) ? (
               <div className="pf-image">
-                <a href={api.previewUrl(printerId, sel.path)} target="_blank" rel="noopener noreferrer" title="Open full size">
-                  <img src={api.previewUrl(printerId, sel.path)} alt={sel.name} />
+                <a href={previewSrc ?? undefined} target="_blank" rel="noopener noreferrer" title="Open full size">
+                  {previewSrc && <img src={previewSrc} alt={sel.name} />}
                 </a>
               </div>
             ) : (
@@ -655,56 +725,72 @@ function SshTerminal({ printerId }: { printerId: number }) {
     termRef.current = term;
     setSize({ cols: term.cols, rows: term.rows });
 
-    const ws = new WebSocket(api.terminalWsUrl(printerId, term.cols, term.rows));
-    ws.binaryType = "arraybuffer";
-    wsRef.current = ws;
+    let ws: WebSocket | null = null;
+    let disposed = false;
     setStatus("connecting");
     setStatusMsg("");
     setErrCodeState(null);
-    // StrictMode/reconnects can leave an older socket closing; ignore its events.
-    const current = () => wsRef.current === ws;
-    ws.onmessage = (ev) => {
-      if (!current()) return;
-      if (typeof ev.data === "string") {
-        try {
-          const m = JSON.parse(ev.data) as {
-            type: string;
-            message?: string;
-            code?: string | null;
-            reason?: string;
-            user?: string;
-            host?: string;
-            port?: number;
-          };
-          if (m.type === "ready") {
-            setStatus("ready");
-            setConn({ user: m.user ?? "", host: m.host ?? "", port: m.port ?? 22 });
-            term.focus();
-          } else if (m.type === "error") {
-            setStatus("error");
-            setStatusMsg(m.message ?? "error");
-            setErrCodeState(m.code ?? null);
-            term.writeln(`\r\n[foreman] ${m.message ?? "error"}`);
-          } else if (m.type === "exit") {
-            setStatus("closed");
-            if (m.reason === "idle") {
-              setStatusMsg("closed after idle timeout");
-              term.writeln("\r\n[foreman] connection closed after idle timeout");
+
+    const attach = (sock: WebSocket) => {
+      sock.binaryType = "arraybuffer";
+      ws = sock;
+      wsRef.current = sock;
+      // StrictMode/reconnects can leave an older socket closing; ignore its events.
+      const current = () => wsRef.current === sock;
+      sock.onmessage = (ev) => {
+        if (!current()) return;
+        if (typeof ev.data === "string") {
+          try {
+            const m = JSON.parse(ev.data) as {
+              type: string;
+              message?: string;
+              code?: string | null;
+              reason?: string;
+              user?: string;
+              host?: string;
+              port?: number;
+            };
+            if (m.type === "ready") {
+              setStatus("ready");
+              setConn({ user: m.user ?? "", host: m.host ?? "", port: m.port ?? 22 });
+              term.focus();
+            } else if (m.type === "error") {
+              setStatus("error");
+              setStatusMsg(m.message ?? "error");
+              setErrCodeState(m.code ?? null);
+              term.writeln(`\r\n[foreman] ${m.message ?? "error"}`);
+            } else if (m.type === "exit") {
+              setStatus("closed");
+              if (m.reason === "idle") {
+                setStatusMsg("closed after idle timeout");
+                term.writeln("\r\n[foreman] connection closed after idle timeout");
+              }
             }
+          } catch {
+            /* ignore malformed control frame */
           }
-        } catch {
-          /* ignore malformed control frame */
+        } else {
+          term.write(new Uint8Array(ev.data as ArrayBuffer));
         }
-      } else {
-        term.write(new Uint8Array(ev.data as ArrayBuffer));
-      }
-    };
-    ws.onclose = () => {
-      if (current()) setStatus((s) => (s === "error" ? s : "closed"));
+      };
+      sock.onclose = () => {
+        if (current()) setStatus((s) => (s === "error" ? s : "closed"));
+      };
     };
 
+    api
+      .terminalWsUrl(printerId, term.cols, term.rows)
+      .then((url) => {
+        if (!disposed) attach(new WebSocket(url));
+      })
+      .catch((e: unknown) => {
+        if (disposed) return;
+        setStatus("error");
+        setStatusMsg(errText(e));
+      });
+
     const onData = term.onData((d) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "input", data: d }));
     });
 
     // Multi-line paste needs confirmation; intercept before xterm's own handler.
@@ -723,7 +809,7 @@ function SshTerminal({ printerId }: { printerId: number }) {
       if (host.clientWidth === 0 || host.clientHeight === 0) return;
       fit.fit();
       setSize({ cols: term.cols, rows: term.rows });
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     });
     ro.observe(host);
 
@@ -738,7 +824,8 @@ function SshTerminal({ printerId }: { printerId: number }) {
       mo.disconnect();
       host.removeEventListener("paste", onPaste, true);
       onData.dispose();
-      ws.close();
+      disposed = true;
+      ws?.close();
       term.dispose();
       wsRef.current = null;
       termRef.current = null;

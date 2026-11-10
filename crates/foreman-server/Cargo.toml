@@ -64,6 +64,10 @@ url = "2"
 # Hidden password prompt for `reset-admin`
 rpassword = { workspace = true }
 
+# LAN announce + own addresses for /api/info
+mdns-sd = { workspace = true }
+if-addrs = { workspace = true }
+
 [dev-dependencies]
 tempfile = "3"
 async-trait = { workspace = true }

@@ -11,6 +11,7 @@ import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
+import { useSignedUrl } from "../hooks/useSignedUrl";
 import "./Printer.css";
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,7 @@ export default function Printer() {
   // Webcam
   const [activeCam, setActiveCam] = useState(0);
   const [camTs, setCamTs] = useState(Date.now());
+  const camSrc = useSignedUrl(printerId ? api.snapshotPath(printerId, camTs) : null);
 
   // Cancel dialog
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -409,7 +411,7 @@ export default function Printer() {
               <div className="webcam-view">
                 {webcams.length > 0 ? (
                   <img
-                    src={`${api.snapshotUrl(printerId)}?t=${camTs}`}
+                    src={camSrc ?? undefined}
                     alt={`${webcams[activeCam]?.name ?? "Webcam"} live view`}
                   />
                 ) : (
@@ -759,12 +761,12 @@ export default function Printer() {
 
       {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
       {visited.has("Files") && (
-        <div hidden={activeTab !== "Files"}>
+        <div className="printer-fill" hidden={activeTab !== "Files"}>
           <FilesTab printerId={printerId} firmware={printer.firmware} isPrinting={isPrinting} />
         </div>
       )}
       {visited.has("Terminal") && (
-        <div hidden={activeTab !== "Terminal"}>
+        <div className="printer-fill" hidden={activeTab !== "Terminal"}>
           <TerminalTab printerId={printerId} firmware={printer.firmware} />
         </div>
       )}

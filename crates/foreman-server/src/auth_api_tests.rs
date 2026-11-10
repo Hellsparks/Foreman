@@ -52,11 +52,13 @@ async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
         auth: Arc::new(auth),
         info: Arc::new(ServerInfo {
             server_id: "test-id".into(),
-            name: "test".into(),
             version: "0.0.0",
             desktop_mode: false,
-            configured_host: "127.0.0.1".into(),
-            bound_host: "127.0.0.1".into(),
+            configured_host: "0.0.0.0".into(),
+            port: 9090,
+            hostname: "test".into(),
+            magic_dns: None,
+            bind: tokio::sync::watch::channel("127.0.0.1".to_owned()).0,
         }),
     };
     (build_router(state.clone()), state)
@@ -142,7 +144,7 @@ async fn setup_code_creates_admin_once() {
     let (s, _, b) = call(&app, "GET", "/api/printers", &[], None).await;
     assert_eq!(
         (s, b["code"].as_str()),
-        (StatusCode::UNAUTHORIZED, Some("setup_required"))
+        (StatusCode::FORBIDDEN, Some("setup_required"))
     );
 
     let setup = |code: &str, pw: &str| json!({ "code": code, "username": "admin", "password": pw });
@@ -340,4 +342,197 @@ async fn login_logout_and_api_keys() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
+}
+
+async fn bearer_login(app: &Router) -> String {
+    let (_, _, b) = call(
+        app,
+        "POST",
+        "/api/auth/login",
+        &[],
+        Some(json!({ "username": "admin", "password": PW, "return_token": true })),
+    )
+    .await;
+    b["token"].as_str().expect("token").to_owned()
+}
+
+#[tokio::test]
+async fn info_name_addresses_and_rename() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, _) = app(&dir, true).await;
+    let (_, _, b) = call(&app, "GET", "/api/info", &[], None).await;
+    assert_eq!(b["name"], "test", "falls back to the hostname");
+    assert_eq!(
+        b["addresses"],
+        json!([{ "address": "127.0.0.1:9090", "kind": "loopback" }]),
+        "loopback-bound server only reports loopback"
+    );
+
+    let bearer = format!("Bearer {}", bearer_login(&app).await);
+    let (s, _, _) = call(
+        &app,
+        "PUT",
+        "/api/settings/server",
+        &[("authorization", &bearer)],
+        Some(json!({ "name": "  " })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, _) = call(
+        &app,
+        "PUT",
+        "/api/settings/server",
+        &[("authorization", &bearer)],
+        Some(json!({ "name": "Workshop Pi" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, _, b) = call(&app, "GET", "/api/info", &[], None).await;
+    assert_eq!(b["name"], "Workshop Pi");
+    assert_eq!(b["server_id"], "test-id", "id never changes");
+}
+
+#[tokio::test]
+async fn unclaimed_server_only_answers_health_info_setup() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, _) = app(&dir, false).await;
+    for uri in ["/api/health", "/api/info"] {
+        let (s, _, _) = call(&app, "GET", uri, &[], None).await;
+        assert_eq!(s, StatusCode::OK, "{uri}");
+    }
+    for (method, uri) in [
+        ("GET", "/api/printers"),
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/login"),
+        ("POST", "/api/auth/url-token"),
+        ("GET", "/ws/events"),
+    ] {
+        let (s, _, b) = call(&app, method, uri, &[], Some(json!({}))).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{method} {uri}");
+        assert_eq!(b["error"], "server not set up");
+    }
+}
+
+#[tokio::test]
+async fn setup_code_rate_limited_after_five_wrong_codes() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, _) = app(&dir, false).await;
+    let body = |code: &str| json!({ "code": code, "username": "admin", "password": PW });
+    for i in 1..=5 {
+        let (s, _, _) = call(
+            &app,
+            "POST",
+            "/api/auth/setup",
+            &[],
+            Some(body("WRNG-CODE")),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "try {i}");
+    }
+    let (s, h, _) = call(&app, "POST", "/api/auth/setup", &[], Some(body(CODE))).await;
+    assert_eq!(
+        s,
+        StatusCode::TOO_MANY_REQUESTS,
+        "even the right code waits"
+    );
+    assert!(h.get(header::RETRY_AFTER).is_some());
+}
+
+#[tokio::test]
+async fn setup_keeps_configured_host() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, state) = app(&dir, false).await;
+    let (s, _, _) = call(
+        &app,
+        "POST",
+        "/api/auth/setup",
+        &[],
+        Some(json!({ "code": CODE, "username": "admin", "password": PW })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(state.info.bound_host(), "0.0.0.0", "configured host");
+}
+
+#[tokio::test]
+async fn desktop_app_session_works_before_setup() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, state) = app(&dir, false).await;
+    let (token, _) = core_auth::create_session(&state.foreman_db.pool, 3600, None, None)
+        .await
+        .expect("session");
+    let bearer = format!("Bearer {token}");
+    let (s, _, b) = call(
+        &app,
+        "GET",
+        "/api/auth/me",
+        &[("authorization", &bearer)],
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["username"], crate::auth::LOCAL_APP_USER);
+    let (s, _, b) = call(&app, "GET", "/api/printers", &[], None).await;
+    assert_eq!(
+        (s, b["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("setup_required"))
+    );
+}
+
+#[tokio::test]
+async fn url_tokens_scoped_session_tokens_refused() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, _) = app(&dir, true).await;
+    let session = bearer_login(&app).await;
+    let bearer = format!("Bearer {session}");
+
+    // Session tokens never work in a URL.
+    for uri in [
+        format!("/api/printers?token={session}"),
+        format!("/api/printers/999/snapshot?token={session}"),
+        format!("/ws/events?token={session}"),
+    ] {
+        let (s, _, _) = call(&app, "GET", &uri, &[], None).await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "{uri}");
+    }
+
+    // Only snapshot / download / WebSocket paths can get a URL token.
+    let (s, _, _) = call(
+        &app,
+        "POST",
+        "/api/auth/url-token",
+        &[("authorization", &bearer)],
+        Some(json!({ "path": "/api/printers" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, b) = call(
+        &app,
+        "POST",
+        "/api/auth/url-token",
+        &[("authorization", &bearer)],
+        Some(json!({ "path": "/api/printers/999/snapshot?t=1" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(b["expires_in"], 60);
+    let url_token = b["token"].as_str().expect("token").to_owned();
+
+    let (s, _, _) = call(
+        &app,
+        "GET",
+        &format!("/api/printers/999/snapshot?t=2&token={url_token}"),
+        &[],
+        None,
+    )
+    .await;
+    assert_ne!(s, StatusCode::UNAUTHORIZED, "valid for its own path");
+    for uri in [
+        format!("/api/printers/998/snapshot?token={url_token}"),
+        format!("/api/printers?token={url_token}"),
+        format!("/ws/events?token={url_token}"),
+    ] {
+        let (s, _, _) = call(&app, "GET", &uri, &[], None).await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED, "{uri}");
+    }
 }

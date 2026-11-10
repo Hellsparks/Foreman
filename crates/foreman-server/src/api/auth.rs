@@ -22,6 +22,8 @@ use crate::{
 };
 
 pub const SETTING_ALLOW_LAN: &str = "network.allow_lan";
+pub const SETTING_SERVER_NAME: &str = "server.name";
+const MAX_NAME_LEN: usize = 64;
 
 fn err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
     (
@@ -36,18 +38,70 @@ fn internal(e: impl std::fmt::Display) -> Response {
     err(StatusCode::INTERNAL_SERVER_ERROR, "internal", e.to_string())
 }
 
+/// Display name: the `server.name` setting, else the hostname, else "Foreman".
+pub async fn server_name(pool: &sqlx::SqlitePool, hostname: &str) -> Result<String, AppError> {
+    if let Some(name) = repo::setting::get(pool, SETTING_SERVER_NAME).await? {
+        return Ok(name);
+    }
+    Ok(if hostname.is_empty() {
+        "Foreman".to_owned()
+    } else {
+        hostname.to_owned()
+    })
+}
+
+async fn allow_lan(pool: &sqlx::SqlitePool) -> Result<bool, AppError> {
+    Ok(repo::setting::get(pool, SETTING_ALLOW_LAN)
+        .await?
+        .is_some_and(|v| v == "true"))
+}
+
+/// Re-evaluate the bind rule and move the listener if it changed (no restart needed).
+pub async fn apply_bind_rule(state: &AppState) -> Result<(), AppError> {
+    let pool = &state.foreman_db.pool;
+    let host = crate::auth::effective_bind_host(
+        &state.info.configured_host,
+        auth::has_admin(pool).await?,
+        state.info.desktop_mode,
+        allow_lan(pool).await?,
+    );
+    state.info.bind.send_if_modified(|cur| {
+        if *cur == host {
+            return false;
+        }
+        info!(from = %cur, to = %host, "moving the listener");
+        *cur = host;
+        true
+    });
+    Ok(())
+}
+
 /// `GET /api/info` (open)
 pub async fn info(State(state): State<AppState>) -> Response {
-    match auth::has_admin(&state.foreman_db.pool).await {
-        Ok(has) => Json(json!({
-            "server_id": state.info.server_id,
-            "name": state.info.name,
-            "version": state.info.version,
-            "needs_setup": !has,
-        }))
-        .into_response(),
-        Err(e) => internal(e),
-    }
+    let pool = &state.foreman_db.pool;
+    let has = match auth::has_admin(pool).await {
+        Ok(has) => has,
+        Err(e) => return internal(e),
+    };
+    let name = match server_name(pool, &state.info.hostname).await {
+        Ok(n) => n,
+        Err(e) => return internal(e),
+    };
+    let addresses = crate::net::own_addresses(
+        &state.info.bound_host(),
+        state.info.port,
+        &crate::net::interface_ips(),
+        &state.info.hostname,
+        state.info.magic_dns.as_deref(),
+    );
+    Json(json!({
+        "server_id": state.info.server_id,
+        "name": name,
+        "version": state.info.version,
+        "needs_setup": !has,
+        "addresses": addresses,
+    }))
+    .into_response()
 }
 
 /// Create a session and build the response (cookie for browsers, token for other clients).
@@ -171,12 +225,11 @@ pub async fn setup(
     }
     let username = body.username.trim().to_owned();
     info!(%username, "admin account created");
-    if state.info.bound_host != state.info.configured_host && !state.info.desktop_mode {
-        info!(
-            "restart the server to listen on {} (bound to {} until an admin existed)",
-            state.info.configured_host, state.info.bound_host
-        );
+    if let Err(e) = apply_bind_rule(&state).await {
+        warn!("bind rule after setup: {e}");
     }
+    // Re-announce so the LAN sees needs_setup=0.
+    state.info.bind.send_modify(|_| {});
     start_session(
         &state,
         &ip,
@@ -269,6 +322,41 @@ pub async fn me(Extension(ctx): Extension<AuthCtx>) -> Json<serde_json::Value> {
     }
 }
 
+#[derive(Deserialize)]
+pub struct UrlTokenBody {
+    path: String,
+}
+
+/// `POST /api/auth/url-token` — a token valid 60 s for one snapshot/download/WebSocket path,
+/// for places that can't send a header (`<img src>`, `<a href>`, `new WebSocket`).
+pub async fn url_token(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
+    Json(body): Json<UrlTokenBody>,
+) -> Response {
+    let path = body.path.split('?').next().unwrap_or_default();
+    if !crate::auth::url_token_path_allowed(path) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "invalid",
+            "URL tokens are only for snapshot, download and WebSocket paths",
+        );
+    }
+    let issued = match state.auth.url_grants.lock() {
+        Ok(mut g) => g.issue(path, ctx, Instant::now()),
+        Err(_) => return internal("url grant lock poisoned"),
+    };
+    match issued {
+        Ok(token) => Json(json!({
+            "token": token,
+            "path": path,
+            "expires_in": crate::auth::URL_TOKEN_TTL.as_secs(),
+        }))
+        .into_response(),
+        Err(e) => internal(e),
+    }
+}
+
 /// API keys may not manage keys or network exposure: `Some(403)` for them.
 fn forbid_api_key(ctx: &AuthCtx) -> Option<Response> {
     match ctx.kind {
@@ -338,21 +426,20 @@ pub async fn revoke_key(
 }
 
 async fn network_body(state: &AppState) -> Result<serde_json::Value, AppError> {
-    let allow_lan = repo::setting::get(&state.foreman_db.pool, SETTING_ALLOW_LAN)
-        .await?
-        .is_some_and(|v| v == "true");
-    let (wanted, _) = crate::auth::effective_bind_host(
+    let allow_lan = allow_lan(&state.foreman_db.pool).await?;
+    let wanted = crate::auth::effective_bind_host(
         &state.info.configured_host,
         true,
         state.info.desktop_mode,
         allow_lan,
     );
+    let bound = state.info.bound_host();
     Ok(json!({
         "desktop_mode": state.info.desktop_mode,
         "allow_lan": allow_lan,
         "configured_host": state.info.configured_host,
-        "bound_host": state.info.bound_host,
-        "restart_required": wanted != state.info.bound_host,
+        "restart_required": wanted != bound,
+        "bound_host": bound,
     }))
 }
 
@@ -386,8 +473,52 @@ pub async fn put_network(
         allow_lan = body.allow_lan,
         "network exposure setting changed"
     );
+    if let Err(e) = apply_bind_rule(&state).await {
+        return internal(e);
+    }
     match network_body(&state).await {
         Ok(b) => Json(b).into_response(),
         Err(e) => internal(e),
     }
+}
+
+/// `GET /api/settings/server`
+pub async fn get_server(State(state): State<AppState>) -> Response {
+    match server_name(&state.foreman_db.pool, &state.info.hostname).await {
+        Ok(name) => {
+            Json(json!({ "server_id": state.info.server_id, "name": name })).into_response()
+        }
+        Err(e) => internal(e),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ServerBody {
+    name: String,
+}
+
+/// `PUT /api/settings/server` — rename the server (shown in the app and announced via mDNS).
+pub async fn put_server(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
+    Json(body): Json<ServerBody>,
+) -> Response {
+    if let Some(r) = forbid_api_key(&ctx) {
+        return r;
+    }
+    let name = body.name.trim();
+    if name.is_empty() || name.chars().count() > MAX_NAME_LEN {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "invalid",
+            format!("name must be 1–{MAX_NAME_LEN} characters"),
+        );
+    }
+    if let Err(e) = repo::setting::set(&state.foreman_db.pool, SETTING_SERVER_NAME, name).await {
+        return internal(e);
+    }
+    info!(%name, "server renamed");
+    // Re-announce under the new name.
+    state.info.bind.send_modify(|_| {});
+    Json(json!({ "server_id": state.info.server_id, "name": name })).into_response()
 }
