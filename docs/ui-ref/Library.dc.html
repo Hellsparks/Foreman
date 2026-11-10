@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Library</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+
+:root{--fw-spatial-depth:22px;--fw-spatial-tilt:-12deg}
+.fw-browser{--fw-control-active:var(--fw-accent-hover);--fw-control-on:var(--fw-on-accent);--fw-scrim:rgba(0,0,0,.35);border:1px solid var(--fw-border);background:var(--fw-raised);min-width:0}
+.fw-browser button,.fw-browser input{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-text)}
+.fw-browser button{cursor:pointer}
+.fw-browser button:focus-visible,.fw-browser input:focus-visible{outline:2px solid var(--fw-focus);outline-offset:-3px}
+.fw-browser-top,.fw-browser-tools,.fw-browser-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid var(--fw-border);flex-wrap:wrap}
+.fw-browser-top{background:var(--fw-surface)}
+.fw-browser-title{display:flex;align-items:center;gap:12px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.06em}
+.fw-browser-signal{width:8px;height:8px;background:var(--fw-control-active)}
+.fw-browser-actions{display:flex;gap:4px;flex-wrap:wrap}
+.fw-browser .fb-button{border:1px solid var(--fw-muted);background:transparent;color:var(--fw-text);padding:0 12px;min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.fw-browser .fb-button:hover{background:var(--fw-surface)}
+.fw-browser .fb-button[aria-pressed=true]{background:var(--fw-control-active);color:var(--fw-control-on);border-color:var(--fw-control-active)}
+.fw-browser .fb-button:disabled{color:var(--fw-muted);border-color:var(--fw-border);cursor:not-allowed;opacity:1}
+.fw-browser .fb-primary{background:var(--fw-accent-hover);color:var(--fw-on-accent);border-color:transparent;font-weight:bold}
+.fw-browser-search{display:flex;align-items:center;gap:12px;flex:1;min-width:180px;max-width:320px}
+.fw-browser input{min-height:44px;min-width:0;width:100%;padding:12px;border:1px solid var(--fw-muted);background:var(--fw-background);box-sizing:border-box}
+.fw-browser-crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--fw-border)}
+.fw-browser-crumbs button{border:0;background:transparent;color:var(--fw-muted)!important;min-height:36px;padding:0 8px}
+.fw-browser-crumbs button[aria-current=page]{color:var(--fw-text)!important;font-weight:bold}
+.fw-browser-body{display:grid;grid-template-columns:190px minmax(0,1fr)}
+.fw-browser-locations{border-right:1px solid var(--fw-border);padding:20px 8px;background:var(--fw-background)}
+.fw-browser-locations>span{display:block;padding:12px 8px 8px;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-muted);letter-spacing:.06em}
+.fw-browser-locations button{display:flex;align-items:center;gap:8px;text-align:left;width:100%;padding:10px 8px;min-height:44px;background:none;border:1px solid transparent;color:var(--fw-muted)!important}
+.fw-browser-locations button[aria-current=page]{color:var(--fw-text)!important;border-color:var(--fw-border);background:var(--fw-surface)}
+.fw-browser-content{min-width:0;position:relative;overflow-y:auto;background:radial-gradient(circle at center,var(--fw-border) 1px,transparent 1px);background-size:24px 24px}
+.fw-file-location-title{font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-muted);margin:0;padding:16px 16px 0}
+.fw-file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));padding:16px;gap:16px;align-content:start}
+.fw-file-card{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;padding:12px 6px;border:1px solid transparent;background:transparent;color:var(--fw-text);text-align:center}
+.fw-file-card:hover,.fw-file-card[aria-pressed=true]{border-color:var(--fw-muted);background:var(--fw-surface)}
+.fw-file-card strong{font:500 13px Arial,Helvetica,sans-serif;overflow-wrap:anywhere;line-height:1.4}
+.fw-file-card small{font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-muted)}
+.fw-file-art{display:block;position:relative;width:112px;height:96px;perspective:450px;margin:4px auto 8px}
+.fw-file-object{position:absolute;inset:10px 6px;transform:rotateX(10deg) rotateY(var(--fw-spatial-tilt));transform-style:preserve-3d;transition:transform 240ms ease}
+.fw-file-card:hover .fw-file-object{transform:rotateX(0deg) rotateY(-4deg) translateY(-5px)}
+.fw-folder-back{position:absolute;inset:3px 8px 0;background:var(--fw-surface);border:1px solid var(--fw-muted)}
+.fw-folder-back:before{content:'';position:absolute;width:36%;height:9px;top:-9px;left:-1px;background:var(--fw-surface);border:1px solid var(--fw-muted);border-bottom:0}
+.fw-folder-paper{position:absolute;inset:12px 15px 4px;border:1px solid var(--fw-muted);background:var(--fw-raised);transform:translateZ(6px) rotate(-5deg)}
+.fw-folder-front{position:absolute;inset:24px 8px -5px;background:var(--fw-surface);border:1px solid var(--fw-control-active);border-top:3px solid var(--fw-control-active);transform:translateZ(var(--fw-spatial-depth)) rotateX(-18deg);transform-origin:bottom;box-shadow:0 8px 8px var(--fw-scrim)}
+.fw-folder-front i{position:absolute;right:6px;bottom:4px;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;font-style:normal;color:var(--fw-muted)}
+.fw-document-face{position:absolute;inset:0 4px;background:var(--fw-raised);border:1px solid var(--fw-muted);transform:translateZ(10px);box-shadow:5px 5px 0 var(--fw-surface),6px 6px 0 var(--fw-border);display:flex;flex-direction:column;overflow:hidden}
+.fw-document-face img{display:block;width:100%;flex:1;min-height:0;object-fit:cover}
+.fw-document-face b{display:flex;justify-content:space-between;padding:3px 6px;font:bold 10px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-text);background:var(--fw-raised);border-top:1px solid var(--fw-border)}
+.fw-document-face b span{font-weight:normal;color:var(--fw-muted)}
+.fw-text-face{flex:1;padding:8px 6px;font:9px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-muted);text-align:left;white-space:pre;overflow:hidden}
+.fw-browser[data-view=flat] .fw-file-object{transform:none!important}
+.fw-browser[data-view=flat] .fw-folder-front,.fw-browser[data-view=flat] .fw-folder-paper,.fw-browser[data-view=flat] .fw-document-face{transform:none;box-shadow:none}
+.fw-browser-foot{border-top:1px solid var(--fw-border);border-bottom:0;font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fw-muted)}
+.fw-file-inspector{padding:24px;border-top:1px solid var(--fw-border);background:var(--fw-background);display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:24px}
+.fw-file-inspector h3{margin:6px 0 12px;font-size:22px;overflow-wrap:anywhere}
+.fw-file-inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:16px;background:var(--fw-surface);border:1px solid var(--fw-border);font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;max-height:260px;overflow:auto}
+.fw-browser-form{display:flex;gap:8px;align-items:end;flex-wrap:wrap;padding:16px;border-bottom:1px solid var(--fw-border)}
+.fw-browser-form label{display:grid;gap:8px;flex:1;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;min-width:160px}
+.fw-browser-error{color:var(--fw-danger);font:12px ui-monospace,SFMono-Regular,Consolas,monospace;flex-basis:100%;margin:4px 0}
+.fw-browser-empty{padding:40px 24px;min-height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+.fw-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media(prefers-reduced-motion:reduce){.fw-file-object{transition:none!important;transform:none!important}.fw-folder-front,.fw-folder-paper,.fw-document-face{transform:none;box-shadow:none}}
+
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Library</a>
+<a href="Projects.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="Service.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="Tools.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<div class="fw-browser" data-view="flat" tabindex="-1" onKeyDown="{{keys}}" style="flex: 1; outline: none; display: flex; flex-direction: column; border: 0; min-height: 0">
+<div class="fw-browser-tools">
+<div class="fw-browser-actions"><button type="button" class="fb-button" aria-label="Back" disabled="{{backOff}}" onClick="{{back}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button type="button" class="fb-button" aria-label="Forward" disabled="{{fwdOff}}" onClick="{{fwd}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button><button type="button" class="fb-button" aria-label="Up one folder" disabled="{{upOff}}" onClick="{{up}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg></button></div>
+<label class="fw-browser-search"><span class="fw-sr">Search this folder</span><input type="search" placeholder="Search this folder…" value="{{query}}" onInput="{{setQuery}}"></label>
+<div class="fw-browser-actions" role="group" aria-label="File display"><button type="button" class="fb-button" onClick="{{copy}}" disabled="{{noPick}}">Copy</button><button type="button" class="fb-button" onClick="{{cut}}" disabled="{{noPick}}">Cut</button><button type="button" class="fb-button" onClick="{{bulkDel}}" disabled="{{noPick}}" style="border-color: {{delBorder}}; color: {{delFg}}">{{bulkDelLabel}}</button><button type="button" class="fb-button" onClick="{{paste}}" disabled="{{pasteOff}}" style="border-color: {{pasteBorder}}">{{pasteLabel}}</button><button type="button" class="fb-button" onClick="{{toggleCreate}}" disabled="{{readOnlyLoc}}">+ Folder</button><button type="button" class="fb-button fb-primary" onClick="{{upload}}">Upload</button></div>
+</div>
+<nav class="fw-browser-crumbs" aria-label="Folder breadcrumbs"><sc-for list="{{crumbs}}" as="c" hint-placeholder-count="3"><sc-if value="{{c.sep}}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="color: var(--fw-muted)">/</span></sc-if><button type="button" onClick="{{c.go}}" aria-current="{{c.cur}}">{{c.label}}</button></sc-for><span style="margin-left: auto; font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .06em; color: var(--fw-muted)">{{topNote}}</span></nav>
+<sc-if value="{{hasPick}}" hint-placeholder-val="{{ false }}"><div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--fw-border); background: var(--fw-info-bg); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"><span style="flex: 1">{{pickText}}</span><sc-if value="{{pickElsewhere}}" hint-placeholder-val="{{ false }}"><button type="button" class="fb-button fb-primary" style="min-height: 32px" onClick="{{copyHere}}" disabled="{{hereOff}}">Copy {{pickN}} here</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{moveHere}}" disabled="{{hereOff}}">Move here</button></sc-if><sc-if value="{{pickHere}}" hint-placeholder-val="{{ true }}"><button type="button" class="fb-button" style="min-height: 32px" onClick="{{copy}}">Copy</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{cut}}">Cut</button></sc-if><button type="button" class="fb-button" style="min-height: 32px; border-color: var(--fw-danger); color: var(--fw-danger)" onClick="{{bulkDel}}">{{bulkDelLabel}}</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{selAll}}">Select all</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{clearPick}}">Clear</button></div></sc-if>
+<sc-if value="{{hasConflict}}" hint-placeholder-val="{{ false }}"><div role="alertdialog" aria-label="Name conflict" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--fw-warning); background: var(--fw-warning-bg); color: var(--fw-text); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"><span style="flex: 1 1 260px">{{conflictText}}</span><button type="button" class="fb-button" style="min-height: 32px" onClick="{{keepBoth}}">Keep both</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{replaceAll}}" disabled="{{replaceOff}}">Replace</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{skipConf}}">Skip those</button><button type="button" class="fb-button" style="min-height: 32px" onClick="{{cancelConf}}">Cancel</button></div></sc-if>
+<sc-if value="{{creating}}" hint-placeholder-val="{{ false }}"><div class="fw-browser-form"><label>New folder name<input type="text" value="{{fname}}" onInput="{{setFname}}" maxlength="80"></label><button type="button" class="fb-button" onClick="{{create}}">Create folder</button><button type="button" class="fb-button" onClick="{{toggleCreate}}">Cancel</button><sc-if value="{{hasErr}}" hint-placeholder-val="{{ false }}"><p class="fw-browser-error" role="alert">{{err}}</p></sc-if></div></sc-if>
+<div class="fw-browser-body" style="flex: 1; min-height: 0; grid-template-columns: {{bodyCols}}">
+<nav class="fw-browser-locations" aria-label="File locations">
+<span>LIBRARY</span>
+<sc-for list="{{libLocs}}" as="l" hint-placeholder-count="5"><button type="button" aria-current="{{l.cur}}" onClick="{{l.go}}" onDragOver="{{l.dragOver}}" onDrop="{{l.drop}}" style="outline: {{l.dropOutline}}"><span aria-hidden="true">{{l.icon}}</span><span style="flex: 1">{{l.name}}</span><span style="font-size: 10px">{{l.count}}</span></button></sc-for>
+<span>PRINTERS</span>
+<sc-for list="{{prnLocs}}" as="l" hint-placeholder-count="2"><button type="button" aria-current="{{l.cur}}" onClick="{{l.go}}" onDragOver="{{l.dragOver}}" onDrop="{{l.drop}}" style="outline: {{l.dropOutline}}"><span aria-hidden="true" style="color: {{l.dot}}">●</span><span style="flex: 1">{{l.name}}<br><span style="font-size: 10px">{{l.sub}}</span></span></button></sc-for>
+</nav>
+<div class="fw-browser-content">
+<h3 class="fw-file-location-title">{{locTitle}}</h3>
+<sc-if value="{{hasItems}}" hint-placeholder-val="{{ true }}">
+<div class="fw-file-grid">
+<sc-for list="{{items}}" as="f" hint-placeholder-count="8">
+<div style="position: relative; min-width: 0" draggable="true" onDragStart="{{f.dragStart}}" onDragEnd="{{dragEnd}}" onDragOver="{{f.dragOver}}" onDrop="{{f.drop}}">
+<button type="button" role="checkbox" aria-checked="{{f.picked}}" aria-label="Select {{f.label}}" onClick="{{f.togglePick}}" style="position: absolute; top: 6px; left: 6px; z-index: 2; width: 22px; height: 22px; padding: 0; min-height: 0; border: 1px solid {{f.ckBorder}}; background: {{f.ckBg}}; color: var(--fw-on-accent); font-size: 12px; line-height: 1; opacity: {{f.ckOpacity}}">{{f.ck}}</button>
+<button type="button" class="fw-file-card" aria-label="{{f.aria}}" aria-pressed="{{f.sel}}" onClick="{{f.open}}" style="width: 100%; outline: {{f.dropOutline}}; opacity: {{f.cutOpacity}}">
+<span class="fw-file-art" aria-hidden="true"><span class="fw-file-object">
+<sc-if value="{{f.isFolder}}" hint-placeholder-val="{{ false }}"><span class="fw-folder-back"></span><span class="fw-folder-paper"></span><span class="fw-folder-front"><i>{{f.count}}</i></span></sc-if>
+<sc-if value="{{f.isModel}}" hint-placeholder-val="{{ true }}"><span class="fw-document-face"><img src="{{f.thumb}}" alt=""><b>{{f.kind}}<span>{{f.badge}}</span></b></span></sc-if>
+<sc-if value="{{f.isText}}" hint-placeholder-val="{{ false }}"><span class="fw-document-face"><span class="fw-text-face">{{f.peek}}</span><b>{{f.kind}}<span>{{f.size}}</span></b></span></sc-if>
+</span></span>
+<strong>{{f.label}}</strong>
+<small>{{f.meta}}</small>
+</button>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{noItems}}" hint-placeholder-val="{{ false }}"><div class="fw-browser-empty"><strong>{{emptyTitle}}</strong><span style="color: var(--fw-muted)">{{emptyText}}</span><button type="button" class="fb-button" onClick="{{emptyAction}}">{{emptyLabel}}</button></div></sc-if>
+</div>
+<sc-if value="{{hasSel}}" hint-placeholder-val="{{ false }}">
+<aside class="fw-file-inspector" aria-label="File inspector" style="display: flex; flex-direction: column; gap: 16px; border-top: 0; border-left: 1px solid var(--fw-border); overflow-y: auto">
+<sc-if value="{{notSending}}" hint-placeholder-val="{{ true }}">
+<div>
+<sc-if value="{{sel.isModel}}" hint-placeholder-val="{{ true }}"><img src="{{sel.thumb}}" alt="Preview of {{sel.name}}" style="display: block; width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--fw-border)"></sc-if>
+<sc-if value="{{sel.isText}}" hint-placeholder-val="{{ false }}"><pre>{{sel.content}}</pre></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<div style="display: flex; align-items: flex-start; gap: 12px"><div style="flex: 1; min-width: 0"><span style="font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .06em; color: var(--fw-muted)">FILE INSPECTOR / {{sel.kind}} / {{sel.size}} / {{sel.where}}</span><h3>{{sel.name}}{{sel.star}}</h3></div><button type="button" class="fb-button" onClick="{{closeSel}}">Close ×</button></div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px">
+<sc-for list="{{sel.facts}}" as="k" hint-placeholder-count="4"><div style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 8px 10px"><div style="font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--fw-muted)">{{k.k}}</div><div style="font-weight: bold">{{k.v}}</div></div></sc-for>
+</div>
+<div class="fw-browser-actions">
+<sc-if value="{{sel.isModel}}" hint-placeholder-val="{{ true }}"><sc-if value="{{sel.canSend}}" hint-placeholder-val="{{ true }}"><button type="button" class="fb-button fb-primary" onClick="{{sel.send}}">Send to printer…</button></sc-if><sc-if value="{{sel.cantSend}}" hint-placeholder-val="{{ false }}"><button type="button" class="fb-button" disabled title="STL files must be sliced first">Slice first to print</button></sc-if><button type="button" class="fb-button" onClick="{{sel.project}}">Add to project…</button></sc-if>
+<sc-if value="{{sel.isText}}" hint-placeholder-val="{{ false }}"><button type="button" class="fb-button fb-primary" onClick="{{sel.editCfg}}">Open in editor</button></sc-if>
+<button type="button" class="fb-button" onClick="{{sel.copy}}">Copy</button><button type="button" class="fb-button" onClick="{{sel.cut}}">Cut</button><button type="button" class="fb-button" aria-pressed="{{sel.starred}}" onClick="{{sel.toggleStar}}">{{sel.starLabel}}</button>
+<button type="button" class="fb-button" onClick="{{sel.download}}">Download</button>
+<button type="button" class="fb-button" onClick="{{sel.del}}" style="border-color: var(--fw-danger); color: var(--fw-danger)">{{sel.delLabel}}</button>
+</div>
+<div class="fw-browser-form" style="padding: 0; border: 0"><label>Rename file<input type="text" value="{{rname}}" onInput="{{setRname}}" maxlength="80"></label><button type="button" class="fb-button" onClick="{{rename}}">Save name</button></div>
+</div>
+</sc-if>
+<sc-if value="{{sending}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 10px">
+<img src="{{sel.thumb}}" alt="" width="64" height="48" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<div style="flex: 1; min-width: 0"><span style="font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .06em; color: var(--fw-muted)">SEND · {{summary}}</span><div style="font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{sel.name}}</div></div>
+<button type="button" class="fb-button" onClick="{{stopSend}}">Back</button>
+</div>
+<div role="radiogroup" aria-label="Printers" style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<div style="background: var(--fw-raised); border: 1px solid {{r.border}}; outline: {{r.outline}}">
+<button type="button" role="radio" aria-checked="{{r.checked}}" onClick="{{r.pick}}" disabled="{{r.blocked}}" style="width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; background: none; border: 0; cursor: pointer; min-height: 52px; font: 14px Arial, Helvetica, sans-serif">
+<span style="flex: none; width: 88px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 3px 6px; color: {{r.fg}}; background: {{r.bg}}">{{r.tag}}</span>
+<span style="flex: 1; min-width: 0"><b>{{r.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{r.reason}}</span></span>
+</button>
+<sc-if value="{{r.hasFix}}" hint-placeholder-val="{{ false }}"><div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 10px 10px 108px"><span style="flex: 1 1 120px; font-size: 12px; color: var(--fw-muted); font-family: Arial, Helvetica, sans-serif">{{r.fixText}}</span><button type="button" class="fb-button" style="min-height: 32px" onClick="{{r.fix}}">{{r.fixLabel}}</button></div></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 12px">
+<button type="button" class="fb-button fb-primary" onClick="{{printNow}}" disabled="{{printDisabled}}">{{printLabel}}</button>
+<span style="font-size: 12px; color: var(--fw-muted); min-height: 18px; font-family: Arial, Helvetica, sans-serif">{{printHint}}</span>
+<div style="display: flex; gap: 8px"><button type="button" class="fb-button" style="flex: 1" onClick="{{queueHere}}" disabled="{{queueDisabled}}">{{queueLabel}}</button><button type="button" class="fb-button" style="flex: 1" onClick="{{fleetQueue}}">Fleet queue · any of {{okCount}}</button></div>
+</div>
+</sc-if>
+</aside>
+</sc-if>
+</div>
+<sc-if value="{{hasXfers}}" hint-placeholder-val="{{ false }}"><div aria-label="Transfers" style="border-top: 1px solid var(--fw-border); background: var(--fw-surface); padding: 8px 16px; display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto">
+<div style="display: flex; align-items: center; gap: 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; letter-spacing: .06em; color: var(--fw-muted)"><span style="flex: 1">TRANSFERS · {{xferSum}}</span><button type="button" class="fb-button" style="min-height: 28px; font-size: 11px" onClick="{{clearXfers}}">Clear finished</button></div>
+<sc-for list="{{xfers}}" as="x" hint-placeholder-count="2"><div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) 120px 70px; gap: 10px; align-items: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{x.name}}</span><span style="color: var(--fw-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{x.route}}</span><span aria-hidden="true" style="height: 6px; background: var(--fw-background); border: 1px solid var(--fw-border)"><span style="display: block; height: 100%; width: {{x.pct}}%; background: {{x.fg}}"></span></span><span style="color: {{x.fg}}; text-align: right">{{x.state}}</span></div></sc-for>
+</div></sc-if>
+<div class="fw-browser-foot"><span>{{footCount}}</span><span role="status" style="display: flex; align-items: center; gap: 8px">{{notice}}<sc-if value="{{canUndo}}" hint-placeholder-val="{{ false }}"><button type="button" class="fb-button" style="min-height: 28px; font-size: 11px" onClick="{{undo}}">Undo</button></sc-if></span></div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sending: false, target: null, cleared: {}, swapped: {}, trail: ['lib'], cursor: 0, query: '', view: 'flat', bulkArm: false, undoIds: [], picked: {}, clip: null, xfers: [], conflict: null, drag: null, sel: null, creating: false, fname: '', err: '', extra: [], starred: { housing: true }, renamed: {}, deleted: {}, delArm: null, rname: '', notice: 'Library and printer storage in one place.' };
+  }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const N = [
+      { id: 'lib', parent: null, name: 'All files', kind: 'folder', loc: 'lib' },
+      { id: 'inbox', parent: 'lib', name: 'Slicer inbox', kind: 'folder', loc: 'lib' },
+      { id: 'chess', parent: 'lib', name: 'Chess set', kind: 'folder', loc: 'lib' },
+      { id: 'encl', parent: 'lib', name: 'Enclosure', kind: 'folder', loc: 'lib' },
+      { id: 'cal', parent: 'lib', name: 'Calibration', kind: 'folder', loc: 'lib' },
+      { id: 'housing', parent: 'inbox', name: 'housing_top.gcode', kind: 'GCODE', hex: '#f4f4ef', size: '4.2 MB', mat: 'PLA White', time: '2 h 05 m', g: '64 g', fits: '5 / 8', loc: 'lib', when: '9 min ago' },
+      { id: 'duct', parent: 'inbox', name: 'fan_duct_v2.gcode', kind: 'GCODE', hex: '#1f8a8a', size: '6.8 MB', mat: 'PLA Teal', time: '4 h 02 m', g: '95 g', fits: '6 / 8', loc: 'lib', when: 'today' },
+      { id: 'c1', parent: 'chess', name: 'pawns.3mf', kind: '3MF', hex: '#1f8a8a', size: '6.0 MB', mat: 'PLA Teal + White', time: '2 h 02 m', g: '55 g', fits: '4 / 8', loc: 'lib', when: 'Sat' },
+      { id: 'c2', parent: 'chess', name: 'rooks_knights.3mf', kind: '3MF', hex: '#f4f4ef', size: '6.2 MB', mat: 'PLA Teal + White', time: '1 h 54 m', g: '56 g', fits: '4 / 8', loc: 'lib', when: 'Sat' },
+      { id: 'c3', parent: 'chess', name: 'king_queen.3mf', kind: '3MF', hex: '#1f8a8a', size: '5.9 MB', mat: 'PLA Teal + White', time: '2 h 05 m', g: '61 g', fits: '4 / 8', loc: 'lib', when: 'Sat' },
+      { id: 'lid', parent: 'encl', name: 'enclosure_lid_v3.gcode', kind: 'GCODE', hex: '#1d1d22', size: '18.4 MB', mat: 'PETG Black', time: '5 h 20 m', g: '210 g', fits: '2 / 8', loc: 'lib', when: '3 Nov' },
+      { id: 'sidel', parent: 'encl', name: 'enclosure_side_l.gcode', kind: 'GCODE', hex: '#1d1d22', size: '11.0 MB', mat: 'PETG Black', time: '3 h 12 m', g: '96 g', fits: '3 / 8', loc: 'lib', when: 'today' },
+      { id: 'panel', parent: 'encl', name: 'door_panel.stl', kind: 'STL', hex: '#8a8f94', size: '2.4 MB', mat: 'not sliced', time: '—', g: '—', fits: 'slice first', loc: 'lib', when: '2 Nov' },
+      { id: 'benchy', parent: 'cal', name: 'benchy.gcode', kind: 'GCODE', hex: '#1f8a8a', size: '1.1 MB', mat: 'PLA Teal', time: '42 m', g: '12 g', fits: '7 / 8', loc: 'lib', when: 'Oct' },
+      { id: 'calistar', parent: 'cal', name: 'calistar_100mm.3mf', kind: '3MF', hex: '#8a8f94', size: '1.3 MB', mat: 'any', time: '48 m', g: '21 g', fits: '8 / 8', loc: 'lib', when: 'Oct' },
+      { id: 'skew', parent: 'cal', name: 'skew_test_xy.stl', kind: 'STL', hex: '#e46a1a', size: '0.4 MB', mat: 'not sliced', time: '—', g: '—', fits: 'slice first', loc: 'lib', when: 'Oct' },
+      { id: 'v24', parent: null, name: 'Voron 2.4 350', kind: 'folder', loc: 'v24' },
+      { id: 'v24cfg', parent: 'v24', name: 'config', kind: 'folder', loc: 'v24' },
+      { id: 'v24gc', parent: 'v24', name: 'gcodes', kind: 'folder', loc: 'v24' },
+      { id: 'pcfg', parent: 'v24cfg', name: 'printer.cfg', kind: 'CFG', size: '6.1 KB', loc: 'v24', when: 'today', content: '[include mainsail.cfg]\n[include macros.cfg]\n\n[printer]\nkinematics: corexy\nmax_velocity: 300\nmax_accel: 8000\n\n[skew_correction]' },
+      { id: 'mcfg', parent: 'v24cfg', name: 'macros.cfg', kind: 'CFG', size: '4.8 KB', loc: 'v24', when: '3 Nov', content: '[gcode_macro PRINT_START]\ngcode:\n  G28\n  QUAD_GANTRY_LEVEL\n  SKEW_PROFILE LOAD=foreman' },
+      { id: 'moon', parent: 'v24cfg', name: 'moonraker.conf', kind: 'CONF', size: '1.2 KB', loc: 'v24', when: '1 Nov', content: '[server]\nhost: 0.0.0.0\nport: 7125\n\n[spoolman]\nserver: http://foreman.local:7912' },
+      { id: 'vlid', parent: 'v24gc', name: 'enclosure_lid_v3.gcode', kind: 'GCODE', hex: '#1d1d22', size: '18.4 MB', mat: 'PETG Black', time: '5 h 20 m', g: '210 g', fits: 'printing now', loc: 'v24', when: 'today' },
+      { id: 'vcal', parent: 'v24gc', name: 'calistar_100mm.gcode', kind: 'GCODE', hex: '#8a8f94', size: '2.1 MB', mat: 'PETG', time: '48 m', g: '21 g', fits: '—', loc: 'v24', when: '5 Nov' },
+      { id: 'x1c', parent: null, name: 'Bambu X1C', kind: 'folder', loc: 'x1c' },
+      { id: 'xc', parent: 'x1c', name: 'cache', kind: 'folder', loc: 'x1c' },
+      { id: 'x3', parent: 'xc', name: 'chess_plate_3.3mf', kind: '3MF', hex: '#1f8a8a', size: '6.2 MB', mat: 'PLA Teal', time: '1 h 54 m', g: '56 g', fits: 'printing now', loc: 'x1c', when: 'today' },
+      { id: 'x2', parent: 'xc', name: 'chess_plate_2.3mf', kind: '3MF', hex: '#f4f4ef', size: '6.0 MB', mat: 'PLA White', time: '2 h 18 m', g: '57 g', fits: '—', loc: 'x1c', when: 'Sat' }
+    ].concat(s.extra).filter(n => !s.deleted[n.id]).map(n => ({ ...n, name: s.renamed[n.id] || n.name }));
+    const byId = (id) => N.find(n => n.id === id);
+    const folder = s.trail[s.cursor];
+    const cur = byId(folder);
+    const kids = N.filter(n => n.parent === folder);
+    const q = s.query.toLowerCase();
+    const vis = kids.filter(n => n.name.toLowerCase().includes(q)).sort((a, b) => (a.kind === 'folder') === (b.kind === 'folder') ? a.name.localeCompare(b.name) : a.kind === 'folder' ? -1 : 1);
+    const count = (id) => N.filter(n => n.parent === id).length;
+    const deep = (id) => { const k = N.filter(n => n.parent === id); return k.filter(x => x.kind !== 'folder').length + k.filter(x => x.kind === 'folder').reduce((a, x) => a + deep(x.id), 0); };
+    const open = (id) => { if (id === folder) return; this.setState({ trail: [...s.trail.slice(0, s.cursor + 1), id], cursor: s.cursor + 1, query: '', sel: null, creating: false, err: '', delArm: null }); };
+    const crumbsRaw = []; let a = cur; while (a) { crumbsRaw.unshift(a); a = a.parent ? byId(a.parent) : null; }
+    const loc = cur ? cur.loc : 'lib';
+    const LOCNOTE = { lib: 'FOREMAN LIBRARY · ON THE SERVER', v24: 'VORON 2.4 350 · SFTP pi@voron24.local', x1c: 'BAMBU X1C · FTPS SD CARD' };
+    const selN = s.sel ? byId(s.sel) : null;
+    const isText = (n) => /^(CFG|CONF|LOG)$/.test(n.kind);
+    const isModel = (n) => /^(GCODE|3MF|STL)$/.test(n.kind);
+    const items = vis.map(n => { const fol = n.kind === 'folder';
+      return { isFolder: fol, isModel: !fol && isModel(n), isText: !fol && isText(n), label: n.name + (s.starred[n.id] ? ' ★' : ''), kind: n.kind, size: n.size || '', badge: n.time || '', count: fol ? count(n.id) : '',
+        thumb: !fol && isModel(n) ? this.thumbOf(n.name, n.hex) : '', peek: !fol && isText(n) ? n.content.replace(/\\n/g, '\n').split('\n').slice(0, 6).join('\n') : '',
+        meta: fol ? count(n.id) + ' items' : isModel(n) ? (n.g !== '—' ? n.mat + ' · ' + n.g : 'STL · ' + n.size) : n.kind + ' / ' + n.size,
+        aria: (fol ? 'Open folder ' : 'Inspect file ') + n.name, sel: (s.sel === n.id || s.picked[n.id]) ? 'true' : 'false',
+        open: (e) => { if (e && (e.ctrlKey || e.metaKey || e.shiftKey)) { this.setState({ picked: { ...this.state.picked, [n.id]: !this.state.picked[n.id] } }); return; } fol ? open(n.id) : this.setState({ sel: n.id, rname: n.name, delArm: null, sending: false, target: null }); } }; });
+
+    const pickIds = Object.keys(s.picked).filter(id => s.picked[id] && byId(id));
+    const pickN = pickIds.length;
+    const LNAME = { lib: 'Library', v24: 'Voron 2.4 350', x1c: 'Bambu X1C' };
+    const VIA = { lib: 'server', v24: 'SFTP', x1c: 'FTPS' };
+    const routeOf = (from, to) => from === to ? LNAME[to] + ' · ' + (from === 'lib' ? 'move on server' : 'on the printer') : from === 'lib' ? 'Library → ' + LNAME[to] + ' (' + VIA[to] + ')' : to === 'lib' ? LNAME[from] + ' (' + VIA[from] + ') → Library' : LNAME[from] + ' → Foreman → ' + LNAME[to] + ' (' + VIA[from] + ' → ' + VIA[to] + ')';
+    const subtree = (id) => { const out = [byId(id)]; N.filter(n => n.parent === id).forEach(k => out.push(...subtree(k.id))); return out; };
+    const blockReason = (n, toLoc) => { if (toLoc === 'x1c' && /^(CFG|CONF|LOG)$/.test(n.kind)) return 'config files only go to Klipper hosts'; if (toLoc === 'x1c' && n.kind === 'folder') return 'the SD card is read-only for folders here'; return ''; };
+    const doTransfer = (ids, mode, target, policy) => {
+      const tgt = byId(target); const toLoc = tgt.loc; const st = this.state;
+      const extra = st.extra.slice(); const deleted = { ...st.deleted }; const xf = st.xfers.slice(); let skipped = 0, blocked = [], warn = [];
+      const clone = (n, parent, name) => { const nid = n.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6); extra.push({ ...n, id: nid, parent, name, loc: toLoc, when: 'now', fits: toLoc === 'lib' ? n.fits : (n.fits === 'printing now' ? '—' : n.fits) }); N.filter(k => k.parent === n.id).forEach(k => clone(k, nid, k.name)); return nid; };
+      ids.forEach(id => { const n = byId(id); if (!n) return; if (n.id === target || subtree(n.id).some(x => x.id === target)) { blocked.push(n.name + ' (into itself)'); return; }
+        const br = blockReason(n, toLoc); if (br) { blocked.push(n.name + ' (' + br + ')'); return; }
+        const clash = N.find(k => k.parent === target && k.name.toLowerCase() === n.name.toLowerCase() && k.id !== n.id);
+        let name = n.name;
+        if (clash) { if (policy === 'skip') { skipped++; return; } if (policy === 'replace') { if (clash.fits === 'printing now') { blocked.push(n.name + ' (printing now, not replaced)'); return; } deleted[clash.id] = true; } else { const dot = name.lastIndexOf('.'); name = dot > 0 ? name.slice(0, dot) + ' (copy)' + name.slice(dot) : name + ' (copy)'; } }
+        if (mode === 'cut' && n.loc === toLoc) { extra.push({ ...n, id: n.id + '_mv' + Date.now(), parent: target, name }); deleted[n.id] = true; xf.push({ id: 'x' + Date.now() + id, name: n.name, route: routeOf(n.loc, toLoc), pct: 100, state: 'moved' }); return; }
+        clone(n, target, name); if (mode === 'cut') deleted[n.id] = true;
+        if (n.kind === 'STL' && toLoc !== 'lib') warn.push(n.name + ' is an STL: printers can\'t print it until it\'s sliced');
+        xf.push({ id: 'x' + Date.now() + id, name: n.name + (n.kind === 'folder' ? '/ (' + (subtree(n.id).length - 1) + ' items)' : ''), route: routeOf(n.loc, toLoc), pct: 8, state: '0%' }); });
+      this.setState({ extra, deleted, xfers: xf.slice(-12), conflict: null, clip: mode === 'cut' ? null : st.clip, picked: {}, notice: ((ids.length - skipped - blocked.length) > 0 ? (ids.length - skipped - blocked.length) + ' item(s) ' + (mode === 'cut' ? 'moving' : 'copying') + ' to ' + tgt.name : 'Nothing ' + (mode === 'cut' ? 'moved' : 'copied')) + (skipped ? ' · ' + skipped + ' skipped' : '') + (blocked.length ? ' · blocked: ' + blocked.join(', ') : '') + (warn.length ? ' · ⚠ ' + warn.join('; ') : '') });
+      const tick = () => { const list = this.state.xfers.map(x => x.state.endsWith('%') ? { ...x, pct: Math.min(100, x.pct + 23), state: x.pct + 23 >= 100 ? 'done' : Math.min(99, x.pct + 23) + '%' } : x); this.setState({ xfers: list }); if (list.some(x => x.state.endsWith('%'))) setTimeout(tick, 350); };
+      setTimeout(tick, 350);
+    };
+    const startPaste = (ids, mode, target) => { const clashes = ids.map(byId).filter(Boolean).filter(n => N.some(k => k.parent === target && k.name.toLowerCase() === n.name.toLowerCase() && k.id !== n.id));
+      if (clashes.length) { this.setState({ conflict: { ids, mode, target, names: clashes.map(n => n.name) } }); return; } doTransfer(ids, mode, target, 'keep'); };
+    const clipIds = (ids, mode) => { const v = ids.filter(id => byId(id)); if (!v.length) return; this.setState({ clip: { ids: v, mode, from: byId(v[0]).loc }, notice: (mode === 'copy' ? 'Copied ' : 'Cut ') + v.length + ' item(s). Open a folder or printer and Paste.' }); };
+    const curPick = () => pickIds.length ? pickIds : (s.sel ? [s.sel] : []);
+    const pasteOff = !s.clip || (cur && cur.loc === 'x1c' && s.clip.ids.some(id => byId(id) && /^(CFG|CONF)$/.test(byId(id).kind)) && false);
+    const dropOn = (target) => (e) => { if (e && e.preventDefault) e.preventDefault(); const d = this.state.drag; if (!d) return; const tl = byId(target).loc; startPaste(d.ids, d.from === tl ? 'cut' : 'copy', target); this.setState({ drag: null }); };
+    const dragOverT = (e) => { if (e && e.preventDefault) e.preventDefault(); };
+
+    const doDelete = (ids) => { const st = this.state; const del = { ...st.deleted }; const added = []; const blocked = [];
+      ids.forEach(id => { const n = byId(id); if (!n) return; const tree = subtree(id); if (tree.some(x => x.fits === 'printing now')) { blocked.push(n.name); return; } tree.forEach(x => { if (!del[x.id]) { del[x.id] = true; added.push(x.id); } }); });
+      const top = ids.map(byId).filter(n => n && !blocked.includes(n.name)); const onPrinter = top.some(n => n.loc !== 'lib');
+      const inDeleted = st.trail.slice(0, st.cursor + 1).some(t => del[t]); this.setState({ ...(inDeleted ? { trail: ['lib'], cursor: 0 } : {}), deleted: del, picked: {}, sel: null, delArm: null, bulkArm: false, undoIds: added,
+        notice: (top.length ? (onPrinter ? 'Deleted ' : 'Moved to trash: ') + top.map(n => n.name + (n.kind === 'folder' ? '/' : '')).join(', ') + '.' : 'Nothing deleted.') + (blocked.length ? ' Not deleted (printing now): ' + blocked.join(', ') + '.' : '') + (onPrinter && top.length ? ' Printer files can\'t be restored after you leave this page.' : '') }); };
+    const seg = (on) => on ? 'true' : 'false';
+    const roots = [['lib', '⊞'], ['inbox', '▱'], ['chess', '▱'], ['encl', '▱'], ['cal', '▱']];
+    const validate = (v, parent) => !v.trim() ? 'Enter a name.' : /[\\/]/.test(v) ? 'Use a name without slashes.' : N.some(n => n.parent === parent && n.name.toLowerCase() === v.trim().toLowerCase()) ? 'That name already exists in this folder.' : '';
+
+    const tone = { info: ['var(--fw-info)', 'var(--fw-info-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'], off: ['var(--fw-muted)', 'var(--fw-surface)'] };
+    const DIM = { housing: [240, 210], duct: [140, 90], c1: [180, 180], c2: [180, 180], c3: [180, 180], lid: [330, 330], sidel: [300, 200], benchy: [60, 31], calistar: [100, 100], vlid: [330, 330], vcal: [100, 100], x3: [180, 180], x2: [180, 180] };
+    const file = selN && isModel(selN) && selN.kind !== 'STL' ? (() => { const parts = String(selN.mat || '').split(/[\s+]+/).filter(Boolean); const mk = parts[0] === 'any' ? 'PLA' : (parts[0] || 'PLA'); const col = parts[0] === 'any' ? 'White' : (parts[1] || 'White'); const d = DIM[String(selN.id).split('_')[0]] || [150, 150];
+      return { id: selN.id, name: selN.name, matKey: mk, colour: col, mat: mk + ' ' + col, w: d[0], h: d[1], noz: 0.4, abrasive: /CF|GF/.test(selN.mat || '') }; })() : null;
+    const P = [
+      { id: 'mk4', name: 'Prusa MK4', bed: [250, 210], noz: 0.4, hard: false, loaded: [['PLA', 'White']], state: 'idle' },
+      { id: 'p1s', name: 'Bambu P1S', bed: [256, 256], noz: 0.4, hard: false, loaded: [['ABS', 'Grey'], ['PLA', 'White']], state: 'idle' },
+      { id: 'v24', name: 'Voron 2.4 350', bed: [350, 350], noz: 0.4, hard: false, loaded: [['PETG', 'Black']], state: 'busy', free: '1 h 12 m' },
+      { id: 'x1c', name: 'Bambu X1C', bed: [256, 256], noz: 0.4, hard: true, loaded: [['PLA', 'Teal'], ['PLA', 'White'], ['PETG', 'Black']], state: 'clear' },
+      { id: 'sv', name: 'Sovol SV08', bed: [350, 350], noz: 0.4, hard: false, loaded: [['PLA', 'Teal']], state: 'busy', free: '3 h 40 m' },
+      { id: 'rr', name: 'RatRig V-Core 4', bed: [400, 400], noz: 0.4, hard: false, loaded: [], state: 'paused' },
+      { id: 'e3', name: 'Ender 3 S1', bed: [220, 220], noz: 0.4, hard: false, loaded: [['PLA', 'White']], state: 'offline' },
+      { id: 'tri', name: 'Voron Trident', bed: [300, 300], noz: 0.6, hard: true, loaded: [['ABS', 'Grey']], state: 'error' }
+    ];
+    const judge = (p, f) => {
+      if (f.w > p.bed[0] || f.h > p.bed[1]) return { t: 'bad', tag: '✖ Too big', reason: 'Bed ' + p.bed[0] + ' × ' + p.bed[1] + ' mm < footprint ' + f.w + ' × ' + f.h, rank: 9 };
+      if (p.noz !== f.noz) return { t: 'bad', tag: '✖ Nozzle', reason: 'Has ' + p.noz + ' mm nozzle; file sliced for ' + f.noz + ' mm', rank: 9 };
+      if (f.abrasive && !p.hard) return { t: 'bad', tag: '✖ Abrasive', reason: 'Needs a hardened nozzle', rank: 9 };
+      if (p.state === 'offline') return { t: 'bad', tag: '✖ Offline', reason: 'Not reachable since 2 h', rank: 8 };
+      if (p.state === 'error') return { t: 'bad', tag: '✖ Error', reason: 'Thermal runaway; fix before printing', rank: 8 };
+      const swapped = s.swapped[p.id];
+      const loaded = swapped ? [[f.matKey, f.colour]] : p.loaded;
+      const exact = loaded.some(([m, c]) => m === f.matKey && c === f.colour);
+      const sameMat = loaded.some(([m]) => m === f.matKey);
+      if (!loaded.length) return { t: 'warn', tag: '⚠ No spool', reason: 'Nothing loaded on T0', rank: 6, fix: true, fixText: 'Load a ' + f.mat + ' spool first.', fixLabel: 'Load #64 ' + f.matKey + ' ' + f.colour };
+      if (!exact) return { t: 'warn', tag: sameMat ? '⚠ Colour' : '⚠ Material', reason: 'Loaded: ' + loaded.map(x => x.join(' ')).join(', ') + ' · file wants ' + f.mat, rank: 5, fix: true, fixText: 'Swap in a matching spool from Shelf B2.', fixLabel: 'Swap to ' + f.mat };
+      if (p.state === 'clear' && !s.cleared[p.id]) return { t: 'warn', tag: '◐ Plate', reason: 'Last print still on the bed', rank: 3, fix: true, fixText: 'Confirm the bed is empty to unlock Print now.', fixLabel: 'Plate cleared', clear: true };
+      if (p.state === 'busy') return { t: 'info', tag: '✓ Busy', reason: 'Matches · free in ' + p.free + ' · queue only', rank: 2, busy: true };
+      if (p.state === 'paused') return { t: 'info', tag: '✓ Busy', reason: 'Paused job in progress · queue only', rank: 2, busy: true };
+      return { t: 'ok', tag: '✓ Ready', reason: 'Idle · ' + f.mat + ' loaded', rank: 1, ready: true };
+    };
+    const rowsRaw = file ? P.map(p => ({ p, j: judge(p, file) })).sort((a, b) => a.j.rank - b.j.rank) : [];
+    const okCount = rowsRaw.filter(r => r.j.t !== 'bad').length;
+    const rows = rowsRaw.map(({ p, j }) => {
+      const on = s.target === p.id;
+      return { name: p.name, tag: j.tag, reason: j.reason, fg: tone[j.t][0], bg: tone[j.t][1], blocked: j.t === 'bad',
+        checked: on ? 'true' : 'false', border: on ? 'var(--fw-focus)' : 'var(--fw-border)', outline: on ? '1px solid var(--fw-focus)' : 'none',
+        pick: () => this.setState({ target: p.id }),
+        hasFix: !!j.fix, fixText: j.fixText || '', fixLabel: j.fixLabel || '',
+        fix: () => {
+          if (j.clear) { this.setState({ cleared: { ...this.state.cleared, [p.id]: true }, target: p.id }); this.setState({ notice: 'Plate cleared on ' + p.name }); }
+          else { this.setState({ swapped: { ...this.state.swapped, [p.id]: true }, target: p.id }); this.setState({ notice: 'Loaded a matching spool on ' + p.name }); }
+        } };
+    });
+    const tgt = rowsRaw.find(r => r.p.id === s.target);
+    const canPrint = !!(tgt && tgt.j.ready);
+    const canQueue = !!(tgt && tgt.j.t !== 'bad');
+    const sel = selN ? { name: selN.name, kind: selN.kind, size: selN.size, where: LOCNOTE[selN.loc].split(' · ')[0], isModel: isModel(selN), isText: isText(selN), thumb: isModel(selN) ? this.thumbOf(selN.name, selN.hex) : '', content: selN.content ? selN.content.replace(/\\n/g, '\n') : '',
+      star: s.starred[selN.id] ? ' ★' : '', starred: seg(!!s.starred[selN.id]), starLabel: s.starred[selN.id] ? '★ Starred' : '☆ Star',
+      facts: isModel(selN) ? [{ k: 'FILAMENT', v: selN.mat }, { k: 'TIME', v: selN.time }, { k: 'GRAMS', v: selN.g }, { k: 'FITS', v: selN.fits }, { k: 'CHANGED', v: selN.when }] : [{ k: 'SIZE', v: selN.size }, { k: 'CHANGED', v: selN.when }],
+      toggleStar: () => this.setState({ starred: { ...s.starred, [selN.id]: !s.starred[selN.id] } }), copy: () => clipIds([selN.id], 'copy'), cut: () => clipIds([selN.id], 'cut'),
+      send: () => this.setState({ sending: true, target: null }), canSend: isModel(selN) && selN.kind !== 'STL', cantSend: selN.kind === 'STL',
+      project: () => this.setState({ notice: 'Pick a project for ' + selN.name + '.' }),
+      editCfg: () => this.setState({ notice: 'Opens ' + selN.name + ' in the printer\'s Files · SSH editor.' }),
+      download: () => this.setState({ notice: 'Downloading ' + selN.name + '.' }),
+      delLabel: s.delArm === selN.id ? (selN.loc === 'lib' ? 'Move to trash? Click again' : 'Delete from printer? Click again') : (selN.loc === 'lib' ? 'Move to trash' : 'Delete'),
+      del: () => { if (s.delArm !== selN.id) { this.setState({ delArm: selN.id }); return; } doDelete([selN.id]); } } : { facts: [] };
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      view: s.view, topNote: LOCNOTE[loc], bodyCols: selN ? '190px minmax(0, 1fr) 380px' : '190px minmax(0, 1fr)',
+      views: [['spatial', '3D'], ['flat', 'Flat']].map(([id, label]) => ({ label, on: seg(s.view === id), pick: () => this.setState({ view: id }) })),
+      backOff: s.cursor === 0, fwdOff: s.cursor >= s.trail.length - 1,
+      back: () => this.setState({ cursor: s.cursor - 1, query: '', sel: null }), fwd: () => this.setState({ cursor: s.cursor + 1, query: '', sel: null }),
+      upOff: !cur || !cur.parent, up: () => cur && cur.parent && open(cur.parent),
+      query: s.query, setQuery: (e) => this.setState({ query: e.target.value }),
+      readOnlyLoc: loc === 'x1c',
+      toggleCreate: () => this.setState({ creating: !s.creating, fname: '', err: '' }), creating: s.creating, fname: s.fname, setFname: (e) => this.setState({ fname: e.target.value }), hasErr: !!s.err, err: s.err,
+      create: () => { const p = validate(s.fname, folder); if (p) { this.setState({ err: p }); return; } this.setState({ extra: [...s.extra, { id: 'f' + Date.now(), parent: folder, name: s.fname.trim(), kind: 'folder', loc }], creating: false, fname: '', notice: 'Created ' + s.fname.trim() + '.' }); },
+      upload: () => { const id = 'u' + Date.now(); this.setState({ extra: [...s.extra, { id, parent: folder, name: 'bracket_v' + (s.extra.length + 2) + '.gcode', kind: 'GCODE', hex: '#f4f4ef', size: '2.0 MB', mat: 'PLA White', time: '1 h 20 m', g: '40 g', fits: '7 / 8', loc, when: 'now' }], notice: 'Uploaded bracket_v' + (s.extra.length + 2) + '.gcode to ' + (cur ? cur.name : '') + '.' }); },
+      crumbs: crumbsRaw.map((c, i) => ({ label: c.name, sep: i > 0, cur: c.id === folder ? 'page' : 'false', go: () => open(c.id) })),
+      libLocs: roots.filter(([id]) => byId(id)).map(([id, icon]) => ({ name: byId(id).name, icon, count: deep(id), cur: folder === id ? 'page' : 'false', go: () => open(id), dragOver: dragOverT, drop: dropOn(id), dropOutline: s.drag ? '1px dashed var(--fw-accent)' : 'none' })),
+      prnLocs: [['v24', 'SFTP · config, gcodes', 'var(--fw-success)', 'v24gc'], ['x1c', 'FTPS · SD card', 'var(--fw-success)', 'xc']].map(([id, sub, dot, dropT]) => ({ name: byId(id).name, sub, dot, cur: (cur && cur.loc === id) ? 'page' : 'false', go: () => open(id), dragOver: dragOverT, drop: dropOn(dropT), dropOutline: s.drag ? '1px dashed var(--fw-accent)' : 'none' })),
+      locTitle: (cur ? cur.name : '') + ' contents',
+      hasItems: vis.length > 0, noItems: vis.length === 0,
+      items: items.map((it, i) => { const n = vis[i]; const pk = !!s.picked[n.id]; const isCut = s.clip && s.clip.mode === 'cut' && s.clip.ids.includes(n.id);
+        return { ...it, picked: pk ? 'true' : 'false', ck: pk ? '✓' : '', ckBg: pk ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', ckBorder: pk ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', ckOpacity: pk || pickN ? '1' : '.55', cutOpacity: isCut ? '.45' : '1',
+          togglePick: () => this.setState({ bulkArm: false, picked: { ...this.state.picked, [n.id]: !this.state.picked[n.id] } }),
+          dragStart: () => this.setState({ drag: { ids: pk ? pickIds : [n.id], from: n.loc } }),
+          dragOver: n.kind === 'folder' ? dragOverT : null, drop: n.kind === 'folder' ? dropOn(n.id) : null,
+          dropOutline: s.drag && n.kind === 'folder' && !s.drag.ids.includes(n.id) ? '1px dashed var(--fw-accent)' : 'none' }; }),
+      dragEnd: () => setTimeout(() => this.setState({ drag: null }), 50),
+      hasPick: pickN > 0, noPick: !curPick().length, pickN,
+      pickElsewhere: pickN > 0 && pickIds.some(id => byId(id).parent !== folder), pickHere: pickN > 0 && pickIds.every(id => byId(id).parent === folder),
+      hereOff: pickIds.some(id => id === folder),
+      pickText: pickN + ' selected' + (pickIds.some(id => byId(id).parent !== folder) ? ' in ' + Array.from(new Set(pickIds.map(id => (byId(byId(id).parent) || {}).name))).join(', ') + ' · open the target folder or printer, then Copy here or Move here' : ' · tick more, or open another folder to copy / move them there'),
+      copyHere: () => startPaste(pickIds.filter(id => byId(id).parent !== folder), 'copy', folder),
+      moveHere: () => startPaste(pickIds.filter(id => byId(id).parent !== folder), 'cut', folder),
+      bulkDelLabel: s.bulkArm ? 'Delete ' + curPick().length + '? Click again' : 'Delete', delBorder: curPick().length ? 'var(--fw-danger)' : 'var(--fw-border)', delFg: curPick().length ? 'var(--fw-danger)' : 'var(--fw-muted)',
+      bulkDel: () => { const ids = curPick(); if (!ids.length) return; if (!s.bulkArm) { this.setState({ bulkArm: true }); return; } doDelete(ids); },
+      canUndo: s.undoIds.length > 0, undo: () => { const d = { ...s.deleted }; s.undoIds.forEach(id => { delete d[id]; }); this.setState({ deleted: d, undoIds: [], notice: 'Restored.' }); },
+      selAll: () => { const p = {}; vis.forEach(n => { p[n.id] = true; }); this.setState({ picked: p }); }, clearPick: () => this.setState({ picked: {} }),
+      copy: () => clipIds(curPick(), 'copy'), cut: () => clipIds(curPick(), 'cut'),
+      pasteOff: !s.clip, pasteBorder: s.clip ? 'var(--fw-accent)' : 'var(--fw-border)', pasteLabel: s.clip ? 'Paste ' + s.clip.ids.length + (s.clip.from !== loc ? ' · from ' + LNAME[s.clip.from] : '') : 'Paste',
+      paste: () => s.clip && startPaste(s.clip.ids, s.clip.mode, folder),
+      keys: (e) => { if (e.target && e.target.tagName === 'INPUT') return; if (e.key === 'Delete' || e.key === 'Backspace') { const ids = curPick(); if (ids.length) { if (e.preventDefault) e.preventDefault(); if (!s.bulkArm) this.setState({ bulkArm: true }); else doDelete(ids); } return; } if (e.key === 'Escape') { this.setState({ bulkArm: false, picked: {} }); return; } if (!(e.ctrlKey || e.metaKey)) return; const k = (e.key || '').toLowerCase(); if (k === 'c') clipIds(curPick(), 'copy'); else if (k === 'x') clipIds(curPick(), 'cut'); else if (k === 'v' && s.clip) startPaste(s.clip.ids, s.clip.mode, folder); else if (k === 'a') { const p = {}; vis.forEach(n => { p[n.id] = true; }); this.setState({ picked: p }); } else return; if (e.preventDefault) e.preventDefault(); },
+      hasConflict: !!s.conflict, conflictText: s.conflict ? s.conflict.names.length + ' already here: ' + s.conflict.names.join(', ') + '. What should happen?' : '',
+      replaceOff: !!(s.conflict && N.some(k => k.parent === s.conflict.target && k.fits === 'printing now' && s.conflict.names.map(x => x.toLowerCase()).includes(k.name.toLowerCase()) && s.conflict.names.length === 1)),
+      keepBoth: () => doTransfer(s.conflict.ids, s.conflict.mode, s.conflict.target, 'keep'), replaceAll: () => doTransfer(s.conflict.ids, s.conflict.mode, s.conflict.target, 'replace'), skipConf: () => doTransfer(s.conflict.ids, s.conflict.mode, s.conflict.target, 'skip'), cancelConf: () => this.setState({ conflict: null }),
+      hasXfers: s.xfers.length > 0, xfers: s.xfers.map(x => ({ ...x, fg: x.state === 'done' || x.state === 'moved' ? 'var(--fw-success)' : 'var(--fw-info)' })), xferSum: s.xfers.filter(x => x.state.endsWith('%')).length + ' running · ' + s.xfers.filter(x => !x.state.endsWith('%')).length + ' done',
+      clearXfers: () => this.setState({ xfers: s.xfers.filter(x => x.state.endsWith('%')) }),
+      emptyTitle: q ? 'No matching files.' : 'An open space.', emptyText: q ? 'Try another name or clear your search.' : 'Upload a file or create a folder.',
+      emptyLabel: q ? 'Clear search' : 'Upload', emptyAction: () => q ? this.setState({ query: '' }) : null,
+      hasSel: !!selN, sel, closeSel: () => this.setState({ sel: null, sending: false }),
+      sending: !!(s.sending && file), notSending: !(s.sending && file), stopSend: () => this.setState({ sending: false }),
+      summary: okCount + ' of 8 can print it', rows, okCount,
+      printDisabled: !canPrint, printLabel: tgt ? 'Print now on ' + tgt.p.name : 'Print now',
+      printHint: !tgt ? 'Pick a printer above.' : canPrint ? 'Starts immediately.' : tgt.j.busy ? tgt.p.name + ' is busy. Queue it instead.' : 'Fix the warning on ' + tgt.p.name + ' first, or queue it.',
+      queueDisabled: !canQueue, queueLabel: tgt ? 'Queue on ' + tgt.p.name : 'Queue on printer',
+      printNow: () => this.setState({ sending: false, target: null, notice: 'Started ' + file.name + ' on ' + tgt.p.name + '.' }),
+      queueHere: () => this.setState({ sending: false, target: null, notice: file.name + ' queued on ' + tgt.p.name + ' · position 4.' }),
+      fleetQueue: () => this.setState({ sending: false, target: null, notice: file.name + ' added to fleet queue · ' + okCount + ' printers can take it.' }),
+      rname: s.rname, setRname: (e) => this.setState({ rname: e.target.value }),
+      rename: () => { if (!selN) return; const v = s.rname.trim(); const p = !v ? 'Enter a name.' : ''; if (p) return; this.setState({ renamed: { ...s.renamed, [selN.id]: v }, notice: 'Renamed to ' + v + '.' }); },
+      footCount: vis.length + ' OF ' + kids.length + ' ITEMS' + (pickN ? ' · ' + pickN + ' SELECTED' : '') + (s.clip ? ' · CLIPBOARD: ' + s.clip.ids.length + ' (' + s.clip.mode + ')' : ''), notice: s.notice
+    };
+  }
+}
+</script>
+</body>
+</html>

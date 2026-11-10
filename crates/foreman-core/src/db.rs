@@ -43,6 +43,23 @@ const MIGRATIONS: &[&str] = &[
        id INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
        key_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, last_used_at TEXT, \
        revoked_at TEXT)",
+    // 0007: Library index + parsed file facts (see migrations/0007_library.sql).
+    "CREATE TABLE IF NOT EXISTS library_entry (\
+       id INTEGER PRIMARY KEY NOT NULL, path TEXT NOT NULL, parent TEXT NOT NULL, kind TEXT NOT NULL, \
+       size INTEGER NOT NULL DEFAULT 0, hash TEXT, mtime INTEGER, added_at TEXT NOT NULL, \
+       starred INTEGER NOT NULL DEFAULT 0, deleted_at TEXT, trash_id TEXT, \
+       trash_root INTEGER NOT NULL DEFAULT 0)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS library_entry_live_path \
+       ON library_entry(path) WHERE deleted_at IS NULL",
+    "CREATE INDEX IF NOT EXISTS library_entry_parent ON library_entry(parent)",
+    "CREATE TABLE IF NOT EXISTS file_meta (\
+       entry_id INTEGER PRIMARY KEY NOT NULL REFERENCES library_entry(id) ON DELETE CASCADE, \
+       format TEXT NOT NULL, parse_status TEXT NOT NULL, parse_error TEXT, slicer TEXT, \
+       slicer_version TEXT, printer_model TEXT, printer_settings_id TEXT, printer_model_id TEXT, \
+       nozzle_diameter REAL, print_time_secs INTEGER, \
+       layer_count INTEGER, bed_width REAL, bed_depth REAL, filament_settings_id TEXT, \
+       suggested_spool_id INTEGER, tools_json TEXT NOT NULL DEFAULT '[]', \
+       plates_json TEXT NOT NULL DEFAULT '[]', thumb_file TEXT, parsed_at TEXT NOT NULL)",
 ];
 
 /// Foreman-native database handle.

@@ -52,6 +52,13 @@ argon2 = { workspace = true }
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 
+# Library: 3MF (zip + XML), binary G-code, STL thumbnails (task 3.1)
+zip = { workspace = true }
+quick-xml = { workspace = true }
+binarygcode = { workspace = true }
+stl_io = { workspace = true }
+png = { workspace = true }
+
 [dev-dependencies]
 tempfile = "3"
 tokio = { workspace = true }

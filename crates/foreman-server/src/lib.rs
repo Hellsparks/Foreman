@@ -9,8 +9,9 @@ mod ssh_pool;
 mod state;
 
 use axum::{
+    extract::DefaultBodyLimit,
     middleware,
-    routing::{delete, get, get_service, post, put},
+    routing::{delete, get, get_service, patch, post, put},
     Router,
 };
 use foreman_core::{db::ForemanDb, events::ServerEvent, repo};
@@ -204,6 +205,11 @@ pub async fn serve_with(
         });
     }
 
+    let library = Arc::new(foreman_core::library::LibraryStore::new(
+        &cfg.data_dir,
+        foreman_db.pool.clone(),
+    )?);
+
     let app_state = AppState {
         foreman_db,
         bus_tx: Arc::clone(&tx),
@@ -214,7 +220,26 @@ pub async fn serve_with(
         ssh_pool,
         auth: auth_state,
         info: server_info,
+        library,
     };
+
+    // Library: catch up with files added/removed on disk, then purge old trash daily.
+    {
+        let state = app_state.clone();
+        tokio::spawn(async move {
+            if let Err(e) = state.library.rebuild_index().await {
+                warn!("library index rebuild failed: {e}");
+            }
+            let mut interval = tokio::time::interval(Duration::from_secs(24 * 3600));
+            loop {
+                interval.tick().await;
+                let days = api::library::trash_days(&state).await;
+                if let Err(e) = state.library.purge_trash(days).await {
+                    warn!("library trash purge failed: {e}");
+                }
+            }
+        });
+    }
 
     let app = build_router(app_state.clone());
 
@@ -395,6 +420,9 @@ async fn spawn_spoolman(cfg: &config::ServerConfig) {
     }
 }
 
+/// Max body for Library / slicer uploads (G-code and 3MF can be large).
+const UPLOAD_LIMIT: usize = 2 * 1024 * 1024 * 1024;
+
 /// Build the HTTP router (all routes behind [`auth::require_auth`]).
 fn build_router(app_state: AppState) -> Router {
     // Static file serving for the frontend.
@@ -435,6 +463,39 @@ fn build_router(app_state: AppState) -> Router {
             get(api::auth::get_server).put(api::auth::put_server),
         )
         .route("/api/printers", get(api::printers::list_printers))
+        // Library
+        .route("/api/library", get(api::library::list))
+        .route("/api/library/trash", get(api::library::list_trash))
+        .route("/api/library/files/{id}", get(api::library::details))
+        .route("/api/library/files/{id}/thumb", get(api::library::thumb))
+        .route(
+            "/api/library/files/{id}/download",
+            get(api::library::download),
+        )
+        .route(
+            "/api/library/upload",
+            post(api::library::upload).layer(DefaultBodyLimit::max(UPLOAD_LIMIT)),
+        )
+        .route("/api/library/folders", post(api::library::new_folder))
+        .route(
+            "/api/library/entries/{id}",
+            patch(api::library::patch_entry).delete(api::library::trash_entry),
+        )
+        .route(
+            "/api/library/entries/{id}/restore",
+            post(api::library::restore_entry),
+        )
+        .route(
+            "/api/settings/library",
+            get(api::library::get_settings).put(api::library::put_settings),
+        )
+        // OctoPrint-compatible upload for slicers (X-Api-Key)
+        .route("/api/version", get(api::library::octoprint_version))
+        .route("/api/server", get(api::library::octoprint_server))
+        .route(
+            "/api/files/local",
+            post(api::library::octoprint_upload).layer(DefaultBodyLimit::max(UPLOAD_LIMIT)),
+        )
         .route("/api/printers", post(api::printers::create_printer))
         .route("/api/printers/{id}", delete(api::printers::delete_printer))
         .route(

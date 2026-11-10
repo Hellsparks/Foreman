@@ -38,3 +38,17 @@ These files are exported from the Foreman UI demo (claude.ai design artifact). T
 - lines 292–381: Files · SSH tab (SFTP browser + terminal + shell macros)
 - lines 382–513: Config tab (connection paths, SSH, settings)
 - lines 514–917: demo logic (`renderVals()` from line 688 has the behaviour)
+# docs/ui-ref — Phase 3 additions (append to README.md)
+
+## Library (file browser + Send) — `Library.dc.html` (465 lines)
+- lines 1–110: styles incl. the Fieldwork `.fw-browser` CSS (flat view only), shell
+- lines 111–142: browser body — pick/carry banner ("Copy here / Move here"), conflict dialog (Keep both / Replace / Skip), new-folder row, grid cards with previews, empty state
+- lines 143–190: right panel — file inspector (preview, filament, time, grams, fits N printers, actions) and the **Send panel** (per-printer compatibility rows + Print now / Queue / Fleet queue)
+- lines 191–199: Transfers list + footer
+- lines 200–465: demo logic (`renderVals()` from line 251 = behaviour)
+
+## Jobs — `Jobs.dc.html` (385 lines)
+- lines 61–104: Queue board (per-printer columns + fleet queue)
+- lines 105–141: History (filters, outcome rating)
+- lines 142–209: Stats
+- lines 210–385: demo logic (`renderVals()` from line 274)

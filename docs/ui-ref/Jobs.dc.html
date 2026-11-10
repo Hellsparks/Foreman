@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Jobs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="padding: 20px 32px 0; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--fw-border)">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+<div style="flex: 1 1 300px"><h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Jobs</h1>
+<p style="margin: 4px 0 0; color: var(--fw-muted)">{{headline}}</p></div>
+<a href="Library.dc.html" style="min-height: 44px; padding: 0 16px; background: var(--fw-accent-hover); color: var(--fw-on-accent); text-decoration: none; border-radius: 2px; display: flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Add job</a>
+</div>
+<div role="tablist" aria-label="Jobs sections" style="display: flex; margin-bottom: -1px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 0 18px; background: {{t.bg}}; border: 1px solid {{t.border}}; border-bottom-color: {{t.bottom}}; margin-right: -1px; cursor: pointer; font-weight: {{t.weight}}">{{t.label}}</button>
+</sc-for>
+</div>
+</header>
+
+<main style="padding: 20px 32px 48px; display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+<sc-if value="{{isQueue}}" hint-placeholder-val="{{ true }}">
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Drag cards between lanes, or use ⋯ on a card. The fleet lane feeds any compatible printer, preferring one that already has the right filament loaded, then by due date.</p>
+<div style="overflow-x: auto; padding-bottom: 8px">
+<div style="display: flex; gap: 12px; align-items: flex-start; min-width: max-content">
+<sc-for list="{{lanes}}" as="l" hint-placeholder-count="5">
+<section aria-label="{{l.name}} queue" onDragOver="{{l.over}}" onDrop="{{l.drop}}" style="width: 272px; flex: none; background: {{l.bg}}; border: 1px solid {{l.border}}; display: flex; flex-direction: column">
+<div style="padding: 10px 12px; border-bottom: 1px solid var(--fw-border); display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: center; gap: 8px"><b style="flex: 1">{{l.name}}</b><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{l.count}}</span></div>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; align-self: flex-start; padding: 2px 6px; color: {{l.fg}}; background: {{l.sbg}}">{{l.state}}</span>
+<span style="font-size: 12px; color: var(--fw-muted)">{{l.now}}</span>
+</div>
+<div style="padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 120px">
+<sc-if value="{{l.empty}}" hint-placeholder-val="{{ false }}"><p style="margin: 8px 4px; font-size: 12px; color: var(--fw-muted)">{{l.emptyText}}</p></sc-if>
+<sc-for list="{{l.jobs}}" as="j" hint-placeholder-count="2">
+<article draggable="true" onDragStart="{{j.dragStart}}" style="position: relative; background: var(--fw-raised); border: 1px solid {{j.border}}; outline: {{j.outline}}; padding: 10px; display: flex; flex-direction: column; gap: 6px; opacity: {{j.opacity}}">
+<div style="display: flex; align-items: flex-start; gap: 6px">
+<span aria-hidden="true" style="color: var(--fw-muted); cursor: grab; line-height: 20px">⋮⋮</span>
+<img src="{{j.thumb}}" alt="" width="48" height="36" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<button type="button" onClick="{{j.open}}" style="flex: 1; min-width: 0; text-align: left; padding: 0; background: none; border: 0; cursor: pointer; font-weight: bold; overflow-wrap: anywhere; min-height: 24px">{{j.file}}</button>
+<button type="button" onClick="{{j.menu}}" aria-label="Actions for {{j.file}}" aria-expanded="{{j.menuOpen}}" style="width: 32px; height: 32px; flex: none; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer">⋯</button>
+</div>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fw-muted)"><span aria-hidden="true" style="width: 12px; height: 12px; background: {{j.hex}}; border: 1px solid var(--fw-muted)"></span>{{j.meta}}</div>
+<sc-if value="{{j.hasProject}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px">◆ {{j.project}}</span></sc-if>
+<span style="align-self: flex-start; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 2px 6px; color: {{j.fg}}; background: {{j.bg}}">{{j.tag}}</span>
+<sc-if value="{{j.menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="group" aria-label="Actions for {{j.file}}" style="position: absolute; top: 44px; right: 8px; z-index: 6; width: 220px; background: var(--fw-raised); border: 1px solid var(--fw-muted); box-shadow: var(--fw-shadow-overlay); display: flex; flex-direction: column; padding: 4px 0">
+<button type="button" onClick="{{j.toTop}}" style="min-height: 40px; padding: 0 12px; text-align: left; background: none; border: 0; cursor: pointer; font-size: 13px">Move to top</button>
+<button type="button" onClick="{{j.hold}}" style="min-height: 40px; padding: 0 12px; text-align: left; background: none; border: 0; cursor: pointer; font-size: 13px">{{j.holdLabel}}</button>
+<div style="padding: 6px 12px 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)">MOVE TO</div>
+<sc-for list="{{j.moves}}" as="m" hint-placeholder-count="3">
+<button type="button" onClick="{{m.run}}" style="min-height: 36px; padding: 0 12px 0 20px; text-align: left; background: none; border: 0; cursor: pointer; font-size: 13px">{{m.label}}</button>
+</sc-for>
+<button type="button" onClick="{{j.remove}}" style="min-height: 40px; padding: 0 12px; text-align: left; background: none; border: 0; border-top: 1px solid var(--fw-border); cursor: pointer; font-size: 13px; color: var(--fw-danger)">Remove from queue</button>
+</div>
+</sc-if>
+</article>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isHistory}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<label style="flex: 1 1 240px; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search history</span><input type="search" placeholder="Search file, project, spool…" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<div role="group" aria-label="Outcome" style="display: flex">
+<sc-for list="{{outFilters}}" as="f" hint-placeholder-count="4">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="min-height: 44px; padding: 0 14px; margin-left: -1px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; cursor: pointer; font-size: 13px">{{f.label}}</button>
+</sc-for>
+</div>
+<select aria-label="Printer" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px"><option>All printers</option><option>Voron 2.4 350</option><option>Bambu X1C</option><option>Prusa MK4</option></select>
+</div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{histCount}}</div>
+<div style="overflow-x: auto; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<table style="width: 100%; border-collapse: collapse; min-width: 760px">
+<thead><tr>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">File</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Printer</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Finished</th>
+<th style="text-align: right; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Time</th>
+<th style="text-align: right; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Filament</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Outcome</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{history}}" as="h" hint-placeholder-count="8">
+<tr style="background: {{h.rowBg}}">
+<td style="padding: 0 12px; height: 56px; border-bottom: 1px solid var(--fw-border)"><span style="display: flex; align-items: center; gap: 10px"><img src="{{h.thumb}}" alt="" width="48" height="36" style="flex: none; display: block; border: 1px solid var(--fw-border)"><button type="button" onClick="{{h.open}}" style="background: none; border: 0; padding: 0; cursor: pointer; font-weight: bold; text-align: left; min-height: 44px; color: var(--fw-text)">{{h.file}}</button></span></td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border)">{{h.printer}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); color: var(--fw-muted)">{{h.when}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{h.time}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{h.grams}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border)"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 3px 8px; color: {{h.fg}}; background: {{h.bg}}">{{h.outcome}}</span></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</sc-if>
+
+<sc-if value="{{isStats}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+<sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+<div style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{k.label}}</div><div style="font-size: 28px; font-weight: bold">{{k.value}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{k.sub}}</div></div>
+</sc-for>
+</div>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Utilization · last 7 days</h2>
+<sc-for list="{{util}}" as="u" hint-placeholder-count="8">
+<div style="display: flex; align-items: center; gap: 12px"><span style="width: 140px; font-size: 13px">{{u.name}}</span><div style="flex: 1; height: 14px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="height: 100%; width: {{u.pct}}%; background: var(--fw-info)"></div></div><span style="width: 96px; text-align: right; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{u.pct}}% · {{u.fail}}</span></div>
+</sc-for>
+</section>
+</sc-if>
+</main>
+</div>
+
+<sc-if value="{{inspOpen}}" hint-placeholder-val="{{ false }}">
+<aside aria-label="Inspector" style="flex: 1 1 380px; max-width: 440px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1; min-width: 0"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{insp.kind}}</div><h2 style="margin: 2px 0 0; font-size: 22px; overflow-wrap: anywhere">{{insp.file}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close inspector" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 13px">
+<sc-for list="{{insp.facts}}" as="f" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 12px; min-height: 28px; align-items: center"><span style="color: var(--fw-muted)">{{f.k}}</span><span style="text-align: right">{{f.v}}</span></div>
+</sc-for>
+</div>
+<sc-if value="{{insp.isJob}}" hint-placeholder-val="{{ true }}">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Who can print it</div>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{insp.compat}}" as="c" hint-placeholder-count="5">
+<div style="display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 0 8px"><span style="width: 86px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; color: {{c.fg}}">{{c.tag}}</span><span style="flex: 1">{{c.name}}</span><span style="font-size: 12px; color: var(--fw-muted)">{{c.why}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{insp.isHist}}" hint-placeholder-val="{{ false }}">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Outcome</div>
+<div role="group" aria-label="Outcome" style="display: flex; gap: 6px">
+<sc-for list="{{insp.outcomes}}" as="o" hint-placeholder-count="3">
+<button type="button" onClick="{{o.pick}}" aria-pressed="{{o.on}}" style="flex: 1; min-height: 44px; border: 1px solid {{o.border}}; background: {{o.bg}}; color: {{o.fg}}; border-radius: 2px; cursor: pointer; font-size: 13px">{{o.label}}</button>
+</sc-for>
+</div>
+<sc-if value="{{insp.showReasons}}" hint-placeholder-val="{{ false }}">
+<div role="group" aria-label="Failure reason" style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{insp.reasons}}" as="r" hint-placeholder-count="6">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="min-height: 36px; padding: 0 10px; border: 1px solid {{r.border}}; background: {{r.bg}}; color: {{r.fg}}; border-radius: 2px; cursor: pointer; font-size: 12px">{{r.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</sc-if>
+<div style="flex: 1"></div>
+<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 16px">
+<a href="Library.dc.html" style="min-height: 44px; padding: 0 16px; background: var(--fw-accent-hover); color: var(--fw-on-accent); text-decoration: none; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{insp.primary}}</a>
+</div>
+</aside>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+<button type="button" onClick="{{t.dismiss}}" aria-label="Dismiss" style="width: 36px; height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'queue', menu: null, sel: null, selKind: null, drag: null, outFilter: 'all', outcomes: {}, reasons: {}, toasts: [],
+      jobs: [
+        { id: 'g1', file: 'gear_pa12cf.gcode', lane: 'fleet', mat: 'PA12-CF', hex: '#2b2b2b', time: '3 h 30 m', g: 118, project: '', held: false, need: 'PA12-CF + hardened nozzle' },
+        { id: 'c5', file: 'chess_plate_5.3mf', lane: 'fleet', mat: 'PLA Teal', hex: '#1f8a8a', time: '2 h 05 m', g: 61, project: 'Chess set · due Fri', held: false },
+        { id: 'c6', file: 'chess_plate_6.3mf', lane: 'fleet', mat: 'PLA White', hex: '#f4f4ef', time: '1 h 50 m', g: 54, project: 'Chess set · due Fri', held: false },
+        { id: 'k1', file: 'cable_clip_x20.gcode', lane: 'fleet', mat: 'PETG Black', hex: '#1d1d22', time: '45 m', g: 22, project: '', held: true },
+        { id: 'c4', file: 'chess_plate_4.3mf', lane: 'v24', mat: 'PLA Teal', hex: '#1f8a8a', time: '2 h 10 m', g: 58, project: 'Chess set · due Fri', held: false },
+        { id: 'h1', file: 'housing_top.gcode', lane: 'v24', mat: 'PLA White', hex: '#f4f4ef', time: '2 h 05 m', g: 64, project: '', held: false },
+        { id: 'b2', file: 'bracket_x4_b.gcode', lane: 'rr', mat: 'PLA White', hex: '#f4f4ef', time: '1 h 20 m', g: 40, project: '', held: false },
+        { id: 'd3', file: 'fan_duct_v3.gcode', lane: 'sv', mat: 'PLA Teal', hex: '#1f8a8a', time: '4 h 02 m', g: 95, project: '', held: false }
+      ]
+    };
+    this.tid = 0;
+  }
+  toast(text, undo) { const id = ++this.tid; this.setState({ toasts: [...this.state.toasts, { id, text, undo }].slice(-2) }); }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  renderVals() {
+    const s = this.state;
+    const tone = { info: ['var(--fw-info)', 'var(--fw-info-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'], off: ['var(--fw-muted)', 'var(--fw-surface)'] };
+    const L = [
+      { id: 'fleet', name: 'Fleet queue', t: 'info', state: 'ANY COMPATIBLE', now: 'Feeds idle printers as plates are cleared' },
+      { id: 'v24', name: 'Voron 2.4 350', t: 'info', state: '▶ PRINTING 63%', now: 'enclosure_lid_v3 · 1 h 12 m left' },
+      { id: 'x1c', name: 'Bambu X1C', t: 'warn', state: '◐ CLEAR PLATE', now: 'chess_plate_2 done · waiting for you' },
+      { id: 'mk4', name: 'Prusa MK4', t: 'ok', state: '● IDLE', now: 'Will take the next fleet job' },
+      { id: 'rr', name: 'RatRig V-Core 4', t: 'warn', state: '‖ PAUSED', now: 'Filament runout on T0' },
+      { id: 'sv', name: 'Sovol SV08', t: 'info', state: '▶ PRINTING 12%', now: 'fan_duct_v2 · 3 h 40 m left' },
+      { id: 'p1s', name: 'Bambu P1S', t: 'ok', state: '● IDLE', now: 'Will take the next fleet job' }
+    ];
+    const lname = (id) => L.find(x => x.id === id).name;
+    const move = (j, to, top) => {
+      const prev = s.jobs;
+      let rest = prev.filter(x => x.id !== j.id);
+      const moved = { ...j, lane: to };
+      if (top) { const i = rest.findIndex(x => x.lane === to); rest.splice(i < 0 ? rest.length : i, 0, moved); } else rest.push(moved);
+      this.setState({ jobs: rest, menu: null, drag: null });
+      this.toast(j.file + ' → ' + lname(to) + (top ? ' (top)' : ''), () => this.setState({ jobs: prev }));
+    };
+    const tagFor = (j) => {
+      if (j.held) return ['off', '‖ On hold'];
+      if (j.need) return ['bad', '✖ No printer: ' + j.need];
+      if (j.lane === 'fleet') return ['ok', j.mat.indexOf('PLA') === 0 ? '✓ 3 printers can take it' : '✓ 2 printers can take it'];
+      if (j.lane === 'rr') return ['warn', '⚠ Load filament first'];
+      return ['ok', '✓ Ready · next'];
+    };
+    const lanes = L.map(l => {
+      const js = s.jobs.filter(j => j.lane === l.id);
+      return { ...l, fg: tone[l.t][0], sbg: tone[l.t][1], count: js.length + ' queued', empty: js.length === 0,
+        emptyText: l.id === 'fleet' ? 'Nothing waiting.' : 'Nothing queued here. Drop a card or let the fleet queue fill it.',
+        bg: s.drag && s.drag !== 'x' ? 'var(--fw-surface)' : 'var(--fw-surface)', border: l.id === 'fleet' ? 'var(--fw-accent)' : 'var(--fw-border)',
+        over: (e) => e.preventDefault(),
+        drop: (e) => { e.preventDefault(); const j = this.state.jobs.find(x => x.id === this.state.drag); if (j && j.lane !== l.id) move(j, l.id, false); else this.setState({ drag: null }); },
+        jobs: js.map((j, i) => { const thumbJ = this.thumbOf(j.file, j.hex);
+          const [t, tag] = tagFor(j); const sel = s.sel === j.id && s.selKind === 'job';
+          return { thumb: thumbJ, ...j, tag, fg: tone[t][0], bg: tone[t][1], meta: j.mat + ' · ' + j.time + ' · ' + j.g + ' g', hasProject: !!j.project,
+            border: sel ? 'var(--fw-focus)' : 'var(--fw-border)', outline: sel ? '1px solid var(--fw-focus)' : 'none', opacity: s.drag === j.id ? '0.5' : '1',
+            dragStart: (e) => { try { e.dataTransfer.setData('text/plain', j.id); } catch (err) {} this.setState({ drag: j.id }); },
+            open: () => this.setState({ sel: j.id, selKind: 'job', menu: null }),
+            menu: () => this.setState({ menu: s.menu === j.id ? null : j.id }), menuOpen: s.menu === j.id,
+            toTop: () => move(j, j.lane, true),
+            holdLabel: j.held ? 'Release hold' : 'Hold',
+            hold: () => { const prev = s.jobs; this.setState({ jobs: s.jobs.map(x => x.id === j.id ? { ...x, held: !x.held } : x), menu: null }); this.toast((j.held ? 'Released ' : 'Holding ') + j.file, () => this.setState({ jobs: prev })); },
+            moves: L.filter(x => x.id !== j.lane).map(x => ({ label: x.name, run: () => move(j, x.id, false) })),
+            remove: () => { const prev = s.jobs; this.setState({ jobs: s.jobs.filter(x => x.id !== j.id), menu: null, sel: null }); this.toast('Removed ' + j.file, () => this.setState({ jobs: prev })); } };
+        }) };
+    });
+    const H = [
+      ['hj1', 'chess_plate_2.3mf', 'Bambu X1C', 'Today 14:02', '2 h 18 m', '57 g', 'ok', 'Chess set', '#57 PLA Teal 57 g', '€1.14'],
+      ['hj2', 'enclosure_side_l.gcode', 'Voron 2.4 350', 'Today 11:40', '3 h 12 m', '96 g', 'ok', '', '#42 PETG Galaxy Black 96 g', '€2.69'],
+      ['hj3', 'benchy.gcode', 'Prusa MK4', 'Today 09:41', '42 m', '12 g', 'ok', '', '#61 PLA White 12 g', '€0.24'],
+      ['hj4', 'hinge_test.gcode', 'Voron 2.4 350', 'Yesterday', '24 m', '6 g', 'bad', '', '#42 PETG Galaxy Black 6 g', '€0.17'],
+      ['hj5', 'chess_plate_1.3mf', 'Bambu P1S', 'Yesterday', '2 h 02 m', '55 g', 'ok', 'Chess set', '#61 PLA White 55 g', '€1.10'],
+      ['hj6', 'bracket_x4.gcode', 'RatRig V-Core 4', 'Mon', '1 h 31 m', '44 g', 'off', '', '#64 PLA White 44 g', '€0.88'],
+      ['hj7', 'fan_mount.gcode', 'Voron 2.4 350', 'Mon', '1 h 02 m', '31 g', 'ok', '', '#42 PETG Galaxy Black 31 g', '€0.87'],
+      ['hj8', 'spool_holder.gcode', 'Sovol SV08', 'Sun', '3 h 44 m', '102 g', 'bad', '', '#57 PLA Teal 102 g', '€2.04']
+    ];
+    const outName = { ok: '✓ Good', bad: '✖ Failed', off: '○ Cancelled' };
+    const outOf = (h) => s.outcomes[h[0]] || h[6];
+    const histAll = H.map(h => ({ h, o: outOf(h) }));
+    const hist = histAll.filter(x => s.outFilter === 'all' || x.o === s.outFilter);
+    const history = hist.map(({ h, o }) => ({ thumb: this.thumbOf(h[1], /PETG/.test(h[8]) ? '#1d1d22' : /Teal/.test(h[8]) ? '#1f8a8a' : '#f4f4ef'), file: h[1], printer: h[2], when: h[3], time: h[4], grams: h[5], outcome: outName[o] + (o === 'bad' && (s.reasons[h[0]] || h[0] === 'hj4' || h[0] === 'hj8') ? ' · ' + (s.reasons[h[0]] || (h[0] === 'hj4' ? 'adhesion' : 'spaghetti')) : ''),
+      fg: tone[o][0], bg: tone[o][1], rowBg: s.sel === h[0] ? 'var(--fw-info-bg)' : 'transparent', open: () => this.setState({ sel: h[0], selKind: 'hist' }) }));
+    const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const outFilters = [['all', 'All'], ['ok', 'Good'], ['bad', 'Failed'], ['off', 'Cancelled']].map(([id, label]) => ({ label, ...seg(s.outFilter === id), pick: () => this.setState({ outFilter: id }) }));
+    let insp = { kind: '', file: '', facts: [], isJob: false, isHist: false, compat: [], outcomes: [], reasons: [], showReasons: false, primary: '' };
+    if (s.selKind === 'job') {
+      const j = s.jobs.find(x => x.id === s.sel);
+      if (j) {
+        const compat = j.need
+          ? [['bad', '✖', 'Bambu X1C', 'hardened ✓ · PA12-CF not loaded'], ['bad', '✖', 'Voron 2.4 350', 'brass nozzle'], ['bad', '✖', 'Prusa MK4', 'brass nozzle'], ['bad', '✖', 'Bambu P1S', 'no hardened nozzle']]
+          : [['ok', '✓ Ready', 'Prusa MK4', 'idle · PLA loaded'], ['ok', '✓ Ready', 'Bambu P1S', 'idle · PLA White in AMS2'], ['info', '✓ Busy', 'Voron 2.4 350', 'free in 1 h 12 m'], ['warn', '◐ Plate', 'Bambu X1C', 'clear plate first'], ['bad', '✖', 'Ender 3 S1', 'offline']];
+        insp = { kind: 'Queued job · ' + lname(j.lane), file: j.file, isJob: true, isHist: false,
+          facts: [{ k: 'Filament', v: j.mat + ' · ' + j.g + ' g' }, { k: 'Time', v: j.time }, { k: 'Project', v: j.project || '—' }, { k: 'Status', v: tagFor(j)[1] }],
+          compat: compat.map(([t, tag, name, why]) => ({ tag, name, why, fg: tone[t][0] })), primary: 'Open Send panel' };
+      }
+    }
+    if (s.selKind === 'hist') {
+      const h = H.find(x => x[0] === s.sel);
+      if (h) {
+        const o = outOf(h);
+        const setO = (v) => { const prev = s.outcomes; this.setState({ outcomes: { ...s.outcomes, [h[0]]: v } }); this.toast(h[1] + ' marked ' + outName[v], () => this.setState({ outcomes: prev })); };
+        const cur = s.reasons[h[0]] || (h[0] === 'hj4' ? 'adhesion' : h[0] === 'hj8' ? 'spaghetti' : '');
+        insp = { kind: 'Finished job', file: h[1], isJob: false, isHist: true,
+          facts: [{ k: 'Printer', v: h[2] }, { k: 'Finished', v: h[3] }, { k: 'Duration', v: h[4] }, { k: 'Spool used', v: h[8] }, { k: 'Material cost', v: h[9] }, { k: 'Project', v: h[7] || '—' }],
+          outcomes: [['ok', '✓ Good'], ['bad', '✖ Failed'], ['off', '○ Cancelled']].map(([v, label]) => ({ label, ...seg(o === v), pick: () => setO(v) })),
+          showReasons: o === 'bad',
+          reasons: ['adhesion', 'spaghetti', 'layer shift', 'clog', 'warping', 'other'].map(r => ({ label: r, ...seg(cur === r), pick: () => this.setState({ reasons: { ...s.reasons, [h[0]]: r } }) })),
+          primary: 'Reprint → Send panel' };
+      }
+    }
+    const tabDefs = [['queue', 'Queue'], ['history', 'History'], ['stats', 'Stats']];
+    const tabs = tabDefs.map(([id, label]) => { const on = s.tab === id; return { label, sel: on ? 'true' : 'false', bg: on ? 'var(--fw-background)' : 'transparent', border: on ? 'var(--fw-border)' : 'transparent', bottom: on ? 'var(--fw-background)' : 'transparent', weight: on ? 'bold' : 'normal', pick: () => this.setState({ tab: id, sel: null, menu: null }) }; });
+    const util = [['Voron 2.4 350', 71, '1 fail'], ['Bambu X1C', 64, '0 fails'], ['Prusa MK4', 38, '0 fails'], ['Bambu P1S', 52, '0 fails'], ['Sovol SV08', 45, '1 fail'], ['RatRig V-Core 4', 29, '0 fails'], ['Voron Trident', 12, '0 fails'], ['Ender 3 S1', 0, 'offline']].map(([name, pct, fail]) => ({ name, pct, fail }));
+    const queued = s.jobs.length;
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      tabs, isQueue: s.tab === 'queue', isHistory: s.tab === 'history', isStats: s.tab === 'stats',
+      headline: queued + ' queued · 2 printing · 1 waiting for plate clear · ~' + Math.round(s.jobs.reduce((a, j) => a + j.g, 0)) + ' g of filament queued',
+      lanes, history, outFilters, histCount: hist.length + ' jobs',
+      kpis: [{ label: 'Printed this week', value: '41 h', sub: '23 jobs' }, { label: 'Success rate', value: '91%', sub: '2 failed · 1 cancelled' }, { label: 'Filament used', value: '1.24 kg', sub: 'PLA 62% · PETG 31%' }, { label: 'Material cost', value: '€27.80', sub: 'from spool prices' }],
+      util,
+      inspOpen: !!s.sel && !!insp.file, insp, closeInsp: () => this.setState({ sel: null }),
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => { if (t.undo) t.undo(); this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }); }, dismiss: () => this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

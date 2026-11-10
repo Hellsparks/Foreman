@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use foreman_core::{db::ForemanDb, events::ServerEvent, secrets::SecretBox};
+use foreman_core::{db::ForemanDb, events::ServerEvent, library::LibraryStore, secrets::SecretBox};
 use tokio::sync::broadcast;
 
 use crate::{
@@ -29,4 +29,6 @@ pub struct AppState {
     pub auth: Arc<AuthState>,
     /// Server identity and bind facts.
     pub info: Arc<ServerInfo>,
+    /// Library files, index and parsed facts.
+    pub library: Arc<LibraryStore>,
 }

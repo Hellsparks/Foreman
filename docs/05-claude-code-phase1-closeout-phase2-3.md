@@ -134,10 +134,10 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 ## Phase 3 — Library, Send, queue, jobs (W4, W5, W7)
 
 ### 3.1 File store + parser
-- [ ] Library storage with folders (on disk + DB index), stars, trash with restore.
-- [ ] Streaming G-code parser: slicer, printer model, nozzle, per-tool material + colour + grams/mm, time, layer count, **filament preset name** (`filament_settings_id`, verify per slicer: Orca, Prusa, Bambu Studio, Cura). Store per-tool data for compatibility + project colour slots.
-- [ ] Thumbnails: embedded G-code thumbnails and 3MF `Metadata/plate_*.png`; STL → server-side render (pick an approach, keep it Rust; log the choice).
-- [ ] Spool hint: when the preset name looks like the Orca Spoolman plugin's `Vendor Name (#ID) - Spoolman`, store spool id `#ID` as the file's suggested spool (used by Send in Phase 4).
+- [x] Library storage with folders (on disk + DB index), stars, trash with restore.
+- [x] Streaming G-code parser: slicer, printer model, nozzle, per-tool material + colour + grams/mm, time, layer count, **filament preset name** (`filament_settings_id`, verify per slicer: Orca, Prusa, Bambu Studio, Cura). Store per-tool data for compatibility + project colour slots.
+- [x] Thumbnails: embedded G-code thumbnails and 3MF `Metadata/plate_*.png`; STL → server-side render (pick an approach, keep it Rust; log the choice).
+- [x] Spool hint: when the preset name looks like the Orca Spoolman plugin's `Vendor Name (#ID) - Spoolman`, store spool id `#ID` as the file's suggested spool (used by Send in Phase 4).
 
 ### 3.2 Library browser API (one browser for everything)
 - [ ] Locations: Library root + each printer's storage (Klipper over SFTP, Bambu over FTPS from 2.3b). List folder, search in folder, file details (preview, filament, time, grams, fits N printers).
@@ -151,7 +151,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 
 ### 3.4 Send
 - [ ] Send endpoint: Print now / Queue on printer / Fleet queue; returns updated queue positions.
-- [ ] OctoPrint-compatible upload endpoint for slicers (verify which routes OrcaSlicer/PrusaSlicer call: version + file upload with optional print), API-key protected; files land in Library "Slicer inbox".
+- [x] OctoPrint-compatible upload endpoint for slicers (verify which routes OrcaSlicer/PrusaSlicer call: version + file upload with optional print), API-key protected; files land in Library "Slicer inbox".
 
 ### 3.5 Queues + scheduler (W5)
 - [ ] Per-printer queues (reorder, remove, move between printers) + **fleet queue** ("next compatible free printer"; prefer printers with the right filament loaded).
@@ -193,6 +193,23 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 21 — 2026-11-10 (3.1 file store + parser + thumbnails, 3.4 slicer upload)
+
+- **Plan change (owner) — Library locations = Library + Klipper printers only.** Bambu storage is parked: the A1 runs in cloud mode and FTPS :990 is closed (see 2.3b). For 3.2, Klipper G-code goes through **Moonraker's file API** (`/server/files/*`); SSH/SFTP stays for config files only. The 3.4 slicer upload moved forward from session 23 to 21.
+- **Store layout:** files live in `<data_dir>/library`, with `library-trash/<trash_id>/` for trash and `library-cache/{thumbs,tmp}` for cache. DB tables `library_entry` (path, parent, kind, size, sha256, mtime, added_at, starred, deleted_at, trash_id, trash_root) and `file_meta` (migration 0007). On startup the index is rebuilt against the disk, and the disk wins: new files are added and parsed, files with a changed size or mtime are re-hashed and re-parsed, and missing rows are dropped. Deleting a folder trashes the whole subtree as one group. Only the root can be restored; if its name was taken meanwhile it gets a ` (n)` suffix. A daily purge deletes trash older than `library.trash_days` (default 30, range 1–365, `GET/PUT /api/settings/library`). Uploads with a name already in use are kept as ` (n)` (OctoPrint overwrites; Foreman never replaces silently).
+- **Parser:** reads the first 1 MiB and last 512 KiB of each file, so the cost is the same for any size. Keys were verified against real files: **OrcaSlicer 2.3.0** (config block at the end, `; total layer number`, `printer_settings_id`, `printer_model`, `filament used [g]/[mm]`), **PrusaSlicer 2.9.7** (`.gcode` + `.bgcode`), and **Bambu Studio 02.08** (plate G-code with the config block at the start, plus a real `slice_info.config`). **Cura** uses a synthetic fixture built from the documented `;FLAVOR/;TIME/;Filament used/;TARGET_MACHINE.NAME` header, best effort, because no Cura install was available. Fixtures are trimmed headers and footers only. Bambu Studio's CLI could not export a 3MF on this machine (GL error), so the 3MF test fixture is built inside the test from the real `slice_info.config` and the real plate G-code.
+- **Owner addition:** `printer_settings_id` (printer profile name) and, for Bambu 3MF, `printer_model_id` from `slice_info.config` (e.g. `N2S` = A1) are stored in `file_meta` for the 3.3 compatibility engine. Per-plate time, grams and filaments are stored as `plates_json`.
+- **bgcode is supported, not parked:** the pure-Rust crate `binarygcode` 0.0.3 (a port of libbgcode) reads the file/printer/slicer metadata blocks and PNG thumbnails, and stops at the first G-code block. QOI/JPG thumbnails are skipped.
+- **3MF:** read with `zip` 9 + `quick-xml` 0.42. Meta comes from `Metadata/slice_info.config` plus the first `Metadata/plate_N.gcode`, else `project_settings.config`. Thumbnail order is `plate_N.png`, then `Metadata/thumbnail.png`, then `Auxiliaries/.thumbnails`. An unsliced 3MF still lists, with the slicer taken from `3D/3dmodel.model`.
+- **STL render — crate choice:** there is no GPU-free pure-Rust STL thumbnailer, so Foreman has a small software rasteriser (`stl_io` 0.11 + `png` 0.18): isometric view, z-buffer, flat two-sided shading, 256 px with a transparent background. It worked on the first attempt, so there is no backlog line.
+- **Thumbnails** are cached as PNG under `library-cache/thumbs/<id>.png` and served at `GET /api/library/files/{id}/thumb?v=<hash12>`. `/thumb` and `/download` were added to the URL-token allow-list.
+- **OctoPrint upload, verified** against docs.octoprint.org (`/api/version`, `/api/files`) and against OrcaSlicer's client source (`src/slic3r/Utils/OctoPrint.cpp`, which PrusaSlicer shares):
+  - "Test" calls `GET /api/version` with `X-Api-Key` and requires an `api` key and a `text` value starting with `OctoPrint`. Foreman answers `OctoPrint 1.10.3 (Foreman x.y.z)`.
+  - Upload is `POST /api/files/local` as multipart with `print`, `path`, optional `plateindex` (Orca/Bambu), and `file`. Foreman returns 201 with a `Location` header and `{done, effectivePrint:false, effectiveSelect:false, files.local{name, path, origin, refs}}`.
+  - Files land in `Slicer inbox/<path>`. `print=true` is accepted and only logs "Send not built yet". Auth uses a normal Foreman API key. `GET /api/server` is also present.
+  - Body limit for the upload routes is 2 GiB.
+- **Library REST:** `GET /api/library?path=`, `GET /api/library/trash`, `GET /api/library/files/{id}` (entry + meta), `/thumb`, `/download`, `POST /api/library/upload?path=` (multipart), `POST /api/library/folders`, `PATCH /api/library/entries/{id}` `{name?, starred?}`, `DELETE /api/library/entries/{id}` (to trash), and `POST /api/library/entries/{id}/restore`.
 
 ### Session 20c — 2026-11-10 (Phase 2 finish: unclaimed servers on the LAN, scoped URL tokens)
 
