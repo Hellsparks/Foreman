@@ -26,11 +26,16 @@ pub const SETTING_SERVER_NAME: &str = "server.name";
 const MAX_NAME_LEN: usize = 64;
 
 fn err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
-    (
+    let mut r = (
         status,
         Json(json!({ "error": message.into(), "code": code })),
     )
-        .into_response()
+        .into_response();
+    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+        r.extensions_mut()
+            .insert(crate::auth::DenyReason(code.to_owned()));
+    }
+    r
 }
 
 fn internal(e: impl std::fmt::Display) -> Response {
@@ -275,7 +280,6 @@ pub async fn login(
             .lock()
             .map(|mut l| l.fail(ip.0, now))
             .unwrap_or(0);
-        warn!(ip = %ip.0, "failed login");
         let msg = if left == 0 {
             "Too many tries. Wait 60 s before trying again.".to_owned()
         } else {

@@ -260,8 +260,10 @@ pub async fn serve_with(
         let addr: SocketAddr = format!("{host}:{}", cfg.port)
             .parse()
             .unwrap_or_else(|_| SocketAddr::from(([127, 0, 0, 1], cfg.port)));
-        let listener = bind_with_retry(addr).await?;
-        info!("listening on http://{addr}");
+        let listeners = bind_listeners(&host, cfg.port).await?;
+        for (a, _) in &listeners {
+            info!("listening on http://{a}");
+        }
         info!("health: http://{addr}/api/health");
         info!("events: ws://{addr}/ws/events");
         if let Some(tx) = ready.take() {
@@ -291,14 +293,18 @@ pub async fn serve_with(
             )
         };
 
-        let server = axum::serve(
-            listener,
-            app.clone()
-                .into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .into_future();
+        let servers = listeners.into_iter().map(|(_, l)| {
+            Box::pin(
+                axum::serve(
+                    l,
+                    app.clone()
+                        .into_make_service_with_connect_info::<SocketAddr>(),
+                )
+                .into_future(),
+            )
+        });
         tokio::select! {
-            res = server => {
+            (res, _, _) = futures_util::future::select_all(servers) => {
                 res.map_err(|e| anyhow::anyhow!("server error: {e}"))?;
                 break;
             }
@@ -314,15 +320,79 @@ pub async fn serve_with(
     Ok(())
 }
 
-/// Bind, retrying briefly (the previous listener on the same port may still be closing).
-async fn bind_with_retry(addr: SocketAddr) -> anyhow::Result<tokio::net::TcpListener> {
+/// Listeners for `host`, dual-stack so `localhost` works whichever family a client
+/// resolves first: `0.0.0.0`/`::` → one `[::]` socket that also takes IPv4;
+/// loopback → `127.0.0.1` plus `::1` (best effort); anything else as given.
+async fn bind_listeners(
+    host: &str,
+    port: u16,
+) -> anyhow::Result<Vec<(SocketAddr, tokio::net::TcpListener)>> {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    let ip: IpAddr = if host == "localhost" {
+        Ipv4Addr::LOCALHOST.into()
+    } else {
+        host.parse().unwrap_or(Ipv4Addr::LOCALHOST.into())
+    };
+    let v6 = |ip: Ipv6Addr| SocketAddr::from((ip, port));
+    let v4 = |ip: Ipv4Addr| SocketAddr::from((ip, port));
+    let mut out = Vec::new();
+    if ip.is_unspecified() {
+        match bind_with_retry(v6(Ipv6Addr::UNSPECIFIED), false).await {
+            Ok(l) => out.push((v6(Ipv6Addr::UNSPECIFIED), l)),
+            Err(e) => {
+                warn!("dual-stack [::] bind failed ({e}); IPv4 only");
+                out.push((
+                    v4(Ipv4Addr::UNSPECIFIED),
+                    bind_with_retry(v4(Ipv4Addr::UNSPECIFIED), true).await?,
+                ));
+            }
+        }
+    } else if ip.is_loopback() {
+        out.push((
+            v4(Ipv4Addr::LOCALHOST),
+            bind_with_retry(v4(Ipv4Addr::LOCALHOST), true).await?,
+        ));
+        match bind_with_retry(v6(Ipv6Addr::LOCALHOST), true).await {
+            Ok(l) => out.push((v6(Ipv6Addr::LOCALHOST), l)),
+            Err(e) => warn!("[::1] bind failed ({e}); IPv4 loopback only"),
+        }
+    } else {
+        let a = SocketAddr::new(ip, port);
+        out.push((a, bind_with_retry(a, true).await?));
+    }
+    Ok(out)
+}
+
+fn bind_socket(addr: SocketAddr, v6_only: bool) -> std::io::Result<tokio::net::TcpListener> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    let socket = Socket::new(Domain::for_address(addr), Type::STREAM, Some(Protocol::TCP))?;
+    if addr.is_ipv6() {
+        socket.set_only_v6(v6_only)?;
+    }
+    #[cfg(unix)]
+    socket.set_reuse_address(true)?;
+    socket.set_nonblocking(true)?;
+    socket.bind(&addr.into())?;
+    socket.listen(1024)?;
+    tokio::net::TcpListener::from_std(socket.into())
+}
+
+/// Bind, retrying briefly while the port is in use (the previous listener may still be closing).
+async fn bind_with_retry(
+    addr: SocketAddr,
+    v6_only: bool,
+) -> anyhow::Result<tokio::net::TcpListener> {
     let mut last = None;
     for _ in 0..10 {
-        match tokio::net::TcpListener::bind(addr).await {
+        match bind_socket(addr, v6_only) {
             Ok(l) => return Ok(l),
-            Err(e) => {
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
                 last = Some(e);
                 tokio::time::sleep(Duration::from_millis(300)).await;
+            }
+            Err(e) => {
+                last = Some(e);
+                break;
             }
         }
     }

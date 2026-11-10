@@ -162,6 +162,65 @@ pub struct AuthState {
     pub setup_code: Mutex<Option<SetupCode>>,
     pub limiter: Mutex<RateLimiter>,
     pub url_grants: Mutex<UrlGrants>,
+    pub deny_log: Mutex<DenyLog>,
+}
+
+// ---------------------------------------------------------------------------
+// Denied-request log (401/403)
+// ---------------------------------------------------------------------------
+
+/// Why a request was refused; handlers attach it to 401/403 responses as an extension.
+#[derive(Clone, Debug)]
+pub struct DenyReason(pub String);
+
+/// One log line per (IP, reason) per [`DENY_LOG_WINDOW`]; repeats are counted and
+/// reported on the next line.
+#[derive(Default)]
+pub struct DenyLog {
+    seen: HashMap<(IpAddr, String), (Instant, u32)>,
+}
+
+pub const DENY_LOG_WINDOW: Duration = Duration::from_secs(60);
+const DENY_LOG_MAX_KEYS: usize = 4096;
+
+impl DenyLog {
+    /// `Some(suppressed_since_last_line)` when this denial should be logged now.
+    pub fn should_log(&mut self, ip: IpAddr, reason: &str, now: Instant) -> Option<u32> {
+        if self.seen.len() >= DENY_LOG_MAX_KEYS {
+            self.seen
+                .retain(|_, (t, _)| now.duration_since(*t) < DENY_LOG_WINDOW);
+        }
+        match self.seen.get_mut(&(ip, reason.to_owned())) {
+            Some((t, n)) if now.duration_since(*t) < DENY_LOG_WINDOW => {
+                *n += 1;
+                None
+            }
+            Some((t, n)) => {
+                let suppressed = *n;
+                *t = now;
+                *n = 0;
+                Some(suppressed)
+            }
+            None => {
+                self.seen.insert((ip, reason.to_owned()), (now, 0));
+                Some(0)
+            }
+        }
+    }
+}
+
+/// Warn about a refused request: IP, method, route (no query, so no URL token) and reason.
+fn log_denied(state: &AppState, ip: IpAddr, method: &str, path: &str, status: u16, reason: &str) {
+    let Ok(mut log) = state.auth.deny_log.lock() else {
+        return;
+    };
+    if let Some(suppressed) = log.should_log(ip, reason, Instant::now()) {
+        if suppressed > 0 {
+            warn!(%ip, method, route = path, status, reason, suppressed, "auth denied (repeats since last line)");
+        } else {
+            warn!(%ip, method, route = path, status, reason, "auth denied");
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -271,14 +330,15 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Self::Rejection> {
-        Ok(ClientIp(
-            parts
-                .extensions
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|c| c.0.ip())
-                .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-        ))
+        Ok(ClientIp(peer_ip(&parts.extensions)))
     }
+}
+
+/// Peer IP with IPv4-mapped IPv6 (`::ffff:a.b.c.d` from the dual-stack listener) unwrapped.
+fn peer_ip(ext: &axum::http::Extensions) -> IpAddr {
+    ext.get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0.ip().to_canonical())
+        .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST))
 }
 
 // ---------------------------------------------------------------------------
@@ -365,20 +425,25 @@ fn query_token(req: &Request) -> Option<String> {
 // Middleware
 // ---------------------------------------------------------------------------
 
-fn unauthorized(code: &'static str, message: &str) -> Response {
-    (
+fn unauthorized(code: &'static str, message: &str, reason: &str) -> Response {
+    let mut r = (
         StatusCode::UNAUTHORIZED,
         Json(json!({ "error": message, "code": code })),
     )
-        .into_response()
+        .into_response();
+    r.extensions_mut().insert(DenyReason(reason.to_owned()));
+    r
 }
 
 fn not_set_up() -> Response {
-    (
+    let mut r = (
         StatusCode::FORBIDDEN,
         Json(json!({ "error": "server not set up", "code": "setup_required" })),
     )
-        .into_response()
+        .into_response();
+    r.extensions_mut()
+        .insert(DenyReason("server not set up".into()));
+    r
 }
 
 pub fn needs_auth(path: &str) -> bool {
@@ -389,19 +454,19 @@ pub fn needs_auth(path: &str) -> bool {
 pub const LOCAL_APP_USER: &str = "local";
 
 /// Credentials on the request: API key, bearer/cookie session, or a scoped URL token.
-/// Session tokens are never taken from the URL.
-async fn authenticate(state: &AppState, headers: &HeaderMap) -> Option<AuthKind> {
+/// Session tokens are never taken from the URL. `Err` carries the reason for the log.
+async fn authenticate(state: &AppState, headers: &HeaderMap) -> Result<AuthKind, &'static str> {
     let pool = &state.foreman_db.pool;
     if let Some(key) = headers.get("x-api-key").and_then(|v| v.to_str().ok()) {
         return match auth::check_api_key(pool, key.trim()).await {
-            Ok(Some(id)) => Some(AuthKind::ApiKey { id }),
-            _ => None,
+            Ok(Some(id)) => Ok(AuthKind::ApiKey { id }),
+            _ => Err("invalid API key"),
         };
     }
-    let t = session_token(headers)?;
+    let t = session_token(headers).ok_or("no credentials")?;
     match auth::session_valid(pool, &t, chrono::Utc::now().timestamp()).await {
-        Ok(true) => Some(AuthKind::Session { token: t }),
-        _ => None,
+        Ok(true) => Ok(AuthKind::Session { token: t }),
+        _ => Err("invalid or expired session"),
     }
 }
 
@@ -415,28 +480,45 @@ fn url_grant(state: &AppState, req: &Request, path: &str) -> Option<AuthCtx> {
 }
 
 /// Reject unauthenticated requests to protected routes; attach [`AuthCtx`] otherwise.
+/// Every 401/403 (from here or a handler) is logged via [`log_denied`].
 ///
 /// An unclaimed server (no admin) answers only health, info and setup; everything else
 /// is 403 — except in-process desktop sessions (Mode A, loopback-only until setup).
-pub async fn require_auth(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
+pub async fn require_auth(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let path = req.uri().path().to_owned();
     if !(path.starts_with("/api/") || path.starts_with("/ws/")) {
         return next.run(req).await;
     }
+    let ip = peer_ip(req.extensions());
+    let method = req.method().to_string();
+    let resp = gate(&state, req, next, &path).await;
+    let status = resp.status();
+    if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+        let reason = resp
+            .extensions()
+            .get::<DenyReason>()
+            .map(|r| r.0.as_str())
+            .unwrap_or("refused by handler");
+        log_denied(&state, ip, &method, &path, status.as_u16(), reason);
+    }
+    resp
+}
+
+async fn gate(state: &AppState, mut req: Request, next: Next, path: &str) -> Response {
     let admin = match auth::admin_username(&state.foreman_db.pool).await {
         Ok(a) => a,
         Err(e) => {
             warn!("auth: admin lookup failed: {e}");
-            return unauthorized("unauthorized", "sign in required");
+            return unauthorized("unauthorized", "sign in required", "admin lookup failed");
         }
     };
 
     let Some(admin) = admin else {
-        if UNCLAIMED_ROUTES.contains(&path.as_str()) {
+        if UNCLAIMED_ROUTES.contains(&path) {
             return next.run(req).await;
         }
-        return match authenticate(&state, req.headers()).await {
-            Some(kind @ AuthKind::Session { .. }) => {
+        return match authenticate(state, req.headers()).await {
+            Ok(kind @ AuthKind::Session { .. }) => {
                 req.extensions_mut().insert(AuthCtx {
                     username: LOCAL_APP_USER.to_owned(),
                     kind,
@@ -447,22 +529,26 @@ pub async fn require_auth(State(state): State<AppState>, mut req: Request, next:
         };
     };
 
-    if !needs_auth(&path) {
+    if !needs_auth(path) {
         return next.run(req).await;
     }
-    let ctx = match authenticate(&state, req.headers()).await {
-        Some(kind) => Some(AuthCtx {
+    let ctx = match authenticate(state, req.headers()).await {
+        Ok(kind) => Ok(AuthCtx {
             username: admin,
             kind,
         }),
-        None => url_grant(&state, &req, &path),
+        Err(reason) => match url_grant(state, &req, path) {
+            Some(ctx) => Ok(ctx),
+            None if query_token(&req).is_some() => Err("invalid or expired URL token"),
+            None => Err(reason),
+        },
     };
     match ctx {
-        Some(ctx) => {
+        Ok(ctx) => {
             req.extensions_mut().insert(ctx);
             next.run(req).await
         }
-        None => unauthorized("unauthorized", "sign in required"),
+        Err(reason) => unauthorized("unauthorized", "sign in required", reason),
     }
 }
 
@@ -492,6 +578,26 @@ mod tests {
         assert_eq!(
             fresh.check("K7QD-2MXP", t0 + SETUP_CODE_TTL - Duration::from_secs(1)),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn deny_log_once_per_window_then_reports_repeats() {
+        let ip: IpAddr = "10.0.0.5".parse().expect("ip");
+        let t0 = Instant::now();
+        let mut log = DenyLog::default();
+        assert_eq!(log.should_log(ip, "no credentials", t0), Some(0));
+        for _ in 0..3 {
+            assert_eq!(log.should_log(ip, "no credentials", t0), None);
+        }
+        assert_eq!(
+            log.should_log(ip, "invalid API key", t0),
+            Some(0),
+            "other reason logs"
+        );
+        assert_eq!(
+            log.should_log(ip, "no credentials", t0 + DENY_LOG_WINDOW),
+            Some(3)
         );
     }
 

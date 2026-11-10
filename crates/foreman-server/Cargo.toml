@@ -61,6 +61,9 @@ tokio-util = { workspace = true }
 # URL parsing (path failover health checks)
 url = "2"
 
+# Dual-stack listener (IPV6_V6ONLY=false)
+socket2 = "0.6"
+
 # Hidden password prompt for `reset-admin`
 rpassword = { workspace = true }
 
