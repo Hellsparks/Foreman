@@ -5,6 +5,7 @@ import type { ShellContext } from "../shell/Shell";
 import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import { signedUrl } from "../api/conn";
+import { api } from "../api/client";
 import {
   lib,
   send,
@@ -199,6 +200,18 @@ function Chevron({ d }: { d: string }) {
   );
 }
 
+/** Chain link; crossed out when the SFTP session is closed. */
+function LinkIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" aria-hidden="true">
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+      {!open && <path d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
+const SFTP_POLL_MS = 15_000;
+
 // ── page ───────────────────────────────────────────────────────────────────
 
 export default function Library() {
@@ -228,6 +241,7 @@ export default function Library() {
   const [bulkArm, setBulkArm] = useState(false);
   const [delArm, setDelArm] = useState(false);
   const [drag, setDrag] = useState<Item[] | null>(null);
+  const [sftp, setSftp] = useState<Record<number, "open" | "closed" | "busy">>({});
   const fileInput = useRef<HTMLInputElement>(null);
 
   const printerName = useCallback(
@@ -283,6 +297,40 @@ export default function Library() {
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+
+  const printerIds = printers.map((p) => p.printer_id).join(",");
+  useEffect(() => {
+    if (!printerIds) return;
+    const ids = printerIds.split(",").map(Number);
+    const poll = () =>
+      ids.forEach((id) =>
+        api
+          .sshSession(id)
+          .then((s) => setSftp((prev) => (prev[id] === "busy" ? prev : { ...prev, [id]: s.open ? "open" : "closed" })))
+          .catch(() => {}),
+      );
+    poll();
+    const timer = setInterval(poll, SFTP_POLL_MS);
+    return () => clearInterval(timer);
+  }, [printerIds]);
+
+  const toggleSftp = async (id: number) => {
+    const wasOpen = sftp[id] === "open";
+    setSftp((prev) => ({ ...prev, [id]: "busy" }));
+    try {
+      if (wasOpen) {
+        await api.closeSshSession(id);
+        setNotice(`Closed the SFTP connection to ${printerName(id)}.`);
+      } else {
+        const info = await api.filesInfo(id);
+        setNotice(`SFTP connected: ${info.user}@${info.host}.`);
+      }
+      setSftp((prev) => ({ ...prev, [id]: wasOpen ? "closed" : "open" }));
+    } catch (e) {
+      setSftp((prev) => ({ ...prev, [id]: wasOpen ? "open" : "closed" }));
+      setNotice(`SFTP to ${printerName(id)}: ${errText(e)}`);
+    }
+  };
 
   const onEvent = useCallback((ev: { type: string; [k: string]: unknown }) => {
     if (!ev.type.startsWith("transfer_")) return;
@@ -966,17 +1014,31 @@ export default function Library() {
             {printers.length === 0 && <span style={{ letterSpacing: 0 }}>No Klipper printers yet.</span>}
             {printers.map((p) => {
               const w: Where = { kind: "printer", id: p.printer_id, path: "" };
+              const s = sftp[p.printer_id];
               return (
-                <button key={p.printer_id} type="button" aria-current={isCurLoc(w) ? "page" : undefined} onClick={() => go(w)} {...dropOn(w)}>
-                  <span aria-hidden="true" style={{ color: printerDot(p) }}>
-                    ●
-                  </span>
-                  <span className="fw-loc-name">
-                    {p.name}
-                    <br />
-                    <span className="fw-loc-sub">{p.browsable ? "Moonraker · gcodes" : "not connected"}</span>
-                  </span>
-                </button>
+                <div key={p.printer_id} className="fw-loc-row">
+                  <button type="button" aria-current={isCurLoc(w) ? "page" : undefined} onClick={() => go(w)} {...dropOn(w)}>
+                    <span aria-hidden="true" style={{ color: printerDot(p) }}>
+                      ●
+                    </span>
+                    <span className="fw-loc-name">
+                      {p.name}
+                      <br />
+                      <span className="fw-loc-sub">{p.browsable ? "Moonraker · gcodes" : "not connected"}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="fw-loc-conn"
+                    aria-pressed={s === "open"}
+                    disabled={s === "busy"}
+                    aria-label={s === "open" ? `Close SFTP connection to ${p.name}` : `Connect SFTP to ${p.name}`}
+                    title={s === "open" ? "SFTP connected · click to close" : "SFTP closed · click to connect"}
+                    onClick={() => void toggleSftp(p.printer_id)}
+                  >
+                    <LinkIcon open={s === "open"} />
+                  </button>
+                </div>
               );
             })}
           </nav>

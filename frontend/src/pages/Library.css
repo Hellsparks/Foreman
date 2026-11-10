@@ -196,6 +196,18 @@
 .fw-browser-locations button[data-drop="true"] { outline: 1px dashed var(--fw-accent); }
 .fw-loc-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .fw-loc-sub { font-size: 10px; }
+.fw-loc-row { display: flex; align-items: stretch; gap: var(--fw-space-1); }
+.fw-loc-row > button:first-child { flex: 1; min-width: 0; }
+.fw-browser-locations .fw-loc-conn {
+  flex: none;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+  color: var(--fw-muted);
+}
+.fw-browser-locations .fw-loc-conn:hover:not(:disabled) { color: var(--fw-text); border-color: var(--fw-border); }
+.fw-browser-locations .fw-loc-conn[aria-pressed="true"] { color: var(--fw-success); }
+.fw-browser-locations .fw-loc-conn:disabled { opacity: 0.5; cursor: progress; }
 
 .fw-browser-content {
   min-width: 0;
