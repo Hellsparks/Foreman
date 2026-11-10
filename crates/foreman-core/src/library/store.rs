@@ -144,7 +144,8 @@ macro_rules! select_entries {
     ($rest:literal) => {
         concat!(
             "SELECT e.id, e.path, e.kind, e.size, e.hash, e.added_at, e.starred, e.deleted_at, \
-             m.format, m.thumb_file FROM library_entry e LEFT JOIN file_meta m ON m.entry_id = e.id ",
+             m.format, m.thumb_file, m.print_time_secs, m.tools_json \
+             FROM library_entry e LEFT JOIN file_meta m ON m.entry_id = e.id ",
             $rest
         )
     };
@@ -156,8 +157,13 @@ fn entry_from_row(r: &sqlx::sqlite::SqliteRow) -> Result<LibraryEntry, AppError>
     let kind: String = r.try_get("kind").map_err(db)?;
     let thumb: Option<String> = r.try_get("thumb_file").map_err(db)?;
     let hash: Option<String> = r.try_get("hash").map_err(db)?;
+    let tools: Option<String> = r.try_get("tools_json").map_err(db)?;
     Ok(LibraryEntry {
         id,
+        print_time_secs: r.try_get("print_time_secs").map_err(db)?,
+        tools: tools
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default(),
         name: name_of(&path).to_owned(),
         kind: if kind == "folder" {
             LibraryEntryKind::Folder

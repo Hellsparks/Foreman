@@ -441,4 +441,4 @@ export interface NetworkSettings {
 
 export type { ApiKey };
 
-export { ApiError };
+export { ApiError, req as request };
