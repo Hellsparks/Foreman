@@ -1,0 +1,20 @@
+;FLAVOR:Marlin
+;TIME:3725
+;Filament used: 4.21871m
+;Layer height: 0.2
+;MINX:95.2
+;MINY:95.2
+;MAXX:124.8
+;MAXY:124.8
+;MAXZ:20
+;TARGET_MACHINE.NAME:Creality Ender-3
+;Generated with Cura_SteamEngine 5.7.1
+M140 S60
+M105
+;LAYER_COUNT:100
+;LAYER:0
+G1 X100 Y100 E0.1
+;LAYER:1
+G1 X101 Y100 E0.2
+;TIME_ELAPSED:3725.0
+;End of Gcode

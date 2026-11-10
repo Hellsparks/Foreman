@@ -7,6 +7,7 @@ pub mod driver;
 pub mod drivers;
 pub mod error;
 pub mod events;
+pub mod library;
 pub mod remote_fs;
 pub mod repo;
 pub mod secrets;

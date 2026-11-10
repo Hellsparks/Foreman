@@ -294,3 +294,102 @@ pub struct AttentionItem {
     pub body: Option<String>,
     pub created_at: DateTime<Utc>,
 }
+
+// ---------------------------------------------------------------------------
+// Library (task 3.1)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum LibraryEntryKind {
+    File,
+    Folder,
+}
+
+/// A file or folder in the Library (path is relative to the library root, `/`-separated).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LibraryEntry {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub path: String,
+    pub name: String,
+    pub kind: LibraryEntryKind,
+    #[ts(type = "number")]
+    pub size: i64,
+    /// SHA-256 hex of the file contents.
+    pub hash: Option<String>,
+    pub added_at: String,
+    pub starred: bool,
+    /// Set while the entry is in the trash.
+    pub deleted_at: Option<String>,
+    /// `gcode` | `bgcode` | `3mf` | `stl` | `other` (files only).
+    pub format: Option<String>,
+    /// `/api/library/files/{id}/thumb` when a thumbnail exists.
+    pub thumb_url: Option<String>,
+}
+
+/// Filament use for one tool / extruder / AMS slot.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ToolUsage {
+    pub index: u32,
+    pub material: Option<String>,
+    /// `#RRGGBB`.
+    pub colour: Option<String>,
+    pub grams: Option<f64>,
+    pub mm: Option<f64>,
+    /// Slicer filament preset (`filament_settings_id`).
+    pub preset: Option<String>,
+    /// From a preset named like `Vendor Name (#ID) - Spoolman`.
+    #[ts(type = "number | null")]
+    pub spool_id: Option<i64>,
+}
+
+/// One sliced plate of a 3MF project.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PlateSummary {
+    pub index: u32,
+    #[ts(type = "number | null")]
+    pub print_time_secs: Option<i64>,
+    pub weight_g: Option<f64>,
+    pub tools: Vec<ToolUsage>,
+}
+
+/// Facts extracted from a print file.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FileMeta {
+    pub format: String,
+    /// `ok` | `unsupported` | `error`.
+    pub parse_status: String,
+    pub parse_error: Option<String>,
+    pub slicer: Option<String>,
+    pub slicer_version: Option<String>,
+    pub printer_model: Option<String>,
+    /// Slicer printer profile name (`printer_settings_id`); matched against a printer's slicer profiles.
+    pub printer_settings_id: Option<String>,
+    /// Bambu printer model code from `slice_info.config` (e.g. `N2S` = A1 mini).
+    pub printer_model_id: Option<String>,
+    pub nozzle_diameter: Option<f64>,
+    #[ts(type = "number | null")]
+    pub print_time_secs: Option<i64>,
+    pub layer_count: Option<u32>,
+    pub bed_width: Option<f64>,
+    pub bed_depth: Option<f64>,
+    pub filament_settings_id: Option<String>,
+    #[ts(type = "number | null")]
+    pub suggested_spool_id: Option<i64>,
+    pub tools: Vec<ToolUsage>,
+    pub plates: Vec<PlateSummary>,
+}
+
+/// `GET /api/library/files/{id}`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LibraryFileDetails {
+    pub entry: LibraryEntry,
+    pub meta: Option<FileMeta>,
+}

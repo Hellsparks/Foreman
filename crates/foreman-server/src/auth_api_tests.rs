@@ -41,6 +41,9 @@ async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
     if let Ok(mut slot) = auth.setup_code.lock() {
         *slot = Some(SetupCode::new(CODE.into(), std::time::Instant::now()));
     }
+    let library = Arc::new(
+        foreman_core::library::LibraryStore::new(dir.path(), db.pool.clone()).expect("library"),
+    );
     let state = AppState {
         driver_manager: DriverManager::new(Arc::new(tx.clone()), db.pool.clone()),
         bus_tx: Arc::new(tx),
@@ -60,6 +63,7 @@ async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
             magic_dns: None,
             bind: tokio::sync::watch::channel("127.0.0.1".to_owned()).0,
         }),
+        library,
     };
     (build_router(state.clone()), state)
 }
@@ -535,4 +539,236 @@ async fn url_tokens_scoped_session_tokens_refused() {
         let (s, _, _) = call(&app, "GET", &uri, &[], None).await;
         assert_eq!(s, StatusCode::UNAUTHORIZED, "{uri}");
     }
+}
+
+fn multipart(fields: &[(&str, &str)], file: (&str, &[u8])) -> (String, Vec<u8>) {
+    let b = "foremanTestBoundary";
+    let mut body = Vec::new();
+    for (k, v) in fields {
+        body.extend(
+            format!("--{b}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").bytes(),
+        );
+    }
+    body.extend(
+        format!(
+            "--{b}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n\
+             Content-Type: application/octet-stream\r\n\r\n",
+            file.0
+        )
+        .bytes(),
+    );
+    body.extend_from_slice(file.1);
+    body.extend(format!("\r\n--{b}--\r\n").bytes());
+    (format!("multipart/form-data; boundary={b}"), body)
+}
+
+async fn raw(app: &Router, req: Request<Body>) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+    let res = app.clone().oneshot(req).await.expect("response");
+    let (status, headers) = (res.status(), res.headers().clone());
+    let bytes = axum::body::to_bytes(res.into_body(), 1 << 24)
+        .await
+        .expect("body");
+    (status, headers, bytes.to_vec())
+}
+
+#[tokio::test]
+async fn octoprint_upload_with_api_key_lands_in_slicer_inbox() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, state) = app(&dir, true).await;
+    let (_, key) = core_auth::create_api_key(&state.foreman_db.pool, "OrcaSlicer")
+        .await
+        .expect("key");
+    let gcode = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../foreman-core/tests/fixtures/library/orca_2.3.0.gcode"),
+    )
+    .expect("fixture");
+
+    // Orca's "Test" button: GET /api/version with X-Api-Key.
+    let (s, _, _) = call(&app, "GET", "/api/version", &[], None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _, v) = call(&app, "GET", "/api/version", &[("x-api-key", &key)], None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(v["api"].is_string());
+    assert!(v["text"].as_str().unwrap_or("").starts_with("OctoPrint"));
+
+    // Orca's upload: POST /api/files/local, fields print + path, then the file.
+    let send = |print: &'static str| {
+        let (ct, body) = multipart(
+            &[("print", print), ("path", "")],
+            ("LED carrier.gcode", &gcode),
+        );
+        Request::builder()
+            .method("POST")
+            .uri("/api/files/local")
+            .header("x-api-key", &key)
+            .header(header::CONTENT_TYPE, ct)
+            .body(Body::from(body))
+            .expect("request")
+    };
+    let (s, h, body) = raw(&app, send("false")).await;
+    assert_eq!(s, StatusCode::CREATED, "{}", String::from_utf8_lossy(&body));
+    let v: Value = serde_json::from_slice(&body).expect("json");
+    assert_eq!(v["done"], true);
+    assert_eq!(v["files"]["local"]["origin"], "local");
+    assert_eq!(
+        v["files"]["local"]["path"],
+        "Slicer inbox/LED carrier.gcode"
+    );
+    assert!(h.get(header::LOCATION).is_some());
+    let (s, _, _) = raw(&app, send("true")).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "print flag accepted (Send not built yet)"
+    );
+
+    // Without a key the upload is refused.
+    let (ct, body) = multipart(&[], ("x.gcode", b"G28\n"));
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/files/local")
+        .header(header::CONTENT_TYPE, ct)
+        .body(Body::from(body))
+        .expect("request");
+    assert_eq!(raw(&app, req).await.0, StatusCode::UNAUTHORIZED);
+
+    // It shows up in the Library with parsed facts and a thumbnail.
+    let (s, _, list) = call(
+        &app,
+        "GET",
+        "/api/library?path=Slicer%20inbox",
+        &[("x-api-key", &key)],
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let entries = list["entries"].as_array().expect("entries");
+    assert_eq!(entries.len(), 2, "second upload kept as a copy");
+    let id = entries[0]["id"].as_i64().expect("id");
+    let thumb_url = entries[0]["thumb_url"]
+        .as_str()
+        .expect("thumb url")
+        .to_owned();
+    let (_, _, d) = call(
+        &app,
+        "GET",
+        &format!("/api/library/files/{id}"),
+        &[("x-api-key", &key)],
+        None,
+    )
+    .await;
+    assert_eq!(d["meta"]["slicer"], "OrcaSlicer");
+    assert_eq!(d["meta"]["printer_settings_id"], "Voron 0.2 0.4 nozzle");
+    assert_eq!(d["meta"]["tools"][0]["material"], "ASA");
+    let req = Request::builder()
+        .uri(&thumb_url)
+        .header("x-api-key", &key)
+        .body(Body::empty())
+        .expect("request");
+    let (s, h, png) = raw(&app, req).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        h.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()),
+        Some("image/png")
+    );
+    assert!(png.starts_with(b"\x89PNG"));
+}
+
+#[tokio::test]
+async fn library_rest_basics() {
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, _) = app(&dir, true).await;
+    let bearer = format!("Bearer {}", bearer_login(&app).await);
+    let auth = [("authorization", bearer.as_str())];
+
+    let (s, _, folder) = call(
+        &app,
+        "POST",
+        "/api/library/folders",
+        &auth,
+        Some(json!({ "path": "", "name": "Calibration" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (ct, body) = multipart(
+        &[],
+        (
+            "cube.gcode",
+            b"; generated by PrusaSlicer 2.9.7 on x\nG28\n",
+        ),
+    );
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/library/upload?path=Calibration")
+        .header("authorization", &bearer)
+        .header(header::CONTENT_TYPE, ct)
+        .body(Body::from(body))
+        .expect("request");
+    let (s, _, body) = raw(&app, req).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let up: Value = serde_json::from_slice(&body).expect("json");
+    let file_id = up["entries"][0]["id"].as_i64().expect("id");
+
+    let (s, _, e) = call(
+        &app,
+        "PATCH",
+        &format!("/api/library/entries/{file_id}"),
+        &auth,
+        Some(json!({ "name": "cube 20mm.gcode", "starred": true })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        (e["path"].as_str(), e["starred"].as_bool()),
+        (Some("Calibration/cube 20mm.gcode"), Some(true))
+    );
+    let (s, _, _) = call(
+        &app,
+        "PATCH",
+        &format!("/api/library/entries/{file_id}"),
+        &auth,
+        Some(json!({ "name": "../x" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    let folder_id = folder["id"].as_i64().expect("id");
+    let (s, _, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/library/entries/{folder_id}"),
+        &auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, _, root) = call(&app, "GET", "/api/library", &auth, None).await;
+    assert_eq!(root["entries"].as_array().map(Vec::len), Some(0));
+    let (_, _, trash) = call(&app, "GET", "/api/library/trash", &auth, None).await;
+    assert_eq!(trash["purge_after_days"], 30);
+    assert_eq!(trash["entries"].as_array().map(Vec::len), Some(1));
+    let (s, _, _) = call(
+        &app,
+        "POST",
+        &format!("/api/library/entries/{folder_id}/restore"),
+        &auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, _, inside) = call(&app, "GET", "/api/library?path=Calibration", &auth, None).await;
+    assert_eq!(inside["entries"][0]["name"], "cube 20mm.gcode");
+
+    let (s, _, _) = call(
+        &app,
+        "PUT",
+        "/api/settings/library",
+        &auth,
+        Some(json!({ "trash_days": 7 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, _, v) = call(&app, "GET", "/api/settings/library", &auth, None).await;
+    assert_eq!(v["trash_days"], 7);
 }
