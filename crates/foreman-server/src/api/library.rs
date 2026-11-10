@@ -28,16 +28,17 @@ pub const DEFAULT_TRASH_DAYS: i64 = 30;
 /// The OctoPrint release whose upload API we mirror (`/api/version`).
 const OCTOPRINT_COMPAT: &str = "1.10.3";
 
-pub struct ApiError(StatusCode, String);
+pub struct ApiError(pub(crate) StatusCode, pub(crate) String);
 
 impl From<AppError> for ApiError {
     fn from(e: AppError) -> Self {
         let status = match &e {
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+            AppError::Driver(_) => StatusCode::BAD_GATEWAY,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        if status == StatusCode::INTERNAL_SERVER_ERROR {
+        if status == StatusCode::INTERNAL_SERVER_ERROR || status == StatusCode::BAD_GATEWAY {
             warn!("library: {e}");
         }
         ApiError(status, e.to_string())
@@ -52,7 +53,7 @@ impl IntoResponse for ApiError {
 
 type ApiResult<T> = Result<T, ApiError>;
 
-fn bad(msg: impl Into<String>) -> ApiError {
+pub(crate) fn bad(msg: impl Into<String>) -> ApiError {
     ApiError(StatusCode::BAD_REQUEST, msg.into())
 }
 
@@ -72,6 +73,15 @@ pub async fn trash_days(state: &AppState) -> i64 {
 struct Spooled {
     name: String,
     tmp: PathBuf,
+}
+
+/// A spooled upload: (file name, temp path). The caller owns the temp file.
+pub(crate) async fn spool_files(
+    state: &AppState,
+    mp: Multipart,
+) -> ApiResult<Vec<(String, PathBuf)>> {
+    let (files, _) = spool_multipart(state, mp).await?;
+    Ok(files.into_iter().map(|f| (f.name, f.tmp)).collect())
 }
 
 /// Read a multipart body: files are streamed to temp files, text fields collected.
@@ -290,6 +300,43 @@ pub async fn restore_entry(
     Path(id): Path<i64>,
 ) -> ApiResult<Json<LibraryEntry>> {
     Ok(Json(state.library.restore(id).await?))
+}
+
+#[derive(Deserialize)]
+pub struct Ids {
+    ids: Vec<i64>,
+}
+
+/// `POST /api/library/trash-many {ids}` → `{trashed, errors}` (multi-select delete).
+pub async fn trash_many(
+    State(state): State<AppState>,
+    Json(body): Json<Ids>,
+) -> Json<serde_json::Value> {
+    let mut trashed = Vec::new();
+    let mut errors = Vec::new();
+    for id in body.ids {
+        match state.library.trash(id).await {
+            Ok(()) => trashed.push(id),
+            Err(e) => errors.push(json!({ "id": id, "error": e.to_string() })),
+        }
+    }
+    Json(json!({ "trashed": trashed, "errors": errors }))
+}
+
+/// `POST /api/library/restore-many {ids}` → `{restored, errors}` (undo of a multi-delete).
+pub async fn restore_many(
+    State(state): State<AppState>,
+    Json(body): Json<Ids>,
+) -> Json<serde_json::Value> {
+    let mut restored = Vec::new();
+    let mut errors = Vec::new();
+    for id in body.ids {
+        match state.library.restore(id).await {
+            Ok(e) => restored.push(e),
+            Err(e) => errors.push(json!({ "id": id, "error": e.to_string() })),
+        }
+    }
+    Json(json!({ "restored": restored, "errors": errors }))
 }
 
 #[derive(Deserialize)]

@@ -63,6 +63,7 @@ url = "2"
 
 # Dual-stack listener (IPV6_V6ONLY=false)
 socket2 = "0.6"
+async-trait = { workspace = true }
 
 # Hidden password prompt for `reset-admin`
 rpassword = { workspace = true }
@@ -73,5 +74,4 @@ if-addrs = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
-async-trait = { workspace = true }
 tower = { workspace = true, features = ["util"] }

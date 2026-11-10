@@ -2,8 +2,9 @@
 import type { AttentionItemEvent } from "./AttentionItemEvent";
 import type { ConnectionEvent } from "./ConnectionEvent";
 import type { PrinterStatus } from "./PrinterStatus";
+import type { TransferInfo } from "./TransferInfo";
 
 /**
  * A single event broadcast on `/ws/events`.
  */
-export type ServerEvent = { "type": "heartbeat", timestamp: string, } | { "type": "printer_status", printer_id: bigint, status: PrinterStatus, } | { "type": "printer_connection", printer_id: bigint, event: ConnectionEvent, } | { "type": "attention_added", item: AttentionItemEvent, } | { "type": "attention_updated", item: AttentionItemEvent, } | { "type": "attention_cleared", item_id: bigint, printer_id: bigint | null, } | { "type": "job", printer_id: bigint | null, payload: unknown, } | { "type": "transfer", payload: unknown, } | { "type": "device", printer_id: bigint | null, payload: unknown, };
+export type ServerEvent = { "type": "heartbeat", timestamp: string, } | { "type": "printer_status", printer_id: bigint, status: PrinterStatus, } | { "type": "printer_connection", printer_id: bigint, event: ConnectionEvent, } | { "type": "attention_added", item: AttentionItemEvent, } | { "type": "attention_updated", item: AttentionItemEvent, } | { "type": "attention_cleared", item_id: bigint, printer_id: bigint | null, } | { "type": "job", printer_id: bigint | null, payload: unknown, } | { "type": "transfer_started", transfer: TransferInfo, } | { "type": "transfer_progress", transfer: TransferInfo, } | { "type": "transfer_finished", transfer: TransferInfo, } | { "type": "device", printer_id: bigint | null, payload: unknown, };

@@ -491,6 +491,47 @@ impl LibraryStore {
         self.get(id).await
     }
 
+    /// Live entry at `path`, if any.
+    pub async fn find(&self, path: &str) -> Result<Option<LibraryEntry>, AppError> {
+        match self.live_id(&clean_rel(path)?).await? {
+            Some(id) => Ok(Some(self.get(id).await?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Move an entry (and a folder's contents) into `folder` as `name`, which must be free.
+    pub async fn move_to(
+        &self,
+        id: i64,
+        folder: &str,
+        name: &str,
+    ) -> Result<LibraryEntry, AppError> {
+        let e = self.live(id).await?;
+        let folder = clean_rel(folder)?;
+        let new_path = join(&folder, &clean_name(name)?);
+        if new_path == e.path {
+            return Ok(e);
+        }
+        if folder == e.path || folder.starts_with(&format!("{}/", e.path)) {
+            return Err(AppError::InvalidInput(format!(
+                "can't move {} into itself",
+                e.name
+            )));
+        }
+        if !new_path.eq_ignore_ascii_case(&e.path) && self.taken(&new_path).await? {
+            return Err(AppError::InvalidInput(format!("{new_path} already exists")));
+        }
+        self.ensure_folder(&folder).await?;
+        fs::rename(self.abs(&e.path), self.abs(&new_path)).map_err(io)?;
+        for (child, p) in self.descendants(&e.path).await? {
+            self.set_path(child, &format!("{new_path}{}", &p[e.path.len()..]))
+                .await?;
+        }
+        self.set_path(id, &new_path).await?;
+        info!(from = %e.path, to = %new_path, "library: moved");
+        self.get(id).await
+    }
+
     pub async fn set_starred(&self, id: i64, starred: bool) -> Result<LibraryEntry, AppError> {
         self.live(id).await?;
         sqlx::query("UPDATE library_entry SET starred = ? WHERE id = ?")

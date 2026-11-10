@@ -34,8 +34,9 @@ hex = { workspace = true }
 suppaftp = { workspace = true }
 native-tls = { workspace = true }
 
-# HTTP client (Moonraker command dispatch)
-reqwest = { workspace = true }
+# HTTP client (Moonraker command dispatch + file API)
+reqwest = { workspace = true, features = ["multipart", "stream", "json"] }
+tokio-util = { workspace = true }
 
 # SSH / SFTP (task 2.5)
 russh = { workspace = true }

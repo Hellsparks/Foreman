@@ -7,6 +7,9 @@ mod driver_manager;
 mod net;
 mod ssh_pool;
 mod state;
+#[cfg(test)]
+mod transfer_tests;
+mod transfers;
 
 use axum::{
     extract::DefaultBodyLimit,
@@ -209,6 +212,11 @@ pub async fn serve_with(
         &cfg.data_dir,
         foreman_db.pool.clone(),
     )?);
+    let transfers = transfers::Transfers::new(
+        Arc::clone(&library),
+        driver_manager.clone(),
+        Arc::clone(&tx),
+    );
 
     let app_state = AppState {
         foreman_db,
@@ -221,6 +229,7 @@ pub async fn serve_with(
         auth: auth_state,
         info: server_info,
         library,
+        transfers,
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -554,6 +563,44 @@ fn build_router(app_state: AppState) -> Router {
         .route(
             "/api/library/entries/{id}/restore",
             post(api::library::restore_entry),
+        )
+        .route("/api/library/trash-many", post(api::library::trash_many))
+        .route(
+            "/api/library/restore-many",
+            post(api::library::restore_many),
+        )
+        // Locations (printer G-code storage) + transfers
+        .route("/api/locations", get(api::storage::locations))
+        .route("/api/printers/{id}/storage", get(api::storage::list))
+        .route("/api/printers/{id}/storage/thumb", get(api::storage::thumb))
+        .route(
+            "/api/printers/{id}/storage/download",
+            get(api::storage::download),
+        )
+        .route(
+            "/api/printers/{id}/storage/folders",
+            post(api::storage::new_folder),
+        )
+        .route(
+            "/api/printers/{id}/storage/rename",
+            post(api::storage::rename),
+        )
+        .route(
+            "/api/printers/{id}/storage/delete",
+            post(api::storage::delete),
+        )
+        .route(
+            "/api/printers/{id}/storage/upload",
+            post(api::storage::upload).layer(DefaultBodyLimit::max(UPLOAD_LIMIT)),
+        )
+        .route(
+            "/api/transfers",
+            get(api::storage::list_transfers).post(api::storage::start_transfer),
+        )
+        .route("/api/transfers/clear", post(api::storage::clear_transfers))
+        .route(
+            "/api/transfers/{id}/cancel",
+            post(api::storage::cancel_transfer),
         )
         .route(
             "/api/settings/library",

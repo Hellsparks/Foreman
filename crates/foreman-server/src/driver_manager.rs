@@ -846,6 +846,25 @@ impl DriverManager {
         self.status_cache.read().await.get(&printer_id).cloned()
     }
 
+    /// The printer's name and G-code storage, when its driver exposes one (Klipper).
+    pub async fn storage(
+        &self,
+        printer_id: i64,
+    ) -> Option<(String, Arc<dyn foreman_core::storage::PrinterStorage>)> {
+        let storage = self
+            .drivers
+            .read()
+            .await
+            .get(&printer_id)?
+            .driver
+            .storage()?;
+        let name = foreman_core::repo::printer::get(&self.pool, printer_id)
+            .await
+            .ok()?
+            .name;
+        Some((name, storage))
+    }
+
     /// Get all cached statuses.
     pub async fn get_all_statuses(&self) -> HashMap<i64, PrinterStatus> {
         self.status_cache.read().await.clone()

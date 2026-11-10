@@ -9,6 +9,7 @@ use crate::{
     auth::{AuthState, ServerInfo},
     driver_manager::DriverManager,
     ssh_pool::SshPool,
+    transfers::Transfers,
 };
 
 /// Shared state available to all route handlers via `State<AppState>`.
@@ -31,4 +32,6 @@ pub struct AppState {
     pub info: Arc<ServerInfo>,
     /// Library files, index and parsed facts.
     pub library: Arc<LibraryStore>,
+    /// Copy/move jobs between the Library and printers.
+    pub transfers: Arc<Transfers>,
 }

@@ -138,4 +138,9 @@ pub trait PrinterDriver: Send + Sync + 'static {
 
     /// Get the current status snapshot.
     async fn current_status(&self) -> Result<PrinterStatus, AppError>;
+
+    /// G-code storage as a Library location (`None` = not browsable from the Library).
+    fn storage(&self) -> Option<std::sync::Arc<dyn crate::storage::PrinterStorage>> {
+        None
+    }
 }

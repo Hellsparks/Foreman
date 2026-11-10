@@ -252,6 +252,8 @@ pub fn url_token_path_allowed(path: &str) -> bool {
         || printer_tail("/ws/printers/", "/terminal")
         || printer_tail("/api/library/files/", "/thumb")
         || printer_tail("/api/library/files/", "/download")
+        || printer_tail("/api/printers/", "/storage/thumb")
+        || printer_tail("/api/printers/", "/storage/download")
 }
 
 impl UrlGrants {
