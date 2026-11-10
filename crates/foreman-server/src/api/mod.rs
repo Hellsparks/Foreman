@@ -1,4 +1,5 @@
 pub mod attention;
+pub mod auth;
 pub mod health;
 pub mod printer_commands;
 pub mod printer_paths;

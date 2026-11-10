@@ -234,6 +234,23 @@ pub struct UpdateShellMacro {
 }
 
 // ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+/// An API key as listed in Settings → Security (the secret itself is never returned).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ApiKey {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+    /// First characters of the key, for recognising it.
+    pub prefix: String,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
 // SftpEntry  (returned by SFTP directory list)
 // ---------------------------------------------------------------------------
 

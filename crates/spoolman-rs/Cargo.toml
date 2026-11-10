@@ -36,6 +36,8 @@ serde_json = { workspace = true }
 # Tag decoding (OpenPrintTag CBOR payloads)
 ciborium = "0.2"
 base64 = "0.22"
+hex = { workspace = true }
+uuid = { workspace = true }
 
 # Date/time
 chrono = { workspace = true }

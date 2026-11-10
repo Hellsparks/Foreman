@@ -545,115 +545,16 @@ fn spec_order_uid(uid: &[u8]) -> Vec<u8> {
     uid.to_vec()
 }
 
-/// Derive a UUID v5 from a namespace + raw bytes.
+/// Derive the instance UUID (v5) from the tag UID, as upstream does.
 fn uuid5_from_bytes(name: &[u8]) -> String {
-    use std::fmt::Write;
-
-    // UUID_NS_INSTANCE = "31062f81-b5bd-4f86-a5f8-46367e841508"
-    let ns_bytes: [u8; 16] = [
-        0x31, 0x06, 0x2f, 0x81, 0xb5, 0xbd, 0x4f, 0x86, 0xa5, 0xf8, 0x46, 0x36, 0x7e, 0x84, 0x15,
-        0x08,
-    ];
-
-    // SHA-1 hash of namespace + name
-    // We inline a minimal SHA-1 here to avoid adding a dependency.
-    // The sha1 crate would be cleaner, but this is a single-use function.
-    let digest = sha1_digest(&ns_bytes, name);
-
-    // Take first 16 bytes, set version=5 and variant bits
-    let mut bytes = [0u8; 16];
-    bytes.copy_from_slice(&digest[..16]);
-    bytes[6] = (bytes[6] & 0x0F) | 0x50; // version 5
-    bytes[8] = (bytes[8] & 0x3F) | 0x80; // variant 10
-
-    let mut s = String::with_capacity(36);
-    for (i, b) in bytes.iter().enumerate() {
-        if matches!(i, 4 | 6 | 8 | 10) {
-            s.push('-');
-        }
-        write!(s, "{b:02x}").ok();
-    }
-    s
+    const UUID_NS_INSTANCE: uuid::Uuid = uuid::uuid!("31062f81-b5bd-4f86-a5f8-46367e841508");
+    uuid::Uuid::new_v5(&UUID_NS_INSTANCE, name).to_string()
 }
 
 fn uuid_from_bytes(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    let mut s = String::with_capacity(36);
-    for (i, b) in bytes.iter().enumerate() {
-        if matches!(i, 4 | 6 | 8 | 10) {
-            s.push('-');
-        }
-        write!(s, "{b:02x}").ok();
-    }
-    s
-}
-
-/// Minimal SHA-1 for UUID v5 derivation (namespace + name).
-#[allow(clippy::chunks_exact_to_as_chunks, clippy::needless_range_loop)]
-fn sha1_digest(ns: &[u8], name: &[u8]) -> [u8; 20] {
-    // SHA-1 constants
-    let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
-
-    let mut msg = Vec::with_capacity(ns.len() + name.len() + 64);
-    msg.extend_from_slice(ns);
-    msg.extend_from_slice(name);
-    let bit_len = (msg.len() as u64) * 8;
-
-    // Padding
-    msg.push(0x80);
-    while msg.len() % 64 != 56 {
-        msg.push(0);
-    }
-    msg.extend_from_slice(&bit_len.to_be_bytes());
-
-    // Process blocks
-    for chunk in msg.chunks_exact(64) {
-        let mut w = [0u32; 80];
-        for i in 0..16 {
-            w[i] = u32::from_be_bytes([
-                chunk[i * 4],
-                chunk[i * 4 + 1],
-                chunk[i * 4 + 2],
-                chunk[i * 4 + 3],
-            ]);
-        }
-        for i in 16..80 {
-            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
-        }
-
-        let [mut a, mut b, mut c, mut d, mut e] = h;
-        for i in 0..80 {
-            let (f, k) = match i {
-                0..=19 => ((b & c) | ((!b) & d), 0x5A827999u32),
-                20..=39 => (b ^ c ^ d, 0x6ED9EBA1u32),
-                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDCu32),
-                _ => (b ^ c ^ d, 0xCA62C1D6u32),
-            };
-            let temp = a
-                .rotate_left(5)
-                .wrapping_add(f)
-                .wrapping_add(e)
-                .wrapping_add(k)
-                .wrapping_add(w[i]);
-            e = d;
-            d = c;
-            c = b.rotate_left(30);
-            b = a;
-            a = temp;
-        }
-
-        h[0] = h[0].wrapping_add(a);
-        h[1] = h[1].wrapping_add(b);
-        h[2] = h[2].wrapping_add(c);
-        h[3] = h[3].wrapping_add(d);
-        h[4] = h[4].wrapping_add(e);
-    }
-
-    let mut digest = [0u8; 20];
-    for (i, val) in h.iter().enumerate() {
-        digest[i * 4..i * 4 + 4].copy_from_slice(&val.to_be_bytes());
-    }
-    digest
+    uuid::Uuid::from_slice(bytes)
+        .map(|u| u.to_string())
+        .unwrap_or_default()
 }
 
 // ---------------------------------------------------------------------------
@@ -713,6 +614,28 @@ mod tests {
         assert_eq!(data.nominal_netto_full_weight, Some(1000.0));
         assert_eq!(data.primary_color_hex.as_deref(), Some("112233"));
         assert_eq!(data.effective_diameter(), 1.75); // default
+    }
+
+    #[test]
+    fn instance_uuid_from_uid_matches_python_uuid5() {
+        // Expected values from Python: uuid.uuid5(UUID_NS_INSTANCE, bytes.fromhex(h))
+        let cases = [
+            ("e0040150a1b2c3d4", "dcefac3a-4ac8-5b57-b9f5-80c8d48107e4"),
+            ("e004015012345678", "bbb7a831-33ce-560e-84db-8518c4089b95"),
+            ("", "d627f944-0a2b-594a-839f-2d8d8994eea5"),
+        ];
+        for (uid_hex, expected) in cases {
+            let uid: Vec<u8> = (0..uid_hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&uid_hex[i..i + 2], 16).expect("hex"))
+                .collect();
+            assert_eq!(uuid5_from_bytes(&uid), expected, "uid {uid_hex}");
+        }
+        let raw: Vec<u8> = (1..=16).collect();
+        assert_eq!(
+            uuid_from_bytes(&raw),
+            "01020304-0506-0708-090a-0b0c0d0e0f10"
+        );
     }
 
     #[test]

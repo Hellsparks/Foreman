@@ -72,19 +72,6 @@ fn decode_payload(
     crate::tags::decode(Some(fmt), &raw, uid_bytes.as_deref())
 }
 
-/// Decode hex string to bytes (minimal, avoids adding the `hex` crate).
-mod hex {
-    pub fn decode(s: &str) -> Result<Vec<u8>, ()> {
-        if !s.len().is_multiple_of(2) {
-            return Err(());
-        }
-        (0..s.len())
-            .step_by(2)
-            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|_| ()))
-            .collect()
-    }
-}
-
 fn decoded_to_info(d: &crate::tags::DecodedTag) -> TagDecodedInfo {
     TagDecodedInfo {
         material_class: d.material_class.clone(),

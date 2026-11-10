@@ -111,6 +111,16 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 
 ### 2.9 Connect screen + auth (moved up from Phase 6) — design in UI demo first; build before remote access.
 
+**2.9a — auth (session 20a)**
+- [x] Single admin account (Argon2id). Fresh server prints a one-time setup code (`XXXX-XXXX`, 24 h, single use) to the log; `POST /api/auth/setup` creates the admin. Min password 10.
+- [x] Login → server-side sessions (hashed): browser HttpOnly SameSite=Strict cookie, other clients bearer token (`return_token`). Remember me 30 d, else 12 h. Logout. 5 failed tries per IP → 60 s pause.
+- [x] API keys (create / list / revoke in Settings → Security, shown once, stored hashed, `X-Api-Key`).
+- [x] Every `/api/*` and `/ws/*` route protected; open: `GET /api/health`, `GET /api/info`, `/api/auth/setup`, `/api/auth/login`.
+- [x] Bind rule: no admin → 127.0.0.1 only (logged). Desktop: localhost unless "Let other devices connect" (needs admin, applies on restart).
+- [x] `foreman-server reset-admin` CLI.
+- [x] Spoolman API (7912) stays unauthenticated — logged at startup.
+- [x] Frontend Setup + Sign-in screens (Connect.dc.html), sign-in on 401, Settings → Security (log out, API keys, LAN toggle). Audit user = admin username.
+- [ ] 2.9b — server picker, saved servers, mDNS, connection-lost view.
 **Phase 2 done =** mock printers + the owner's real Klipper printer + real Bambu live on Fleet (temps, AMS, camera); killing the primary path fails over and back; SSH tab browses and edits `printer.cfg`; a file uploads to the Bambu over FTPS; Attention shows a finished print on both.
 
 ---
@@ -178,6 +188,18 @@ Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversig
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
 
+### Session 20a — 2026-11-09 (2.9a auth)
+
+- **Token hashing:** session tokens (`fms_…`) and API keys (`fmk_…`) are 256-bit random values, stored as SHA-256 hex. Argon2id is only for the admin password — a slow KDF adds nothing for full-entropy tokens and would make every request expensive.
+- **Setup code lives in memory** (not the DB): restarting the server prints a new one and the old one dies. Matches the Connect.dc.html hint text. Wrong codes count toward the per-IP rate limit.
+- **WebSocket auth:** browsers send the cookie on the upgrade; non-browser clients that can't set headers may pass `?token=` on `/ws/*` only (never on REST).
+- **No `Secure` cookie flag:** the server speaks plain HTTP on the LAN today; `Secure` would break sign-in. Revisit with TLS / remote access. CSRF is covered by `SameSite=Strict`.
+- **Tauri uses the cookie, not a bearer token:** the webview loads the frontend same-origin (Vite proxy in dev), so the HttpOnly cookie works and no token has to be kept in JS-readable storage. The bearer path (`return_token: true` on login/setup, `Authorization: Bearer`) is implemented and tested for other clients; the desktop app switches to it in 2.9b when it talks to a remote server.
+- **API keys can't manage auth:** an `X-Api-Key` request can use the API but can't list/create/revoke keys or change the network setting (403) — a leaked slicer key can't mint more keys.
+- **"Let other devices connect"** is stored as setting `network.allow_lan` and applies on next start (the listener is bound once). Settings shows "Restart Foreman to apply". Likewise a headless server set to `0.0.0.0` keeps 127.0.0.1 until restarted after setup (logged).
+- **Spoolman API (7912) stays open** as instructed; a startup log line says so.
+- **`GET /api/info`** also gets `server_id` (random UUID, setting `server.id`) and `name` (setting or hostname) for the 2.9b server picker.
+- **Step 0 clean-up:** `openprinttag.rs` hand-rolled SHA-1 replaced by `Uuid::new_v5` (new test pins Python `uuid.uuid5` reference values, passed before and after); `api/tag.rs` local hex module replaced by the `hex` crate.
 ### Session 19 — 2026-11-09 (2.5 SSH / SFTP / terminal / shell macros)
 
 **Crate choice:** `russh` 0.65 + `russh-sftp` 2.4 (as planned). Pure Rust, tokio-native, no libssh2/OpenSSL system dependency (`ssh2` would need libssh2 + OpenSSL on Windows CI). Gives client PTY/shell/exec/subsystem channels, and its server side lets the TOFU test run against a real in-process SSH server (`crates/foreman-core/tests/ssh_pinning.rs`). `ssh-key` is pinned to `=0.7.0-rc.11` (the version russh 0.65 uses) with the `rand_core` feature for ed25519 keygen.

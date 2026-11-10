@@ -34,6 +34,11 @@ pub struct ServerConfig {
     /// Default: `true`. Disable with `FOREMAN__SPOOLMAN_ENABLED=false`.
     #[serde(default = "default_spoolman_enabled")]
     pub spoolman_enabled: bool,
+
+    /// Embedded in the desktop app (Mode A): localhost-only unless the admin enables
+    /// "Let other devices connect". Set by foreman-desktop, not by config files.
+    #[serde(skip)]
+    pub desktop_mode: bool,
 }
 
 fn default_port() -> u16 {
@@ -117,6 +122,7 @@ impl Default for ServerConfig {
             db_url: Some(db_url),
             data_dir,
             spoolman_enabled: default_spoolman_enabled(),
+            desktop_mode: false,
         }
     }
 }

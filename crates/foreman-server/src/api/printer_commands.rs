@@ -19,12 +19,12 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
+    Extension, Json,
 };
 use foreman_core::driver::PrinterCommand;
 use serde::Deserialize;
 
-use crate::state::AppState;
+use crate::{auth::AuthCtx, state::AppState};
 
 // ---------------------------------------------------------------------------
 // Command dispatch
@@ -60,6 +60,7 @@ pub struct CommandBody {
 /// `POST /api/printers/:id/commands/:kind`
 pub async fn send_command(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path((id, kind)): Path<(i64, String)>,
     Json(body): Json<CommandBody>,
 ) -> impl IntoResponse {
@@ -125,7 +126,7 @@ pub async fn send_command(
 
     match state
         .driver_manager
-        .send_command(id, cmd, body.confirm_token.as_deref())
+        .send_command_as(id, cmd, body.confirm_token.as_deref(), Some(&ctx.username))
         .await
     {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),

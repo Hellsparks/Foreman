@@ -30,7 +30,8 @@ fn main() {
             // Spawn the embedded HTTP + WebSocket server as a background task
             // on Tauri's (tokio) async runtime.  It binds to 127.0.0.1 on the
             // port configured via FOREMAN__PORT (default 9090).
-            let cfg = foreman_server::config::ServerConfig::load();
+            let mut cfg = foreman_server::config::ServerConfig::load();
+            cfg.desktop_mode = true;
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = foreman_server::serve(cfg).await {
                     tracing::error!("embedded server stopped: {e}");

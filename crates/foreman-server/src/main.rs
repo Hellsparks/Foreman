@@ -9,6 +9,14 @@ async fn main() {
 
     let cfg = foreman_server::config::ServerConfig::load();
 
+    if std::env::args().nth(1).as_deref() == Some("reset-admin") {
+        if let Err(err) = foreman_server::reset_admin_cli(cfg).await {
+            eprintln!("reset-admin failed: {err}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     if let Err(err) = foreman_server::serve(cfg).await {
         eprintln!("server error: {err}");
         std::process::exit(1);

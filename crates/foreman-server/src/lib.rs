@@ -1,14 +1,18 @@
 mod api;
+mod auth;
+#[cfg(test)]
+mod auth_api_tests;
 pub mod config;
 mod driver_manager;
 mod ssh_pool;
 mod state;
 
 use axum::{
+    middleware,
     routing::{delete, get, get_service, post, put},
     Router,
 };
-use foreman_core::{db::ForemanDb, events::ServerEvent};
+use foreman_core::{db::ForemanDb, events::ServerEvent, repo};
 use spoolman_rs::{
     api as spoolman_api,
     config::SpoolmanConfig,
@@ -52,6 +56,50 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     let foreman_db_path = cfg.data_dir.join("foreman.db");
     let foreman_db = ForemanDb::connect(&foreman_db_path).await?;
     info!(path = %foreman_db_path.display(), "foreman db ready");
+
+    // Auth bootstrap: setup code when there is no admin yet, then the bind rule.
+    let has_admin = foreman_core::auth::has_admin(&foreman_db.pool).await?;
+    let auth_state = Arc::new(auth::AuthState::default());
+    if !has_admin {
+        let code = foreman_core::auth::generate_setup_code()?;
+        info!(
+            "No admin account yet. Setup code: {code} (single use, valid 24 h). \
+             Open http://127.0.0.1:{} and enter it to create the admin.",
+            cfg.port
+        );
+        if let Ok(mut slot) = auth_state.setup_code.lock() {
+            *slot = Some(auth::SetupCode::new(code, std::time::Instant::now()));
+        }
+    }
+    let allow_lan = repo::setting::get(&foreman_db.pool, api::auth::SETTING_ALLOW_LAN)
+        .await?
+        .is_some_and(|v| v == "true");
+    let (bind_host, bind_reason) =
+        auth::effective_bind_host(&cfg.host, has_admin, cfg.desktop_mode, allow_lan);
+    if let Some(reason) = bind_reason {
+        warn!(configured = %cfg.host, "{reason}");
+    }
+    let server_info = Arc::new(auth::ServerInfo {
+        server_id: server_id(&foreman_db).await?,
+        name: server_name(&foreman_db).await?,
+        version: env!("CARGO_PKG_VERSION"),
+        desktop_mode: cfg.desktop_mode,
+        configured_host: cfg.host.clone(),
+        bound_host: bind_host.clone(),
+    });
+    {
+        let db = foreman_db.pool.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                let now = chrono::Utc::now().timestamp();
+                if let Err(e) = foreman_core::auth::purge_expired_sessions(&db, now).await {
+                    warn!("purge expired sessions: {e}");
+                }
+            }
+        });
+    }
 
     // Broadcast bus — 256-slot ring buffer.
     let (tx, _) = broadcast::channel::<ServerEvent>(256);
@@ -109,8 +157,141 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         ssh_identity,
         secrets,
         ssh_pool,
+        auth: auth_state,
+        info: server_info,
     };
 
+    let app = build_router(app_state);
+
+    let addr: SocketAddr = format!("{}:{}", bind_host, cfg.port)
+        .parse()
+        .unwrap_or_else(|_| SocketAddr::from(([127, 0, 0, 1], 9090)));
+
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to bind {addr}: {err}"))?;
+
+    info!("listening on http://{addr}");
+    info!("health: http://{addr}/api/health");
+    info!("events: ws://{addr}/ws/events");
+
+    spawn_spoolman(&cfg).await;
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .map_err(|e| anyhow::anyhow!("server error: {e}"))?;
+
+    Ok(())
+}
+
+/// Persistent server id (UUID v4, created once).
+async fn server_id(db: &ForemanDb) -> anyhow::Result<String> {
+    if let Some(id) = repo::setting::get(&db.pool, "server.id").await? {
+        return Ok(id);
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    repo::setting::set(&db.pool, "server.id", &id).await?;
+    Ok(id)
+}
+
+/// Display name: `server.name` setting, else the machine's hostname.
+async fn server_name(db: &ForemanDb) -> anyhow::Result<String> {
+    if let Some(name) = repo::setting::get(&db.pool, "server.name").await? {
+        return Ok(name);
+    }
+    let host = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .ok()
+        .or_else(|| std::fs::read_to_string("/etc/hostname").ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty());
+    Ok(host.unwrap_or_else(|| "Foreman".to_owned()))
+}
+
+/// `foreman-server reset-admin`: set a new admin password from the terminal.
+pub async fn reset_admin_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
+    use std::io::Write as _;
+
+    let db = ForemanDb::connect(&cfg.data_dir.join("foreman.db")).await?;
+    let current = foreman_core::auth::admin_username(&db.pool).await?;
+    let default_user = current.clone().unwrap_or_else(|| "admin".to_owned());
+    print!("Username [{default_user}]: ");
+    std::io::stdout().flush()?;
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    let username = match line.trim() {
+        "" => default_user,
+        u => u.to_owned(),
+    };
+    let pw = rpassword::prompt_password(format!(
+        "New password (min {} characters): ",
+        foreman_core::auth::MIN_PASSWORD_LEN
+    ))?;
+    foreman_core::auth::check_password_rules(&pw)?;
+    let pw2 = rpassword::prompt_password("Repeat password: ")?;
+    if pw != pw2 {
+        anyhow::bail!("passwords do not match");
+    }
+    foreman_core::auth::reset_admin(&db.pool, &username, &pw).await?;
+    println!("Admin '{username}' saved. All sessions were signed out.");
+    Ok(())
+}
+
+/// The Spoolman-compatible API on its own port (default 7912).
+async fn spawn_spoolman(cfg: &config::ServerConfig) {
+    if !cfg.spoolman_enabled {
+        return;
+    }
+    info!(
+        "Spoolman-compatible API is unauthenticated by design (Moonraker and slicers expect that)"
+    );
+    match SpoolmanConfig::from_env() {
+        Ok(spoolman_cfg) => {
+            let spoolman_addr: SocketAddr = format!("{}:{}", spoolman_cfg.host, spoolman_cfg.port)
+                .parse()
+                .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 7912)));
+            match SpoolmanDb::connect(&spoolman_cfg).await {
+                Ok(db) => {
+                    if let Err(e) = extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await
+                    {
+                        warn!("could not create Foreman default extra fields: {e}");
+                    }
+                    let state = SpoolmanState::new(db, spoolman_cfg.clone());
+                    let spoolman_router =
+                        spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
+                    match tokio::net::TcpListener::bind(spoolman_addr).await {
+                        Ok(spoolman_listener) => {
+                            info!(%spoolman_addr, "spoolman-rs API listening");
+                            tokio::spawn(async move {
+                                if let Err(e) =
+                                    axum::serve(spoolman_listener, spoolman_router).await
+                                {
+                                    tracing::error!("spoolman-rs server error: {e}");
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            warn!("could not bind spoolman-rs to {spoolman_addr}: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("spoolman-rs database connect failed: {e}");
+                }
+            }
+        }
+        Err(e) => {
+            warn!("spoolman-rs config error (spoolman-rs disabled): {e}");
+        }
+    }
+}
+
+/// Build the HTTP router (all routes behind [`auth::require_auth`]).
+fn build_router(app_state: AppState) -> Router {
     // Static file serving for the frontend.
     let frontend_dist = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -126,8 +307,23 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         get_service(ServeDir::new(&frontend_dist))
     };
 
-    let app = Router::new()
+    Router::new()
         .route("/api/health", get(api::health::health))
+        // Auth
+        .route("/api/info", get(api::auth::info))
+        .route("/api/auth/setup", post(api::auth::setup))
+        .route("/api/auth/login", post(api::auth::login))
+        .route("/api/auth/logout", post(api::auth::logout))
+        .route("/api/auth/me", get(api::auth::me))
+        .route(
+            "/api/auth/api-keys",
+            get(api::auth::list_keys).post(api::auth::create_key),
+        )
+        .route("/api/auth/api-keys/{id}", delete(api::auth::revoke_key))
+        .route(
+            "/api/settings/network",
+            get(api::auth::get_network).put(api::auth::put_network),
+        )
         .route("/api/printers", get(api::printers::list_printers))
         .route("/api/printers", post(api::printers::create_printer))
         .route("/api/printers/{id}", delete(api::printers::delete_printer))
@@ -262,74 +458,13 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
         )
         .route("/ws/events", get(api::ws::ws_handler))
         .fallback_service(static_service)
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth::require_auth,
+        ))
         .with_state(app_state)
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive());
-
-    let addr: SocketAddr = format!("{}:{}", cfg.host, cfg.port)
-        .parse()
-        .unwrap_or_else(|_| SocketAddr::from(([127, 0, 0, 1], 9090)));
-
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|err| anyhow::anyhow!("failed to bind {addr}: {err}"))?;
-
-    info!("listening on http://{addr}");
-    info!("health: http://{addr}/api/health");
-    info!("events: ws://{addr}/ws/events");
-
-    // Spawn the Spoolman-compatible API on its own port (default 7912).
-    if cfg.spoolman_enabled {
-        match SpoolmanConfig::from_env() {
-            Ok(spoolman_cfg) => {
-                let spoolman_addr: SocketAddr =
-                    format!("{}:{}", spoolman_cfg.host, spoolman_cfg.port)
-                        .parse()
-                        .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 7912)));
-                match SpoolmanDb::connect(&spoolman_cfg).await {
-                    Ok(db) => {
-                        if let Err(e) =
-                            extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await
-                        {
-                            warn!("could not create Foreman default extra fields: {e}");
-                        }
-                        let state = SpoolmanState::new(db, spoolman_cfg.clone());
-                        let spoolman_router =
-                            spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
-                        match tokio::net::TcpListener::bind(spoolman_addr).await {
-                            Ok(spoolman_listener) => {
-                                info!(%spoolman_addr, "spoolman-rs API listening");
-                                tokio::spawn(async move {
-                                    if let Err(e) =
-                                        axum::serve(spoolman_listener, spoolman_router).await
-                                    {
-                                        tracing::error!("spoolman-rs server error: {e}");
-                                    }
-                                });
-                            }
-                            Err(e) => {
-                                warn!("could not bind spoolman-rs to {spoolman_addr}: {e}");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        warn!("spoolman-rs database connect failed: {e}");
-                    }
-                }
-            }
-            Err(e) => {
-                warn!("spoolman-rs config error (spoolman-rs disabled): {e}");
-            }
-        }
-    }
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(|e| anyhow::anyhow!("server error: {e}"))?;
-
-    info!("foreman-server stopped");
-    Ok(())
+        .layer(CorsLayer::permissive())
 }
 
 /// Waits for Ctrl+C (all platforms) or SIGTERM (Unix).

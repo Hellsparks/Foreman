@@ -32,6 +32,17 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE printer_ssh ADD COLUMN pending_host_key_fingerprint TEXT",
     // 0005: idle auto-close for SSH connections (seconds, 0 = never).
     "ALTER TABLE printer_ssh ADD COLUMN idle_timeout_secs INTEGER NOT NULL DEFAULT 900",
+    // 0006: single admin, server-side sessions, API keys (tokens stored as SHA-256).
+    "CREATE TABLE IF NOT EXISTS admin_user (\
+       id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1), username TEXT NOT NULL, \
+       password_hash TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS auth_session (\
+       id INTEGER PRIMARY KEY NOT NULL, token_hash TEXT NOT NULL UNIQUE, \
+       created_at TEXT NOT NULL, expires_at INTEGER NOT NULL, ip TEXT, user_agent TEXT)",
+    "CREATE TABLE IF NOT EXISTS api_key (\
+       id INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL, prefix TEXT NOT NULL, \
+       key_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, last_used_at TEXT, \
+       revoked_at TEXT)",
 ];
 
 /// Foreman-native database handle.

@@ -9,7 +9,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
-    Json,
+    Extension, Json,
 };
 use foreman_core::{
     domain::{CreateShellMacro, PrinterSsh, UpdateShellMacro, UpsertPrinterSsh},
@@ -27,7 +27,7 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt as _;
 use tracing::{info, warn};
 
-use crate::{ssh_pool::PooledSftp, state::AppState};
+use crate::{auth::AuthCtx, ssh_pool::PooledSftp, state::AppState};
 
 pub(crate) const HOST_KEY_ATTENTION_KIND: &str = "ssh_host_key";
 
@@ -494,6 +494,7 @@ pub async fn download_file(
 /// `PUT /api/printers/{id}/files/write` — whole-file write, `.bak` first.
 pub async fn write_file(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Json(body): Json<WriteBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
@@ -503,7 +504,7 @@ pub async fn write_file(
     audit(
         &state,
         id,
-        &s.user,
+        &ctx.username,
         &format!(
             "sftp write {}{}",
             body.path,
@@ -532,6 +533,7 @@ pub(crate) fn firmware_restart_allowed(status: Option<&PrinterStatus>) -> Result
 /// Refused (nothing written) while printing.
 pub async fn save_and_restart(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Json(body): Json<WriteBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
@@ -550,11 +552,10 @@ pub async fn save_and_restart(
     }
     let backup =
         remote_fs::write_with_backup(&s.fs, &s.roots, &body.path, body.content.as_bytes()).await?;
-    let user = s.user.clone();
     audit(
         &state,
         id,
-        &user,
+        &ctx.username,
         &format!("sftp write {} (.bak kept)", body.path),
     )
     .await;
@@ -563,12 +564,13 @@ pub async fn save_and_restart(
     firmware_restart_allowed(state.driver_manager.get_status(id).await.as_ref())?;
     state
         .driver_manager
-        .send_command(
+        .send_command_as(
             id,
             PrinterCommand::Gcode {
                 command: "FIRMWARE_RESTART".into(),
             },
             None,
+            Some(&ctx.username),
         )
         .await?;
     Ok(Json(
@@ -579,6 +581,7 @@ pub async fn save_and_restart(
 /// `POST /api/printers/{id}/files/upload?path=` — raw body streamed to the printer.
 pub async fn upload_file(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
     body: Body,
@@ -611,7 +614,7 @@ pub async fn upload_file(
     audit(
         &state,
         id,
-        &s.user,
+        &ctx.username,
         &format!("sftp upload {path} ({total} bytes)"),
     )
     .await;
@@ -621,36 +624,45 @@ pub async fn upload_file(
 /// `POST /api/printers/{id}/files/mkdir`
 pub async fn mkdir(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Json(body): Json<MkdirBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let s = open_fs(&state, id).await?;
     let path = remote_fs::mkdir(&s.fs, &s.roots, &body.path).await?;
-    audit(&state, id, &s.user, &format!("sftp mkdir {path}")).await;
+    audit(&state, id, &ctx.username, &format!("sftp mkdir {path}")).await;
     Ok(Json(json!({ "ok": true, "path": path })))
 }
 
 /// `POST /api/printers/{id}/files/rename`
 pub async fn rename_file(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Json(body): Json<RenameBody>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let s = open_fs(&state, id).await?;
     let (from, to) = remote_fs::rename(&s.fs, &s.roots, &body.from, &body.to).await?;
-    audit(&state, id, &s.user, &format!("sftp rename {from} -> {to}")).await;
+    audit(
+        &state,
+        id,
+        &ctx.username,
+        &format!("sftp rename {from} -> {to}"),
+    )
+    .await;
     Ok(Json(json!({ "ok": true, "path": to })))
 }
 
 /// `DELETE /api/printers/{id}/files?path=`
 pub async fn delete_file(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<StatusCode> {
     let s = open_fs(&state, id).await?;
     let path = remote_fs::delete(&s.fs, &s.roots, &q.path).await?;
-    audit(&state, id, &s.user, &format!("sftp delete {path}")).await;
+    audit(&state, id, &ctx.username, &format!("sftp delete {path}")).await;
     Ok(StatusCode::NO_CONTENT)
 }
 

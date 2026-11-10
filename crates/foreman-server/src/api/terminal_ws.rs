@@ -16,6 +16,7 @@ use axum::{
         Path, Query, State, WebSocketUpgrade,
     },
     response::IntoResponse,
+    Extension,
 };
 use foreman_core::{repo, ssh_client};
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
@@ -25,7 +26,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 use tracing::{info, warn};
 
-use crate::{api::ssh, state::AppState};
+use crate::{api::ssh, auth::AuthCtx, state::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct TermQuery {
@@ -37,12 +38,13 @@ pub struct TermQuery {
 pub async fn terminal_ws(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
     Query(q): Query<TermQuery>,
 ) -> impl IntoResponse {
     let cols = q.cols.unwrap_or(120).clamp(20, 500);
     let rows = q.rows.unwrap_or(32).clamp(5, 200);
-    ws.on_upgrade(move |socket| handle_terminal(socket, state, id, cols, rows))
+    ws.on_upgrade(move |socket| handle_terminal(socket, state, ctx.username, id, cols, rows))
 }
 
 #[derive(Debug, Deserialize)]
@@ -140,6 +142,7 @@ async fn audit(state: &AppState, printer_id: i64, user: &str, cmd: &str) {
 async fn handle_terminal(
     socket: WebSocket,
     state: AppState,
+    admin: String,
     printer_id: i64,
     cols: u32,
     rows: u32,
@@ -220,7 +223,7 @@ async fn handle_terminal(
                     Ok(ClientMsg::Input { data }) => {
                         idle.as_mut().reset(Instant::now() + idle_limit);
                         for line in lines.feed(&data) {
-                            audit(&state, printer_id, &user, &format!("terminal: {line}")).await;
+                            audit(&state, printer_id, &admin, &format!("terminal: {line}")).await;
                         }
                         if ch_tx.data(data.as_bytes()).await.is_err() {
                             break;
@@ -233,10 +236,10 @@ async fn handle_terminal(
                     }
                     Ok(ClientMsg::Macro { id }) => match ssh::macro_for_run(&state, printer_id, id).await {
                         Ok(m) => {
-                            audit(&state, printer_id, &user, &format!("macro run: {}", m.name)).await;
+                            audit(&state, printer_id, &admin, &format!("macro run: {}", m.name)).await;
                             let mut body = String::new();
                             for line in m.commands.lines().filter(|l| !l.trim().is_empty()) {
-                                audit(&state, printer_id, &user, &format!("macro '{}': {}", m.name, line.trim())).await;
+                                audit(&state, printer_id, &admin, &format!("macro '{}': {}", m.name, line.trim())).await;
                                 body.push_str(line.trim_end());
                                 body.push('\r');
                             }

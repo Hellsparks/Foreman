@@ -46,6 +46,9 @@ getrandom = { workspace = true }
 ssh-key = { workspace = true }
 aes-gcm = { workspace = true }
 
+# Admin password hashing (Argon2id)
+argon2 = { workspace = true }
+
 # Database (Foreman-native SQLite store)
 sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "chrono"] }
 
