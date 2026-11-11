@@ -484,9 +484,12 @@ pub struct Pagination {
 }
 
 impl Pagination {
+    /// Upstream applies no LIMIT when `limit` is absent (`database/filament.py`
+    /// et al.), so no limit means every row. `i64::MAX` works as "no limit" on
+    /// SQLite, Postgres and MySQL alike.
     pub fn new(limit: Option<i64>, offset: Option<i64>) -> Self {
         Self {
-            limit: limit.unwrap_or(100).clamp(1, 10_000),
+            limit: limit.map_or(i64::MAX, |l| l.max(1)),
             offset: offset.unwrap_or(0).max(0),
         }
     }
@@ -498,6 +501,15 @@ impl Pagination {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn no_limit_means_every_row_like_upstream() {
+        let p = super::Pagination::new(None, None);
+        assert_eq!((p.limit, p.offset), (i64::MAX, 0));
+        let p = super::Pagination::new(Some(20_000), Some(-5));
+        assert_eq!((p.limit, p.offset), (20_000, 0));
+        assert_eq!(super::Pagination::new(Some(0), None).limit, 1);
+    }
+
     use super::*;
 
     #[test]

@@ -40,3 +40,8 @@ compat-tests/
 # dev-check step logs (scripts/dev-check.sh)
 /.dev-logs/
 *.tsbuildinfo
+
+# Spoolman backups dropped in the repo root (personal data)
+/spoolman-*.zip
+# Real Spoolman databases used by the migration test (personal data)
+/crates/spoolman-rs/tests/fixtures/*.db
