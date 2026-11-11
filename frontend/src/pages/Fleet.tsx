@@ -16,7 +16,8 @@ import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
-import { StatusChip, ProgressBar, Swatch } from "../ui";
+import { StatusChip, ProgressBar, Swatch, OverflowMenu } from "../ui";
+import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import { ATTENTION_PREFIX, everyText, maintenanceApi, type TaskTemplate } from "../api/maintenance";
@@ -162,6 +163,7 @@ const ATTENTION_TOPICS = ["attention.added", "attention.updated", "attention.cle
 // ── Fleet page ───────────────────────────────────────────────────────────────
 
 export default function Fleet() {
+  const phone = usePhone();
   const navigate = useNavigate();
   const {
     statuses,
@@ -480,6 +482,18 @@ export default function Fleet() {
                       )}
                     </div>
                     <div className="fleet__attn-actions">
+                      {phone ? (
+                        <PhoneAttnActions
+                          item={item}
+                          relatedPrinter={relatedPrinter}
+                          onPlateCleared={(pid) => void plateCleared(pid, item.id)}
+                          onService={() => navigate(`/service?task=${item.kind.slice(ATTENTION_PREFIX.length)}`)}
+                          onOpenPrinter={() => relatedPrinter && selectPrinter(relatedPrinter.id)}
+                          onDismiss={() => dismissAttention(item.id)}
+                        />
+                      ) : (
+                        <>
+
                       {item.kind === "print_finished" && item.printer_id != null && (
                         <button
                           type="button"
@@ -516,6 +530,8 @@ export default function Fleet() {
                         >
                           Dismiss
                         </button>
+                      )}
+                                            </>
                       )}
                     </div>
                   </div>
@@ -667,7 +683,7 @@ export function PrinterCard({
       {/* Row 2: status + thumbnail */}
       <div className="fleet-card__mid">
         <div className="fleet-card__status">
-          <StatusChip tone={tone} symbol={statusSymbol(state)} word={statusWord(state)} />
+          <StatusChip tone={tone} symbol={statusSymbol(state)} word={statusWord(state)} short={hasProgress && state === "printing" ? `${pct}%` : undefined} />
           <div className="fleet-card__job">{jobName}</div>
           {sub && <div className="fleet-card__sub">{sub}</div>}
         </div>
@@ -739,6 +755,48 @@ export function PrinterCard({
 }
 
 // ── CameraThumb ───────────────────────────────────────────────────────────────
+
+/** Attention actions on phone: one primary and at most one secondary beside it;
+ *  anything else goes in the "⋯" sheet. */
+function PhoneAttnActions({
+  item,
+  relatedPrinter,
+  onPlateCleared,
+  onService,
+  onOpenPrinter,
+  onDismiss,
+}: {
+  item: AttentionItem;
+  relatedPrinter: { id: number } | null | undefined;
+  onPlateCleared: (printerId: number) => void;
+  onService: () => void;
+  onOpenPrinter: () => void;
+  onDismiss: () => void;
+}) {
+  const acts: { label: string; run: () => void }[] = [];
+  if (item.kind === "print_finished" && item.printer_id != null) {
+    const pid = item.printer_id;
+    acts.push({ label: "Plate cleared", run: () => onPlateCleared(pid) });
+  }
+  if (item.kind.startsWith(ATTENTION_PREFIX)) acts.push({ label: "Open in Service", run: onService });
+  if (relatedPrinter) acts.push({ label: "Open printer", run: onOpenPrinter });
+  if (!item.kind.startsWith(ATTENTION_PREFIX)) acts.push({ label: "Dismiss", run: onDismiss });
+  const shown = acts.slice(0, 2);
+  const rest = acts.slice(2);
+  return (
+    <>
+      {shown.map((a, i) => (
+        <button key={a.label} type="button" className={`fleet__attn-btn${i === 0 ? " fleet__attn-btn--primary" : ""}`} onClick={a.run}>
+          {a.label}
+        </button>
+      ))}
+      {rest.length > 0 && (
+        <OverflowMenu label="More actions" items={rest.map((a) => ({ label: a.label, onSelect: a.run }))} />
+      )}
+    </>
+  );
+}
+
 
 function CameraThumb({ url }: { url: string | null }) {
   const [err, setErr] = useState(false);

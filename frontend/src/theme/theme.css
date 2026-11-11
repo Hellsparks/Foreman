@@ -44,3 +44,22 @@
 :where(button, input, select) {
   font-family: var(--fw-font-body);
 }
+
+/* Phone density (34c). Below the 760 px breakpoint the spacing, type and small
+   control tokens shrink so every component gets denser without its own CSS.
+   --fw-control-h stays 44 px: it is the tap target. --fw-control-h-md (40) and
+   --fw-control-h-sm (36) stay too: shrinking them would put taps under what
+   desktop already allows. A user theme still wins (higher specificity, see
+   userTheme.ts). Keep the breakpoint in sync with hooks/useMediaQuery.ts. */
+@media (max-width: 759px) {
+  :root {
+    --fw-space-1: 3px;
+    --fw-space-2: 6px;
+    --fw-space-3: 10px;
+    --fw-space-4: 12px;
+    --fw-space-5: 16px;
+    --fw-space-6: 18px;
+    --fw-font-size: 13px;
+    --fw-line-height: 1.35;
+  }
+}

@@ -219,12 +219,12 @@ export default function InventoryTab({
           </div>
         )}
         <div className="fil-table-wrap inv-table-wrap">
-          <table className="fil-table">
+          <table className="fil-table ph-table ph-inv">
             <thead>
               <tr>
                 <th>Filament</th>
-                <th>Material</th>
-                <th>Size</th>
+                <th className="ph-hide">Material</th>
+                <th className="ph-hide">Size</th>
                 <th className="inv-c">In stock</th>
                 <th className="inv-c">Target</th>
                 <th className="inv-c">Buy below</th>
@@ -248,16 +248,16 @@ export default function InventoryTab({
                         </span>
                       </span>
                     </td>
-                    <td className="fil-mono">{materialFull(r.filament.material ?? "—", r.filament.modifiers)}</td>
-                    <td>{sizeLabel(r.filament.weight)}</td>
-                    <td className="inv-c">
+                    <td className="fil-mono ph-hide">{materialFull(r.filament.material ?? "—", r.filament.modifiers)}</td>
+                    <td className="ph-hide">{sizeLabel(r.filament.weight)}</td>
+                    <td className="inv-c" data-label="In stock">
                       <b className={`fil-mono inv-have inv-have--${r.status}`}>{r.stock}</b>
                       <br />
                       <span className="fil-sub">
                         {Math.round(r.grams)} g{r.grams_reserved > 0 ? ` · ${Math.round(r.grams_reserved)} g reserved` : ""}
                       </span>
                     </td>
-                    <td className="inv-c">
+                    <td className="inv-c" data-label="Target">
                       <Stepper
                         value={r.target}
                         what="target"
@@ -266,7 +266,7 @@ export default function InventoryTab({
                         onUp={() => set(r, "target", 1)}
                       />
                     </td>
-                    <td className="inv-c">
+                    <td className="inv-c" data-label="Buy below">
                       <Stepper
                         value={r.buy_below}
                         what="buy-below"

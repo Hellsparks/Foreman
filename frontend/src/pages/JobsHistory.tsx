@@ -262,14 +262,14 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
         </div>
         {err && <p className="jobs-err">{err}</p>}
         <div className="jh-table-wrap">
-          <table className="jh-table">
+          <table className="jh-table ph-table ph-hist">
             <thead>
               <tr>
                 <th>File</th>
                 <th>Printer</th>
                 <th>Finished</th>
-                <th className="jh-num">Time</th>
-                <th className="jh-num">Filament</th>
+                <th className="jh-num ph-hide">Time</th>
+                <th className="jh-num ph-hide">Filament</th>
                 <th>Outcome</th>
               </tr>
             </thead>
@@ -296,8 +296,8 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
                     </td>
                     <td>{j.printer_name}</td>
                     <td className="jh-muted jh-nowrap">{j.end === "running" ? "printing…" : fmtWhen(j.ended_at)}</td>
-                    <td className="jh-num jh-mono">{fmtDuration(j.duration_secs)}</td>
-                    <td className="jh-num jh-mono">
+                    <td className="jh-num jh-mono ph-hide">{fmtDuration(j.duration_secs)}</td>
+                    <td className="jh-num jh-mono ph-hide">
                       {fmtGrams(j.grams_used ?? j.grams_planned)}
                       {sp && <span className="jh-sub">{sp}</span>}
                     </td>
