@@ -27,9 +27,9 @@ Decisions in those docs are final. If something is impossible or contradicts ups
 - No per-printer custom themes (Mainsail CSS scraping removed per D6).
 
 ### Commits
-- Run before every commit: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --all`, frontend `npm run build` + tests if touched.
+- Run `cargo check-all` before every commit (`scripts/dev-check.sh`: stops the server, fmt, clippy -D warnings, cargo test, frontend type-check + build + tests, rebuilds and starts the server, checks `/api/health` commit == HEAD, stops it; `--printers` adds read-only HellV0 checks, `--keep` leaves the server running).
+- Use `cargo check-all` instead of running fmt/clippy/test/build separately. Read `.dev-logs/<step>.log` only for steps that failed.
 - Small commits — one checkbox (or a cluster) per commit.
-- Use `cargo fmt-check`, `cargo lint`, `cargo check-all` aliases (see `.cargo/config.toml`).
 
 ### Code quality
 - No `unwrap()` / `expect()` in server code paths. Errors via `thiserror`; logs via `tracing`.
@@ -105,7 +105,9 @@ If brief disagrees with upstream source, **upstream wins**. Log the correction i
 - You start, restart and stop the dev server yourself. Never ask the owner to do it.
 - Before any test that needs the server: kill whatever is on the port, rebuild, start the new binary in the background with output to a log file, wait until `/api/health` answers, then test. Same for the frontend dev server.
 - After changing Rust code, always restart the server before testing. A stale binary has wasted two sessions already.
-- The server logs its commit/build time at startup; check it matches the code you just built.
+- The server logs its commit and build time at startup (`foreman-server starting … commit=… built_at=…`) and `/api/health` returns `{commit, built_at}`; check the commit matches HEAD (`cargo check-all` does this).
+- To call protected routes locally, get a token with `cargo server -- dev-token` (or `target/debug/foreman-server dev-token`): a 30-minute admin session, token only on stdout. Send it as `Authorization: Bearer <token>`. **Never hand-edit the database to authenticate.**
+- Never start a real print to test Send. Use `POST /api/send` with `"dry_run": true`: it runs compat and the upload, then stops before the start command.
 - Only ask the owner to do something physical: touch a printer, clear a plate, press Print now on real hardware, or plug something in.
 - Don't narrate what you're about to do and then stop. Carry the task through to the end, then report.
 - Never ask a question the owner can't answer physically. Starting servers, rebuilding, choosing a branch name, picking a crate — decide it yourself and say what you chose.

@@ -228,6 +228,8 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 ### 3.4 Send
 - [ ] Send endpoint: Print now / Queue on printer / Fleet queue; returns updated queue positions.
 - [x] OctoPrint-compatible upload endpoint for slicers (verify which routes OrcaSlicer/PrusaSlicer call: version + file upload with optional print), API-key protected; files land in Library "Slicer inbox".
+- [x] Print now: compat check, upload, `start_print` (session 23). `dry_run: true` runs compat + upload and stops before the start command (owner, 2026-11-11).
+- [ ] Backlog: `POST /api/send` with `mode: queue` and `mode: fleet_queue` still returns **501** ("coming in session 24"); wire both in 3.5.
 
 ### 3.5 Queues + scheduler (W5)
 - [ ] Per-printer queues (reorder, remove, move between printers) + **fleet queue** ("next compatible free printer"; prefer printers with the right filament loaded).
