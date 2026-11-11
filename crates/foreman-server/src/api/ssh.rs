@@ -43,7 +43,7 @@ pub struct ApiError {
 }
 
 impl ApiError {
-    fn new(status: StatusCode, message: impl Into<String>) -> Self {
+    pub(crate) fn new(status: StatusCode, message: impl Into<String>) -> Self {
         Self {
             status,
             message: message.into(),
@@ -74,7 +74,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-type ApiResult<T> = Result<T, ApiError>;
+pub(crate) type ApiResult<T> = Result<T, ApiError>;
 
 // ---------------------------------------------------------------------------
 // Session setup
@@ -213,7 +213,7 @@ pub(crate) async fn open_session(state: &AppState, printer_id: i64) -> ApiResult
 }
 
 /// The printer's pooled SFTP session, opening (and pinning/authenticating) one if needed.
-async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<Arc<PooledSftp>> {
+pub(crate) async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<Arc<PooledSftp>> {
     if let Some(s) = state.ssh_pool.get(printer_id).await {
         return Ok(s);
     }
@@ -248,7 +248,7 @@ async fn open_fs(state: &AppState, printer_id: i64) -> ApiResult<Arc<PooledSftp>
     Ok(state.ssh_pool.insert(printer_id, pooled).await)
 }
 
-async fn audit(state: &AppState, printer_id: i64, user: &str, command: &str) {
+pub(crate) async fn audit(state: &AppState, printer_id: i64, user: &str, command: &str) {
     if let Err(e) = repo::audit_log::insert(
         &state.foreman_db.pool,
         Some(printer_id),

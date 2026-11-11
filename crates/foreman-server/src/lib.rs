@@ -2,6 +2,9 @@ mod api;
 mod auth;
 #[cfg(test)]
 mod auth_api_tests;
+mod calibration;
+#[cfg(test)]
+mod calibration_tests;
 pub mod config;
 mod driver_manager;
 mod filaments;
@@ -752,6 +755,43 @@ fn build_router(app_state: AppState) -> Router {
             post(api::queue::plate_cleared),
         )
         // Jobs (3.6): history + stats
+        // Calibration (5.4, W10): skew per printer, shrinkage per filament
+        .route(
+            "/api/calibration/skew",
+            get(api::calibration::skew_printers),
+        )
+        .route(
+            "/api/calibration/skew/preview",
+            post(api::calibration::skew_preview),
+        )
+        .route(
+            "/api/calibration/skew/{id}/measurements",
+            post(api::calibration::skew_measure),
+        )
+        .route(
+            "/api/calibration/skew/{id}/apply",
+            post(api::calibration::skew_apply),
+        )
+        .route(
+            "/api/calibration/skew/{id}/clear",
+            post(api::calibration::skew_clear),
+        )
+        .route(
+            "/api/calibration/skew/{id}/macros",
+            get(api::calibration::macros_preview).post(api::calibration::macros_apply),
+        )
+        .route(
+            "/api/calibration/shrinkage",
+            get(api::calibration::shrink_filaments),
+        )
+        .route(
+            "/api/calibration/shrinkage/preview",
+            post(api::calibration::shrink_preview),
+        )
+        .route(
+            "/api/calibration/shrinkage/{id}",
+            post(api::calibration::shrink_save),
+        )
         .route("/api/maintenance", get(api::maintenance::overview))
         .route(
             "/api/maintenance/settings",

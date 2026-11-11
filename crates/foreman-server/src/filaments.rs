@@ -117,7 +117,7 @@ async fn all_vendors(sm: &Spoolman) -> Result<Vec<VendorResponse>, AppError> {
         .map_err(sm_err("vendors"))
 }
 
-async fn all_filaments(sm: &Spoolman) -> Result<Vec<FilamentResponse>, AppError> {
+pub(crate) async fn all_filaments(sm: &Spoolman) -> Result<Vec<FilamentResponse>, AppError> {
     let filter = sm_filament::FilamentFilter::default();
     sm_filament::find(&sm.db.pool, &sm.db.engine, &filter)
         .await

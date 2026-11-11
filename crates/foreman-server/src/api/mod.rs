@@ -1,5 +1,6 @@
 pub mod attention;
 pub mod auth;
+pub mod calibration;
 pub mod filaments;
 pub mod health;
 pub mod inventory;

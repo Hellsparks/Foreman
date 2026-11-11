@@ -1,5 +1,6 @@
 pub mod attention;
 pub mod audit_log;
+pub mod calibration;
 pub mod job;
 pub mod macro_favourite;
 pub mod maintenance;
