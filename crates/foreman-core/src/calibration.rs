@@ -365,13 +365,20 @@ pub fn merge_orca_config(
             }
         },
     };
+    // Strings, like the values already in these profiles ("98.85"): Orca's own
+    // profile format keeps numbers as strings.
     if let Some(v) = shrinkage_xy {
-        obj.insert("shrinkage_xy".into(), serde_json::json!(v));
+        obj.insert("shrinkage_xy".into(), serde_json::json!(orca_num(v)));
     }
     if let Some(v) = shrinkage_z {
-        obj.insert("shrinkage_z".into(), serde_json::json!(v));
+        obj.insert("shrinkage_z".into(), serde_json::json!(orca_num(v)));
     }
     (serde_json::Value::Object(obj).to_string(), replaced)
+}
+
+/// `100.402`, `100.2`, `100` — up to 3 decimals, no trailing zeros.
+pub fn orca_num(v: f64) -> String {
+    len(v)
 }
 
 /// Read `shrinkage_xy` / `shrinkage_z` from an `orcaslicer_config` text.
@@ -949,8 +956,8 @@ mod tests {
         assert!(!replaced);
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         assert_eq!(v["filament_flow_ratio"], 0.95);
-        assert_eq!(v["shrinkage_xy"], 100.402);
-        assert_eq!(v["shrinkage_z"], 100.2);
+        assert_eq!(v["shrinkage_xy"], "100.402");
+        assert_eq!(v["shrinkage_z"], "100.2");
         assert_eq!(read_orca_shrinkage(Some(&s)), (Some(100.402), Some(100.2)));
         // Only z: xy untouched.
         let (s2, _) = merge_orca_config(Some(&s), None, Some(100.1));

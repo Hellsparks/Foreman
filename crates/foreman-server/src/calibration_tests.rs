@@ -294,8 +294,8 @@ async fn shrinkage_round_trips_through_spoolman_extra_field() {
         .expect("raw");
     let inner: String = serde_json::from_str(raw).expect("json string");
     let cfg: Value = serde_json::from_str(&inner).expect("object");
-    assert_eq!(cfg["shrinkage_xy"], 100.402);
-    assert_eq!(cfg["shrinkage_z"], 100.2);
+    assert_eq!(cfg["shrinkage_xy"], "100.402");
+    assert_eq!(cfg["shrinkage_z"], "100.2");
     assert_eq!(cfg["filament_flow_ratio"], 0.95);
 
     // And through Foreman's list + history.
