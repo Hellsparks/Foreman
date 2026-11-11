@@ -8,6 +8,7 @@ pub mod printer_paths;
 pub mod printers;
 pub mod queue;
 pub mod send;
+pub mod spools;
 pub mod ssh;
 pub mod storage;
 pub mod terminal_ws;

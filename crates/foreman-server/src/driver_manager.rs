@@ -894,9 +894,33 @@ impl DriverManager {
             if let Ok(live) = driver.probe_capabilities().await {
                 caps.spoolman_connected = live.spoolman_connected;
                 caps.spoolman_spool_id = live.spoolman_spool_id;
+                // Bambu learns its AMS size from the first full report.
+                caps.ams_slot_count = live.ams_slot_count.or(caps.ams_slot_count);
             }
         }
         Some(caps)
+    }
+
+    /// Tests: put a driver in place with cached capabilities and status.
+    #[cfg(test)]
+    pub async fn insert_test_driver(
+        &self,
+        printer_id: i64,
+        driver: Arc<dyn PrinterDriver>,
+        caps: PrinterCapabilities,
+        status: Option<PrinterStatus>,
+    ) {
+        self.capabilities_cache
+            .write()
+            .await
+            .insert(printer_id, caps);
+        if let Some(s) = status {
+            self.status_cache.write().await.insert(printer_id, s);
+        }
+        self.drivers
+            .write()
+            .await
+            .insert(printer_id, DriverHandle { driver });
     }
 
     /// Return the first webcam snapshot URL for a printer (from cached capabilities).

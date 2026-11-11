@@ -9,6 +9,9 @@ mod net;
 mod scheduler;
 #[cfg(test)]
 mod scheduler_tests;
+mod spools;
+#[cfg(test)]
+mod spools_tests;
 mod ssh_pool;
 mod state;
 #[cfg(test)]
@@ -250,6 +253,7 @@ pub async fn serve_with(
         library,
         transfers,
         scheduler,
+        spoolman: Arc::clone(&spoolman),
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -618,6 +622,20 @@ fn build_router(app_state: AppState) -> Router {
             post(api::library::restore_many),
         )
         // Send (3.4): print-now + compat check
+        .route("/api/spools", get(api::spools::list))
+        .route("/api/spools/loaded", get(api::spools::loaded))
+        .route("/api/spools/{id}", patch(api::spools::edit))
+        .route("/api/printers/{id}/spools", get(api::spools::printer_slots))
+        .route(
+            "/api/printers/{id}/spools/candidates",
+            get(api::spools::candidates),
+        )
+        .route("/api/printers/{id}/spools/check", post(api::spools::check))
+        .route("/api/printers/{id}/spools/load", post(api::spools::load))
+        .route(
+            "/api/printers/{id}/spools/unload",
+            post(api::spools::unload),
+        )
         .route("/api/send/check/{file_id}", get(api::send::check_file))
         .route("/api/send", post(api::send::send_file))
         // Queues (3.5)

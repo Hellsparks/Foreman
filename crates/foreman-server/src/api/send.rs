@@ -314,13 +314,7 @@ pub(crate) async fn build_snapshot_for(
     let printer = repo::printer::get(&state.foreman_db.pool, printer_id)
         .await
         .ok()?;
-    let caps = state.driver_manager.get_capabilities(printer_id).await;
-    let status = state.driver_manager.get_status(printer_id).await;
-    Some(PrinterSnapshot {
-        printer,
-        caps,
-        status,
-    })
+    Some(crate::spools::snapshot(&state.driver_manager, state.spoolman.get(), printer).await)
 }
 
 /// Build compatibility snapshots for all printers.
@@ -330,13 +324,7 @@ pub(crate) async fn build_snapshots(state: &AppState) -> Vec<PrinterSnapshot> {
         .unwrap_or_default();
     let mut snaps = Vec::with_capacity(printers.len());
     for p in printers {
-        let caps = state.driver_manager.get_capabilities(p.id).await;
-        let status = state.driver_manager.get_status(p.id).await;
-        snaps.push(PrinterSnapshot {
-            printer: p,
-            caps,
-            status,
-        });
+        snaps.push(crate::spools::snapshot(&state.driver_manager, state.spoolman.get(), p).await);
     }
     snaps
 }

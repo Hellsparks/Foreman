@@ -268,6 +268,14 @@ pub enum ServerEvent {
     QueueChanged {
         printer_id: Option<i64>,
     },
+    /// The spool loaded in a printer slot changed (from Foreman, Mainsail, or the
+    /// printer itself). Clients refetch `GET /api/printers/{id}/spools`.
+    SpoolLoaded {
+        printer_id: i64,
+        tool: u32,
+        #[ts(type = "number | null")]
+        spool_id: Option<i64>,
+    },
     /// Device discovery / change (Phase 4).
     Device {
         printer_id: Option<i64>,
@@ -297,6 +305,7 @@ impl ServerEvent {
             ServerEvent::TransferProgress { .. } => Some("transfer.progress"),
             ServerEvent::TransferFinished { .. } => Some("transfer.finished"),
             ServerEvent::QueueChanged { .. } => Some("queue"),
+            ServerEvent::SpoolLoaded { .. } => Some("spool"),
             ServerEvent::Device { .. } => Some("device"),
         }
     }
@@ -312,6 +321,7 @@ impl ServerEvent {
             ServerEvent::Job { printer_id, .. } => *printer_id,
             ServerEvent::Device { printer_id, .. } => *printer_id,
             ServerEvent::QueueChanged { printer_id } => *printer_id,
+            ServerEvent::SpoolLoaded { printer_id, .. } => Some(*printer_id),
             _ => None,
         }
     }

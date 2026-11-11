@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::{
-    domain::{FileMeta, Printer},
+    domain::{FileMeta, Printer, ToolUsage},
     driver::PrinterCapabilities,
     events::{AmsTray, PrinterState, PrinterStatus},
+    filament::{self, LoadedSlot, SpoolFacts},
 };
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,27 @@ pub enum Verdict {
     Offline,
 }
 
+/// How well what is loaded matches the file's filament, best first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum FilamentMatch {
+    /// The loaded spool is the one the file's preset names (`(#ID)`).
+    Exact,
+    /// Loaded spool / tray matches material and colour.
+    Colour,
+    /// Loaded spool / tray matches material, colour differs or unknown.
+    Material,
+    /// Nothing loaded is known; the file's `(#ID)` preset is the only hint.
+    Guess,
+    /// No filament information (printer doesn't report, file has no material).
+    Unknown,
+    /// Loaded material doesn't match.
+    Mismatch,
+    /// Printer tracks spools and nothing is loaded.
+    Empty,
+}
+
 /// Full compatibility result for one printer.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -52,6 +74,8 @@ pub struct CompatResult {
     pub reason: String,
     /// Optional quick-fix action, e.g. "Plate cleared" or "Load matching spool".
     pub quick_fix: Option<String>,
+    /// Filament match level (independent of the verdict's other checks).
+    pub filament: FilamentMatch,
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +87,121 @@ pub struct PrinterSnapshot {
     pub printer: Printer,
     pub caps: Option<PrinterCapabilities>,
     pub status: Option<PrinterStatus>,
+    /// Loaded spools per tool / slot (Klipper: Moonraker's active spool).
+    pub loaded: Vec<LoadedSlot>,
+}
+
+impl PrinterSnapshot {
+    /// The printer tracks a loaded spool (Moonraker with a `[spoolman]` link).
+    fn tracks_spools(&self) -> bool {
+        self.loaded.iter().any(|s| s.writable)
+    }
+
+    /// Spool loaded for a file tool: same tool index, else tool 0 on a
+    /// single-tool printer.
+    fn spool_for(&self, tool: u32) -> Option<&SpoolFacts> {
+        let with: Vec<&LoadedSlot> = self.loaded.iter().filter(|s| s.spool.is_some()).collect();
+        with.iter()
+            .find(|s| s.tool == tool)
+            .or_else(|| if with.len() == 1 { with.first() } else { None })
+            .and_then(|s| s.spool.as_ref())
+    }
+}
+
+/// Match one file tool against a loaded spool.
+fn spool_match(t: &ToolUsage, sp: &SpoolFacts) -> FilamentMatch {
+    if t.spool_id.is_some() && t.spool_id == Some(sp.id) {
+        return FilamentMatch::Exact;
+    }
+    let Some(want) = t.material.as_deref() else {
+        return FilamentMatch::Unknown;
+    };
+    let have = sp.material.as_deref().unwrap_or("");
+    if !filament::materials_match(want, have) {
+        return FilamentMatch::Mismatch;
+    }
+    let colour_ok = t.colour.as_deref().is_some_and(|c| {
+        sp.colours()
+            .iter()
+            .filter_map(|h| filament::hex_distance(h, c))
+            .any(|d| d <= filament::COLOUR_MATCH_DISTANCE)
+    });
+    if colour_ok {
+        FilamentMatch::Colour
+    } else {
+        FilamentMatch::Material
+    }
+}
+
+/// Worst match across the file's tools (one mismatching tool spoils it).
+fn worst(ms: impl Iterator<Item = FilamentMatch>) -> Option<FilamentMatch> {
+    ms.max_by_key(|m| match m {
+        FilamentMatch::Exact => 0,
+        FilamentMatch::Colour => 1,
+        FilamentMatch::Material => 2,
+        FilamentMatch::Guess => 3,
+        FilamentMatch::Unknown => 4,
+        FilamentMatch::Mismatch => 5,
+        FilamentMatch::Empty => 6,
+    })
+}
+
+/// Filament match for a file on a printer, plus a short "what's loaded" note.
+fn filament_check(file: &FileMeta, snap: &PrinterSnapshot) -> (FilamentMatch, Option<String>) {
+    let tools: Vec<&ToolUsage> = file.tools.iter().filter(|t| t.material.is_some()).collect();
+    let has_guess =
+        file.tools.iter().any(|t| t.spool_id.is_some()) || file.suggested_spool_id.is_some();
+    let ams = snap
+        .status
+        .as_ref()
+        .map(|s| &s.ams_trays[..])
+        .unwrap_or(&[]);
+
+    // Loaded spools (Klipper active spool) win over everything else.
+    if snap.loaded.iter().any(|s| s.spool.is_some()) {
+        let first = snap.loaded.iter().find_map(|s| s.spool.as_ref());
+        let note = first.map(|sp| format!("{} {} loaded", sp.label(), sp.material_label()));
+        if tools.is_empty() {
+            return (FilamentMatch::Unknown, note);
+        }
+        let m = worst(tools.iter().map(|t| match snap.spool_for(t.index) {
+            Some(sp) => spool_match(t, sp),
+            None => FilamentMatch::Empty,
+        }))
+        .unwrap_or(FilamentMatch::Unknown);
+        return (m, note);
+    }
+    if !ams.is_empty() {
+        if tools.is_empty() {
+            return (FilamentMatch::Unknown, None);
+        }
+        let m = worst(tools.iter().map(|t| {
+            let mat = t.material.as_deref().unwrap_or("");
+            let want = t.colour.as_deref();
+            let same: Vec<&AmsTray> = ams.iter().filter(|tr| tray_has_material(tr, mat)).collect();
+            let colour_ok = same.iter().any(|tr| match (want, tr.color.as_deref()) {
+                (Some(w), Some(c)) => filament::hex_distance(w, c)
+                    .is_some_and(|d| d <= filament::COLOUR_MATCH_DISTANCE),
+                _ => false,
+            });
+            if same.is_empty() {
+                FilamentMatch::Mismatch
+            } else if colour_ok {
+                FilamentMatch::Colour
+            } else {
+                FilamentMatch::Material
+            }
+        }))
+        .unwrap_or(FilamentMatch::Unknown);
+        return (m, None);
+    }
+    if snap.tracks_spools() && !tools.is_empty() {
+        return (FilamentMatch::Empty, None);
+    }
+    if has_guess {
+        return (FilamentMatch::Guess, None);
+    }
+    (FilamentMatch::Unknown, None)
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +220,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
         .as_ref()
         .map(|s| &s.state)
         .unwrap_or(&PrinterState::Offline);
+    let (fil, loaded_note) = filament_check(file, snap);
     if *state == PrinterState::Offline {
         return CompatResult {
             printer_id: id,
@@ -88,6 +228,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
             verdict: Verdict::Offline,
             reason: "offline".into(),
             quick_fix: None,
+            filament: fil,
         };
     }
 
@@ -102,6 +243,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
                         verdict: Verdict::TooBig,
                         reason: format!("file needs {fw:.0}×{fd:.0} mm, bed is {bw:.0}×{bd:.0} mm"),
                         quick_fix: None,
+                        filament: fil,
                     };
                 }
             }
@@ -125,6 +267,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
             verdict: Verdict::Nozzle,
             reason: "file uses abrasive filament; printer has no hardened nozzle".into(),
             quick_fix: None,
+            filament: fil,
         };
     }
 
@@ -141,6 +284,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
                             "file needs {file_nozzle:.2} mm nozzle, printer has {printer_nozzle:.2} mm"
                         ),
                         quick_fix: None,
+                        filament: fil,
                     };
                 }
             }
@@ -155,6 +299,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
             verdict: Verdict::Plate,
             reason: "clear plate first".into(),
             quick_fix: Some("Plate cleared".into()),
+            filament: fil,
         };
     }
 
@@ -179,60 +324,94 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
             verdict: Verdict::Busy,
             reason: eta,
             quick_fix: None,
+            filament: fil,
         };
     }
 
-    // 7. Material / spool match (AMS trays for Bambu, or best-effort).
-    let needed_materials: Vec<&str> = file
-        .tools
-        .iter()
-        .filter_map(|t| t.material.as_deref())
-        .collect();
-
-    if !needed_materials.is_empty() {
-        let ams = snap
-            .status
-            .as_ref()
-            .map(|s| &s.ams_trays[..])
-            .unwrap_or(&[]);
-
-        if !ams.is_empty() {
-            // Check every needed material can be found in AMS.
-            for mat in &needed_materials {
-                let loaded = ams_has_material(ams, mat);
-                if !loaded {
-                    return CompatResult {
-                        printer_id: id,
-                        printer_name: name,
-                        verdict: Verdict::Material,
-                        reason: format!("{mat} not loaded"),
-                        quick_fix: Some("Load matching spool".into()),
-                    };
-                }
-            }
+    // 7. Material / spool match: loaded spool (Klipper), AMS trays (Bambu).
+    let wanted = || {
+        file.tools
+            .iter()
+            .filter_map(|t| t.material.as_deref())
+            .next()
+            .unwrap_or("filament")
+            .to_owned()
+    };
+    match fil {
+        FilamentMatch::Mismatch => {
+            let reason = match &loaded_note {
+                Some(n) => format!("file wants {}; {n}", wanted()),
+                None => format!("{} not loaded", wanted()),
+            };
+            return CompatResult {
+                printer_id: id,
+                printer_name: name,
+                verdict: Verdict::Material,
+                reason,
+                quick_fix: Some("Load matching spool".into()),
+                filament: fil,
+            };
         }
-        // If no AMS data, we can't check — assume ready (Klipper printers
-        // don't report loaded filament via the driver).
+        FilamentMatch::Empty => {
+            return CompatResult {
+                printer_id: id,
+                printer_name: name,
+                verdict: Verdict::NoSpool,
+                reason: format!("no spool loaded · file wants {}", wanted()),
+                quick_fix: Some("Load spool".into()),
+                filament: fil,
+            };
+        }
+        _ => {}
     }
 
     // 8. Ready.
-    let loaded_hint = snap
-        .status
-        .as_ref()
-        .and_then(|s| {
-            s.ams_trays
-                .first()
-                .and_then(|t| t.material.as_deref())
-                .map(|m| format!("idle · {m} loaded"))
-        })
-        .unwrap_or_else(|| "idle".into());
+    let mut reason = match (&loaded_note, fil) {
+        (Some(n), FilamentMatch::Exact) => format!("idle · {n} · the file's spool"),
+        (Some(n), FilamentMatch::Colour) => format!("idle · {n} · material and colour match"),
+        (Some(n), FilamentMatch::Material) => format!("idle · {n} · colour differs"),
+        (Some(n), _) => format!("idle · {n}"),
+        (None, FilamentMatch::Guess) => {
+            let guess = file
+                .tools
+                .iter()
+                .find_map(|t| t.spool_id)
+                .or(file.suggested_spool_id)
+                .map(|g| format!("idle · preset names spool #{g}, nothing loaded is known"))
+                .unwrap_or_else(|| "idle".into());
+            guess
+        }
+        (None, _) => snap
+            .status
+            .as_ref()
+            .and_then(|s| {
+                s.ams_trays
+                    .first()
+                    .and_then(|t| t.material.as_deref())
+                    .map(|m| format!("idle · {m} loaded"))
+            })
+            .unwrap_or_else(|| "idle".into()),
+    };
+    let mut quick_fix = None;
+    // Enough filament left on the loaded spool?
+    for t in &file.tools {
+        if let (Some(g), Some(sp)) = (t.grams, snap.spool_for(t.index)) {
+            if let Some(left) = sp.remaining_weight {
+                if left < g {
+                    reason.push_str(&format!(" · only {left:.0} g left, needs {g:.0} g"));
+                    quick_fix = Some("Load a fuller spool".into());
+                }
+            }
+        }
+    }
 
     CompatResult {
         printer_id: id,
         printer_name: name,
         verdict: Verdict::Ready,
-        reason: loaded_hint,
-        quick_fix: None,
+        reason,
+        quick_fix,
+        filament: fil,
     }
 }
 
@@ -257,9 +436,9 @@ fn verdict_order(v: &Verdict) -> u8 {
     }
 }
 
-/// How well the loaded filament matches the file: +2 per tool whose material is
-/// loaded in a tray, +1 more when the colour matches too. 0 when the printer reports
-/// no trays (Klipper). The fleet queue prefers the highest score.
+/// How well the loaded filament matches the file, per tool: +4 exact spool,
+/// +3 material and colour, +2 material. 0 when nothing loaded is known.
+/// The fleet queue prefers the highest score.
 pub fn filament_score(file: &FileMeta, snap: &PrinterSnapshot) -> u32 {
     let trays = snap
         .status
@@ -268,6 +447,15 @@ pub fn filament_score(file: &FileMeta, snap: &PrinterSnapshot) -> u32 {
         .unwrap_or(&[]);
     let mut score = 0;
     for tool in &file.tools {
+        if let Some(sp) = snap.spool_for(tool.index) {
+            score += match spool_match(tool, sp) {
+                FilamentMatch::Exact => 4,
+                FilamentMatch::Colour => 3,
+                FilamentMatch::Material => 2,
+                _ => 0,
+            };
+            continue;
+        }
         let Some(mat) = tool.material.as_deref() else {
             continue;
         };
@@ -297,22 +485,6 @@ fn tray_has_material(t: &AmsTray, needed: &str) -> bool {
             m_up.starts_with(&needed_up) || needed_up.starts_with(&m_up)
         })
         .unwrap_or(false)
-}
-
-/// Check if any AMS tray has a material matching the needed one (case-insensitive prefix).
-fn ams_has_material(trays: &[AmsTray], needed: &str) -> bool {
-    let needed_up = needed.to_uppercase();
-    trays.iter().any(|t| {
-        t.material
-            .as_deref()
-            .map(|m| {
-                let m_up = m.to_uppercase();
-                // "PLA" matches "PLA", "PLA-CF", etc.; "PETG" matches "PETG".
-                // Also match the reverse: file says "PLA Basic" and tray says "PLA".
-                m_up.starts_with(&needed_up) || needed_up.starts_with(&m_up)
-            })
-            .unwrap_or(false)
-    })
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +556,7 @@ mod tests {
             printer: make_printer(1, "V0"),
             caps: Some(make_caps(120.0, 120.0)),
             status: None,
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Offline);
@@ -398,6 +571,7 @@ mod tests {
             printer: make_printer(1, "V0"),
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::TooBig);
@@ -411,6 +585,7 @@ mod tests {
             printer: make_printer(1, "V0"),
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
@@ -426,6 +601,7 @@ mod tests {
             printer,
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -440,6 +616,7 @@ mod tests {
             printer,
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Plate);
@@ -453,6 +630,7 @@ mod tests {
             printer: make_printer(1, "V0"),
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Printing)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Busy);
@@ -472,6 +650,7 @@ mod tests {
             printer: make_printer(1, "X1C"),
             caps: Some(make_caps(256.0, 256.0)),
             status: Some(status),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Material);
@@ -491,6 +670,7 @@ mod tests {
             printer: make_printer(1, "X1C"),
             caps: Some(make_caps(256.0, 256.0)),
             status: Some(status),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -503,6 +683,7 @@ mod tests {
             printer: make_printer(1, "V0"),
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -516,16 +697,19 @@ mod tests {
                 printer: make_printer(1, "Offline"),
                 caps: None,
                 status: None,
+                loaded: vec![],
             },
             PrinterSnapshot {
                 printer: make_printer(2, "Idle"),
                 caps: Some(make_caps(120.0, 120.0)),
                 status: Some(make_status(PrinterState::Idle)),
+                loaded: vec![],
             },
             PrinterSnapshot {
                 printer: make_printer(3, "Printing"),
                 caps: Some(make_caps(120.0, 120.0)),
                 status: Some(make_status(PrinterState::Printing)),
+                loaded: vec![],
             },
         ];
         let results = check_all(&meta, &snaps);
@@ -546,8 +730,130 @@ mod tests {
                 ..Default::default()
             }),
             status: Some(make_status(PrinterState::Idle)),
+            loaded: vec![],
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
+    }
+
+    fn klipper_slot(spool: Option<SpoolFacts>) -> LoadedSlot {
+        LoadedSlot {
+            printer_id: 1,
+            printer_name: "V0".into(),
+            tool: 0,
+            label: "T0".into(),
+            spool_id: spool.as_ref().map(|s| s.id),
+            spool,
+            tray: None,
+            writable: true,
+            read_only_reason: None,
+        }
+    }
+
+    fn pla_white(id: i64, grams: f64) -> SpoolFacts {
+        SpoolFacts {
+            id,
+            name: "PLA Basic White".into(),
+            material: Some("PLA".into()),
+            color_hex: Some("FAFAFA".into()),
+            remaining_weight: Some(grams),
+            ..Default::default()
+        }
+    }
+
+    fn idle_klipper(loaded: Vec<LoadedSlot>) -> PrinterSnapshot {
+        PrinterSnapshot {
+            printer: make_printer(1, "V0"),
+            caps: Some(make_caps(120.0, 120.0)),
+            status: Some(make_status(PrinterState::Idle)),
+            loaded,
+        }
+    }
+
+    #[test]
+    fn loaded_spool_improves_on_the_preset_guess() {
+        let mut meta = make_meta(); // PLA #FFFFFF 50 g
+        meta.tools[0].spool_id = Some(9);
+        // No [spoolman] link: only the preset hint.
+        let before = check(&meta, &idle_klipper(vec![]));
+        assert_eq!(before.verdict, Verdict::Ready);
+        assert_eq!(before.filament, FilamentMatch::Guess);
+        assert!(before.reason.contains("#9"), "{}", before.reason);
+        // Load a matching spool: better verdict, reason names it.
+        let after = check(
+            &meta,
+            &idle_klipper(vec![klipper_slot(Some(pla_white(1, 800.0)))]),
+        );
+        assert_eq!(after.verdict, Verdict::Ready);
+        assert_eq!(after.filament, FilamentMatch::Colour);
+        assert!(
+            after.reason.contains("#1 PLA Basic White"),
+            "{}",
+            after.reason
+        );
+        let snap_before = idle_klipper(vec![]);
+        let snap_after = idle_klipper(vec![klipper_slot(Some(pla_white(1, 800.0)))]);
+        assert!(filament_score(&meta, &snap_after) > filament_score(&meta, &snap_before));
+        // The preset's own spool loaded: exact.
+        let exact = check(
+            &meta,
+            &idle_klipper(vec![klipper_slot(Some(pla_white(9, 800.0)))]),
+        );
+        assert_eq!(exact.filament, FilamentMatch::Exact);
+        assert!(
+            filament_score(
+                &meta,
+                &idle_klipper(vec![klipper_slot(Some(pla_white(9, 800.0)))])
+            ) > filament_score(&meta, &snap_after)
+        );
+    }
+
+    #[test]
+    fn no_spool_only_when_nothing_is_loaded() {
+        let meta = make_meta();
+        let r = check(&meta, &idle_klipper(vec![klipper_slot(None)]));
+        assert_eq!(r.verdict, Verdict::NoSpool);
+        assert_eq!(r.filament, FilamentMatch::Empty);
+        assert_eq!(r.quick_fix.as_deref(), Some("Load spool"));
+        let r = check(
+            &meta,
+            &idle_klipper(vec![klipper_slot(Some(pla_white(1, 800.0)))]),
+        );
+        assert_eq!(r.verdict, Verdict::Ready);
+    }
+
+    #[test]
+    fn loaded_spool_of_another_material_is_a_material_verdict() {
+        let mut meta = make_meta();
+        meta.tools[0].material = Some("PETG".into());
+        let r = check(
+            &meta,
+            &idle_klipper(vec![klipper_slot(Some(pla_white(1, 800.0)))]),
+        );
+        assert_eq!(r.verdict, Verdict::Material);
+        assert_eq!(r.filament, FilamentMatch::Mismatch);
+        assert!(
+            r.reason.contains("PETG") && r.reason.contains("#1"),
+            "{}",
+            r.reason
+        );
+    }
+
+    #[test]
+    fn loaded_spool_colour_differs_and_low_remaining() {
+        let mut meta = make_meta();
+        meta.tools[0].colour = Some("#000000".into());
+        let r = check(
+            &meta,
+            &idle_klipper(vec![klipper_slot(Some(pla_white(1, 30.0)))]),
+        );
+        assert_eq!(r.verdict, Verdict::Ready);
+        assert_eq!(r.filament, FilamentMatch::Material);
+        assert!(
+            r.reason.contains("only 30 g left, needs 50 g"),
+            "{}",
+            r.reason
+        );
+        assert_eq!(r.quick_fix.as_deref(), Some("Load a fuller spool"));
     }
 }

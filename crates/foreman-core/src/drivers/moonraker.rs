@@ -584,7 +584,12 @@ impl MoonrakerDriver {
                                     .and_then(|o| o.get("spool_id"))
                                     .and_then(|v| v.as_i64());
                                 let mut caps = capabilities.write().await;
-                                caps.get_or_insert_with(PrinterCapabilities::default).spoolman_spool_id = spool;
+                                let c = caps.get_or_insert_with(PrinterCapabilities::default);
+                                if c.spoolman_spool_id != spool {
+                                    c.spoolman_spool_id = spool;
+                                    info!(printer_id, ?spool, "moonraker: active spool set");
+                                    let _ = bus_tx.send(ServerEvent::SpoolLoaded { printer_id, tool: 0, spool_id: spool });
+                                }
                             } else if method == "notify_klippy_ready" {
                                 // Klippy came back — re-subscribe.
                                 let mut s = status.write().await;
@@ -717,6 +722,15 @@ impl MoonrakerDriver {
                 {
                     if nozzle > 0.0 {
                         c.nozzle_diameter = Some(nozzle);
+                    }
+                }
+                if let Some(t) = settings
+                    .get("extruder")
+                    .and_then(|e| e.get("max_temp"))
+                    .and_then(|v| v.as_f64())
+                {
+                    if t > 0.0 {
+                        c.max_nozzle_temp = Some(t);
                     }
                 }
             }
@@ -956,6 +970,64 @@ impl PrinterDriver for MoonrakerDriver {
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
         Ok(self.status.read().await.to_printer_status())
+    }
+
+    async fn set_active_spool(&self, tool: u32, spool_id: Option<i64>) -> Result<(), AppError> {
+        if tool != 0 {
+            return Err(AppError::InvalidInput(
+                "Moonraker has one active spool; only tool 0 can be set".into(),
+            ));
+        }
+        if self
+            .capabilities
+            .read()
+            .await
+            .as_ref()
+            .and_then(|c| c.spoolman_connected)
+            .is_none()
+        {
+            return Err(AppError::NotImplemented(
+                "Moonraker has no [spoolman] section; add one to set the active spool".into(),
+            ));
+        }
+        // `POST /server/spoolman/spool_id`: a body without `spool_id` clears it.
+        let url = format!("{}/server/spoolman/spool_id", self.config.url);
+        let body = match spool_id {
+            Some(id) => serde_json::json!({ "spool_id": id }),
+            None => serde_json::json!({}),
+        };
+        let mut req = self.http.post(&url).json(&body);
+        if let Some(k) = self.config.api_key.as_deref().filter(|k| !k.is_empty()) {
+            req = req.header("X-Api-Key", k);
+        }
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| AppError::Driver(format!("set active spool: {e}")))?
+            .error_for_status()
+            .map_err(|e| AppError::Driver(format!("set active spool rejected: {e}")))?;
+        let v: Value = resp.json().await.unwrap_or(Value::Null);
+        let got = v
+            .get("result")
+            .unwrap_or(&v)
+            .get("spool_id")
+            .and_then(|x| x.as_i64());
+        if got != spool_id {
+            return Err(AppError::Driver(format!(
+                "Moonraker answered spool_id {got:?}, expected {spool_id:?}"
+            )));
+        }
+        let mut caps = self.capabilities.write().await;
+        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+        if c.spoolman_spool_id != spool_id {
+            c.spoolman_spool_id = spool_id;
+            let _ = self.bus_tx.send(ServerEvent::SpoolLoaded {
+                printer_id: self.config.printer_id,
+                tool: 0,
+                spool_id,
+            });
+        }
+        Ok(())
     }
 
     fn storage(&self) -> Option<Arc<dyn PrinterStorage>> {

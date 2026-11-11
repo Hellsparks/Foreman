@@ -37,4 +37,6 @@ pub struct AppState {
     pub transfers: Arc<Transfers>,
     /// Printer queues + fleet queue dispatcher.
     pub scheduler: Arc<Scheduler>,
+    /// The built-in Spoolman, once it has started (empty while disabled).
+    pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
 }
