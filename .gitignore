@@ -36,3 +36,6 @@ compat-tests/
 # Generated types are COMMITTED and checked in CI.
 # Do not add frontend/src/api/types/ here.
 # Run `cargo gen-types` after changing API DTOs.
+
+# dev-check step logs (scripts/dev-check.sh)
+/.dev-logs/

@@ -18,7 +18,10 @@ gen-types = "test --all -- export_bindings --nocapture"
 # Quality checks (run before every commit)
 fmt-check = "fmt --all -- --check"
 lint = "clippy --all-targets -- -D warnings"
-check-all = ["fmt-check", "lint", "test --all"]
+# Whole pre-commit cycle: stop server, fmt, clippy, test, frontend, rebuild + start
+# server, check /api/health commit == HEAD, stop server. Compact PASS/FAIL table;
+# full logs in .dev-logs/. Flags: --printers (read-only live checks), --keep.
+check-all = "run -q -p xtask -- dev-check"
 
 # Compatibility gate: runs upstream Spoolman v0.27.1 tests_integration/ suite
 # against a locally-started spoolman-rs server.
