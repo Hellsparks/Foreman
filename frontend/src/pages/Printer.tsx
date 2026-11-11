@@ -369,7 +369,7 @@ export default function Printer() {
 
           {/* Webcam: scales to fit the viewport */}
           <div className="printer-live__cam">
-            <section aria-label="Webcams" style={{ border: "1px solid var(--fw-border)", background: "var(--fw-raised)" }}>
+            <section aria-label="Webcams" style={{ border: "var(--fw-border-width) solid var(--fw-border)", background: "var(--fw-raised)" }}>
               <div className="webcam-bar">
                 <div role="tablist" aria-label="Choose webcam" style={{ display: "flex", flexWrap: "wrap" }}>
                   {webcams.map((wc, i) => (
@@ -641,14 +641,14 @@ export default function Printer() {
 
                 {/* Home all + Home X/Y + level */}
                 <div className="jog-home-col" role="group" aria-label="Homing">
-                  <button className="jog-btn jog-btn--primary" disabled={isPrinting} onClick={() => cmd("home")} style={{ width: "100%", height: 44 }}>
+                  <button className="jog-btn jog-btn--primary" disabled={isPrinting} onClick={() => cmd("home")} style={{ width: "100%", height: "var(--fw-control-h)" }}>
                     ⌂ Home all
                   </button>
                   <div className="home-xy-row">
-                    <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("home", { axes: ["X"] })} style={{ width: "100%", height: 44 }}>⌂ X</button>
-                    <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("home", { axes: ["Y"] })} style={{ width: "100%", height: 44 }}>⌂ Y</button>
+                    <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("home", { axes: ["X"] })} style={{ width: "100%", height: "var(--fw-control-h)" }}>⌂ X</button>
+                    <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("home", { axes: ["Y"] })} style={{ width: "100%", height: "var(--fw-control-h)" }}>⌂ Y</button>
                   </div>
-                  <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("motors_off")} style={{ width: "100%", height: 44, fontSize: 11 }}>
+                  <button className="jog-btn" disabled={isPrinting} onClick={() => cmd("motors_off")} style={{ width: "100%", height: "var(--fw-control-h)", fontSize: 11 }}>
                     Motors off
                   </button>
                 </div>
@@ -1055,9 +1055,9 @@ function PrinterConfigTab({
       {/* ── Connection section ───────────────────────────────────── */}
       <section
         style={{
-          border: "1px solid var(--fw-border)",
+          border: "var(--fw-border-width) solid var(--fw-border)",
           background: "var(--fw-raised)",
-          padding: 20,
+          padding: "var(--fw-space-5)",
           display: "flex",
           flexDirection: "column",
           gap: 14,
@@ -1065,9 +1065,9 @@ function PrinterConfigTab({
       >
         <h2 style={{ margin: 0, fontSize: 18 }}>Connection</h2>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-2)" }}>
           {/* Header row */}
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--fw-space-2)" }}>
             <span style={{ flex: 1, fontSize: 13, fontWeight: "bold" }}>
               Connection paths{" "}
               <span style={{ fontWeight: "normal", color: "var(--fw-muted)" }}>
@@ -1114,9 +1114,9 @@ function PrinterConfigTab({
                   display: "grid",
                   gridTemplateColumns: "26px minmax(90px, 0.8fr) minmax(0, 1.6fr) 100px auto",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "6px 8px",
-                  border: "1px solid var(--fw-border)",
+                  gap: "var(--fw-space-2)",
+                  padding: "6px var(--fw-space-2)",
+                  border: "var(--fw-border-width) solid var(--fw-border)",
                   background: "var(--fw-surface)",
                 }}
               >
@@ -1141,11 +1141,11 @@ function PrinterConfigTab({
                   }
                   aria-label={`Path ${i + 1} name`}
                   style={{
-                    minHeight: 36,
-                    border: "1px solid var(--fw-muted)",
+                    minHeight: "var(--fw-control-h-sm)",
+                    border: "var(--fw-border-width) solid var(--fw-muted)",
                     background: "var(--fw-raised)",
-                    padding: "0 8px",
-                    borderRadius: 2,
+                    padding: "0 var(--fw-space-2)",
+                    borderRadius: "var(--fw-radius)",
                     boxSizing: "border-box",
                     width: "100%",
                     fontSize: 13,
@@ -1162,11 +1162,11 @@ function PrinterConfigTab({
                   spellCheck={false}
                   aria-label={`Path ${i + 1} address`}
                   style={{
-                    minHeight: 36,
-                    border: "1px solid var(--fw-muted)",
+                    minHeight: "var(--fw-control-h-sm)",
+                    border: "var(--fw-border-width) solid var(--fw-muted)",
                     background: "var(--fw-raised)",
-                    padding: "0 8px",
-                    borderRadius: 2,
+                    padding: "0 var(--fw-space-2)",
+                    borderRadius: "var(--fw-radius)",
                     boxSizing: "border-box",
                     width: "100%",
                     fontFamily: "var(--fw-mono)",
@@ -1186,7 +1186,7 @@ function PrinterConfigTab({
                 >
                   {statusLabel}
                 </span>
-                <span style={{ display: "flex", gap: 4 }}>
+                <span style={{ display: "flex", gap: "var(--fw-space-1)" }}>
                   <button
                     type="button"
                     onClick={() => movePath(i, -1)}
@@ -1195,10 +1195,10 @@ function PrinterConfigTab({
                     style={{
                       width: 32,
                       height: 32,
-                      border: "1px solid var(--fw-border)",
+                      border: "var(--fw-border-width) solid var(--fw-border)",
                       background: "transparent",
                       cursor: "pointer",
-                      borderRadius: 2,
+                      borderRadius: "var(--fw-radius)",
                       color: "var(--fw-text)",
                     }}
                   >
@@ -1212,10 +1212,10 @@ function PrinterConfigTab({
                     style={{
                       width: 32,
                       height: 32,
-                      border: "1px solid var(--fw-border)",
+                      border: "var(--fw-border-width) solid var(--fw-border)",
                       background: "transparent",
                       cursor: "pointer",
-                      borderRadius: 2,
+                      borderRadius: "var(--fw-radius)",
                       color: "var(--fw-text)",
                     }}
                   >
@@ -1229,10 +1229,10 @@ function PrinterConfigTab({
                     style={{
                       width: 32,
                       height: 32,
-                      border: "1px solid var(--fw-border)",
+                      border: "var(--fw-border-width) solid var(--fw-border)",
                       background: "transparent",
                       cursor: "pointer",
-                      borderRadius: 2,
+                      borderRadius: "var(--fw-radius)",
                       color: "var(--fw-text)",
                     }}
                   >
@@ -1244,17 +1244,17 @@ function PrinterConfigTab({
           })}
 
           {/* Add + Test all */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)", alignItems: "center" }}>
             <button
               type="button"
               onClick={addPath}
               style={{
-                minHeight: 36,
-                padding: "0 12px",
-                border: "1px dashed var(--fw-muted)",
+                minHeight: "var(--fw-control-h-sm)",
+                padding: "0 var(--fw-space-3)",
+                border: "var(--fw-border-width) dashed var(--fw-muted)",
                 background: "transparent",
                 color: "var(--fw-text)",
-                borderRadius: 2,
+                borderRadius: "var(--fw-radius)",
                 fontSize: 13,
                 cursor: "pointer",
               }}
@@ -1266,12 +1266,12 @@ function PrinterConfigTab({
               onClick={testAll}
               disabled={testing}
               style={{
-                minHeight: 36,
-                padding: "0 12px",
-                border: "1px solid var(--fw-muted)",
+                minHeight: "var(--fw-control-h-sm)",
+                padding: "0 var(--fw-space-3)",
+                border: "var(--fw-border-width) solid var(--fw-muted)",
                 background: "transparent",
                 color: "var(--fw-text)",
-                borderRadius: 2,
+                borderRadius: "var(--fw-radius)",
                 fontSize: 13,
                 cursor: "pointer",
               }}
@@ -1288,10 +1288,10 @@ function PrinterConfigTab({
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 8,
+              gap: "var(--fw-space-2)",
             }}
           >
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
               <span style={{ fontSize: 12, fontWeight: "bold" }}>
                 Switch to the next path after
               </span>
@@ -1299,11 +1299,11 @@ function PrinterConfigTab({
                 value={failAfter}
                 onChange={(e) => setFailAfter(Number(e.target.value))}
                 style={{
-                  minHeight: 36,
-                  border: "1px solid var(--fw-muted)",
+                  minHeight: "var(--fw-control-h-sm)",
+                  border: "var(--fw-border-width) solid var(--fw-muted)",
                   background: "var(--fw-raised)",
-                  padding: "0 8px",
-                  borderRadius: 2,
+                  padding: "0 var(--fw-space-2)",
+                  borderRadius: "var(--fw-radius)",
                 }}
               >
                 {FAIL_OPTIONS.map((o) => (
@@ -1313,7 +1313,7 @@ function PrinterConfigTab({
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
               <span style={{ fontSize: 12, fontWeight: "bold" }}>
                 Go back up when a higher path is
               </span>
@@ -1321,11 +1321,11 @@ function PrinterConfigTab({
                 value={returnAfter}
                 onChange={(e) => setReturnAfter(Number(e.target.value))}
                 style={{
-                  minHeight: 36,
-                  border: "1px solid var(--fw-muted)",
+                  minHeight: "var(--fw-control-h-sm)",
+                  border: "var(--fw-border-width) solid var(--fw-muted)",
                   background: "var(--fw-raised)",
-                  padding: "0 8px",
-                  borderRadius: 2,
+                  padding: "0 var(--fw-space-2)",
+                  borderRadius: "var(--fw-radius)",
                 }}
               >
                 {RETURN_OPTIONS.map((o) => (
@@ -1339,16 +1339,16 @@ function PrinterConfigTab({
 
           {/* Switch back now button */}
           {activePath != null && activePath.index > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--fw-space-3)" }}>
               <button
                 type="button"
                 onClick={switchBack}
                 style={{
-                  minHeight: 36,
-                  padding: "0 12px",
-                  border: "1px solid var(--fw-muted)",
+                  minHeight: "var(--fw-control-h-sm)",
+                  padding: "0 var(--fw-space-3)",
+                  border: "var(--fw-border-width) solid var(--fw-muted)",
                   background: "transparent",
-                  borderRadius: 2,
+                  borderRadius: "var(--fw-radius)",
                   cursor: "pointer",
                   fontSize: 13,
                 }}
@@ -1364,18 +1364,18 @@ function PrinterConfigTab({
         </div>
 
         {/* Auth field */}
-        <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-2)" }}>
           <span style={{ fontSize: 13, fontWeight: "bold" }}>{authLabel}</span>
           <input
             type="password"
             value={authValue}
             onChange={(e) => setAuthValue(e.target.value)}
             style={{
-              minHeight: 44,
-              border: "1px solid var(--fw-muted)",
+              minHeight: "var(--fw-control-h)",
+              border: "var(--fw-border-width) solid var(--fw-muted)",
               background: "var(--fw-raised)",
-              padding: "0 12px",
-              borderRadius: 2,
+              padding: "0 var(--fw-space-3)",
+              borderRadius: "var(--fw-radius)",
             }}
           />
           <span style={{ fontSize: 12, color: "var(--fw-muted)" }}>{authHelp}</span>
@@ -1388,12 +1388,12 @@ function PrinterConfigTab({
       <section
         aria-label="Display"
         style={{
-          border: "1px solid var(--fw-border)",
+          border: "var(--fw-border-width) solid var(--fw-border)",
           background: "var(--fw-raised)",
-          padding: 20,
+          padding: "var(--fw-space-5)",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: "var(--fw-space-3)",
         }}
       >
         <h2 style={{ margin: 0, fontSize: 18 }}>Display</h2>
@@ -1423,15 +1423,15 @@ function PrinterConfigTab({
       {/* ── Capabilities section ─────────────────────────────────── */}
       <section
         style={{
-          border: "1px solid var(--fw-border)",
+          border: "var(--fw-border-width) solid var(--fw-border)",
           background: "var(--fw-raised)",
-          padding: 20,
+          padding: "var(--fw-space-5)",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: "var(--fw-space-3)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--fw-space-3)" }}>
           <h2 style={{ flex: 1, margin: 0, fontSize: 18 }}>Capabilities</h2>
         </div>
         {capsList.length === 0 ? (
@@ -1445,10 +1445,10 @@ function PrinterConfigTab({
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                gap: 12,
-                minHeight: 40,
+                gap: "var(--fw-space-3)",
+                minHeight: "var(--fw-control-h-md)",
                 alignItems: "center",
-                borderBottom: "1px solid var(--fw-border)",
+                borderBottom: "var(--fw-border-width) solid var(--fw-border)",
               }}
             >
               <span>{c.k}</span>
@@ -1456,7 +1456,7 @@ function PrinterConfigTab({
             </div>
           ))
         )}
-        <label style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, minHeight: "var(--fw-control-h)" }}>
           <input
             type="checkbox"
             checked={hardenedNozzle}

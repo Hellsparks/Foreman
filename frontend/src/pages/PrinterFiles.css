@@ -3,9 +3,9 @@
 .pf {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fw-space-3);
   min-width: 0;
-  padding: 20px 0 32px;
+  padding: var(--fw-space-5) 0 32px;
 }
 
 .pf-mono {
@@ -16,7 +16,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .pf-conn {
@@ -33,15 +33,15 @@
 }
 
 .pf-note {
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-raised);
-  padding: 10px 12px;
+  padding: 10px var(--fw-space-3);
   font-size: 13px;
   color: var(--fw-muted);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .pf-note--warn {
@@ -59,14 +59,14 @@
 .pf-split {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--fw-space-3);
   align-items: stretch;
   min-width: 0;
 }
 
 .pf-panel {
   min-width: 0;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-raised);
   display: flex;
   flex-direction: column;
@@ -137,34 +137,34 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--fw-border);
+  padding: var(--fw-space-2) 10px;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
 }
 
 .pf-bar--bottom {
   border-bottom: 0;
-  border-top: 1px solid var(--fw-border);
+  border-top: var(--fw-border-width) solid var(--fw-border);
 }
 
 .pf-crumb {
   min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--fw-border);
+  padding: 0 var(--fw-space-2);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-surface);
   cursor: pointer;
   font-family: var(--fw-mono);
   font-size: 12px;
   color: var(--fw-text);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
 }
 
 .pf-btn {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h-sm);
+  padding: 0 var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
   color: var(--fw-text);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -185,12 +185,12 @@
 }
 
 .pf-btn--primary {
-  min-height: 36px;
+  min-height: var(--fw-control-h-sm);
   padding: 0 14px;
-  border: 1px solid transparent;
+  border: var(--fw-border-width) solid transparent;
   background: var(--fw-accent-hover);
   color: var(--fw-on-accent);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
   font-family: var(--fw-mono);
   font-weight: bold;
@@ -205,11 +205,11 @@
 
 .pf-input {
   min-height: 32px;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: var(--fw-raised);
   color: var(--fw-text);
-  padding: 0 8px;
-  border-radius: 2px;
+  padding: 0 var(--fw-space-2);
+  border-radius: var(--fw-radius);
   font-family: var(--fw-mono);
   font-size: 12px;
   box-sizing: border-box;
@@ -227,10 +227,10 @@
   grid-template-columns: 24px minmax(0, 1fr) 80px 120px;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
+  min-height: var(--fw-control-h-md);
   padding: 0 10px;
   border: 0;
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   cursor: pointer;
   text-align: left;
@@ -261,7 +261,7 @@
 }
 
 .pf-empty {
-  padding: 24px;
+  padding: var(--fw-space-6);
   color: var(--fw-muted);
   font-size: 13px;
 }
@@ -291,7 +291,7 @@
   border: 0;
   background: var(--fw-surface);
   color: var(--fw-text);
-  padding: 10px 12px;
+  padding: 10px var(--fw-space-3);
   font-family: var(--fw-mono);
   font-size: 12px;
   line-height: 1.5;
@@ -330,7 +330,7 @@
 /* ── Terminal ─────────────────────────────────────────────────────────── */
 
 .pf-term {
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-surface);
   display: flex;
   flex-direction: column;
@@ -340,9 +340,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
   padding: 6px 10px;
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
   font-family: var(--fw-mono);
   font-size: 11px;
   color: var(--fw-muted);
@@ -358,14 +358,14 @@
 
 .pf-snip button {
   min-height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--fw-border);
+  padding: 0 var(--fw-space-2);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   color: var(--fw-text);
   cursor: pointer;
   font-family: var(--fw-mono);
   font-size: 11px;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
 }
 
 .pf-snip button + button {
@@ -389,16 +389,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--fw-border);
+  gap: var(--fw-space-2);
+  padding: var(--fw-space-2) 10px;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-raised);
 }
 
 .pf-snipform label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fw-space-1);
   font-family: var(--fw-mono);
   font-size: 11px;
   color: var(--fw-muted);
@@ -407,10 +407,10 @@
 .pf-snipform textarea {
   min-height: 56px;
   resize: vertical;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: var(--fw-raised);
   color: var(--fw-text);
-  padding: 6px 8px;
+  padding: 6px var(--fw-space-2);
   font-family: var(--fw-mono);
   font-size: 12px;
   line-height: 1.4;
@@ -438,7 +438,7 @@
 
 .pf-xterm {
   height: 420px;
-  padding: 6px 8px;
+  padding: 6px var(--fw-space-2);
 }
 
 /* ── Files / Terminal fill the content area's height ──────────────────── */
@@ -499,9 +499,9 @@
 }
 
 .pf-paste {
-  border-top: 1px solid var(--fw-warning);
+  border-top: var(--fw-border-width) solid var(--fw-warning);
   background: var(--fw-warning-bg);
-  padding: 8px 10px;
+  padding: var(--fw-space-2) 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -521,16 +521,16 @@
   max-height: 120px;
   overflow-y: auto;
   border-left: 2px solid var(--fw-border);
-  padding-left: 8px;
+  padding-left: var(--fw-space-2);
   margin: 0;
 }
 
 /* ── SSH settings (Config tab) ───────────────────────────────────────── */
 
 .pf-ssh {
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-raised);
-  padding: 20px;
+  padding: var(--fw-space-5);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -544,31 +544,31 @@
 .pf-ssh__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .pf-ssh label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--fw-space-1);
   font-size: 12px;
   font-weight: bold;
 }
 
 .pf-ssh__field {
-  min-height: 36px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h-sm);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: var(--fw-raised);
   color: var(--fw-text);
-  padding: 0 8px;
-  border-radius: 2px;
+  padding: 0 var(--fw-space-2);
+  border-radius: var(--fw-radius);
   font-size: 13px;
 }
 
 .pf-ssh__radio {
   flex-direction: row !important;
   align-items: center;
-  gap: 8px !important;
+  gap: var(--fw-space-2) !important;
   font-weight: normal !important;
   font-size: 13px !important;
   min-height: 32px;
@@ -578,9 +578,9 @@
   font-family: var(--fw-mono);
   font-size: 11px;
   word-break: break-all;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-surface);
-  padding: 8px 10px;
+  padding: var(--fw-space-2) 10px;
   margin: 0;
 }
 
@@ -588,7 +588,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .pf-ok {

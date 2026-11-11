@@ -3,6 +3,7 @@ import { useAppearance, THEMES, MODES, type Theme, type Mode } from "../hooks/us
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
 import SecuritySettings from "../auth/SecuritySettings";
+import ThemeSettings from "../theme/ThemeSettings";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
 // Used only for the swatch dots; never hardcoded in component logic.
@@ -44,13 +45,13 @@ export default function Settings() {
       <section aria-labelledby="appearance-heading" style={{ maxWidth: 640 }}>
         <h2
           id="appearance-heading"
-          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 16px", letterSpacing: "-0.02em" }}
+          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
         >
           Appearance
         </h2>
 
         {/* Theme selector */}
-        <fieldset style={{ border: 0, padding: 0, margin: "0 0 24px" }}>
+        <fieldset style={{ border: 0, padding: 0, margin: "0 0 var(--fw-space-6)" }}>
           <legend
             style={{
               fontFamily: "var(--fw-mono)",
@@ -99,7 +100,7 @@ export default function Settings() {
           >
             Mode
           </legend>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: "var(--fw-space-2)" }}>
             {MODES.map((m) => (
               <button
                 key={m}
@@ -125,13 +126,15 @@ export default function Settings() {
             ))}
           </div>
         </fieldset>
+
+        <ThemeSettings />
       </section>
 
       {/* Printers ───────────────────────────────────────────────────────── */}
       <section aria-labelledby="printers-heading" style={{ maxWidth: 720, marginTop: 32 }}>
         <h2
           id="printers-heading"
-          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 16px", letterSpacing: "-0.02em" }}
+          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
         >
           Printers
         </h2>
@@ -140,13 +143,13 @@ export default function Settings() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {printers.map((p) => (
-              <div key={p.id} style={{ border: "1px solid var(--fw-border)", background: "var(--fw-raised)" }}>
+              <div key={p.id} style={{ border: "var(--fw-border-width) solid var(--fw-border)", background: "var(--fw-raised)" }}>
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 12,
-                    padding: "12px 16px",
+                    gap: "var(--fw-space-3)",
+                    padding: "var(--fw-space-3) var(--fw-space-4)",
                   }}
                 >
                   <span style={{ flex: 1, fontWeight: 500 }}>{p.name}</span>
@@ -172,9 +175,9 @@ export default function Settings() {
                     style={{
                       minHeight: 32,
                       padding: "0 10px",
-                      border: "1px solid var(--fw-border)",
+                      border: "var(--fw-border-width) solid var(--fw-border)",
                       background: "transparent",
-                      borderRadius: 2,
+                      borderRadius: "var(--fw-radius)",
                       cursor: "pointer",
                       fontSize: 12,
                     }}
@@ -183,7 +186,7 @@ export default function Settings() {
                   </button>
                 </div>
                 {expandedId === p.id && (
-                  <div style={{ borderTop: "1px solid var(--fw-border)", padding: "16px" }}>
+                  <div style={{ borderTop: "var(--fw-border-width) solid var(--fw-border)", padding: "var(--fw-space-4)" }}>
                     <SettingsPrinterConfigForm printer={p} />
                     <RemovePrinter
                       printer={p}
@@ -232,12 +235,12 @@ function RemovePrinter({ printer, onRemoved }: { printer: PrinterWithStatus; onR
   };
 
   const btn = {
-    minHeight: 36,
+    minHeight: "var(--fw-control-h-sm)",
     padding: "0 14px",
-    border: "1px solid var(--fw-danger)",
+    border: "var(--fw-border-width) solid var(--fw-danger)",
     color: "var(--fw-danger)",
     background: "transparent",
-    borderRadius: 2,
+    borderRadius: "var(--fw-radius)",
     cursor: "pointer",
     fontSize: 13,
   } as const;
@@ -245,9 +248,9 @@ function RemovePrinter({ printer, onRemoved }: { printer: PrinterWithStatus; onR
   return (
     <div
       style={{
-        marginTop: 16,
-        paddingTop: 16,
-        borderTop: "1px solid var(--fw-border)",
+        marginTop: "var(--fw-space-4)",
+        paddingTop: "var(--fw-space-4)",
+        borderTop: "var(--fw-border-width) solid var(--fw-border)",
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
@@ -274,11 +277,11 @@ function RemovePrinter({ printer, onRemoved }: { printer: PrinterWithStatus; onR
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             style={{
-              minHeight: 36,
-              border: "1px solid var(--fw-danger)",
+              minHeight: "var(--fw-control-h-sm)",
+              border: "var(--fw-border-width) solid var(--fw-danger)",
               background: "var(--fw-raised)",
               padding: "0 10px",
-              borderRadius: 2,
+              borderRadius: "var(--fw-radius)",
               fontSize: 13,
             }}
           />
@@ -451,9 +454,9 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-4)" }}>
       {/* Paths */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-2)" }}>
         <span style={{ fontSize: 13, fontWeight: "bold" }}>
           Connection paths
           <span style={{ fontWeight: "normal", color: "var(--fw-muted)" }}> · tried top to bottom</span>
@@ -467,9 +470,9 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
                 display: "grid",
                 gridTemplateColumns: "26px minmax(90px, 0.8fr) minmax(0, 1.6fr) auto",
                 alignItems: "center",
-                gap: 8,
-                padding: "6px 8px",
-                border: "1px solid var(--fw-border)",
+                gap: "var(--fw-space-2)",
+                padding: "6px var(--fw-space-2)",
+                border: "var(--fw-border-width) solid var(--fw-border)",
                 background: "var(--fw-surface)",
               }}
             >
@@ -495,10 +498,10 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
                 aria-label={`Path ${i + 1} name`}
                 style={{
                   minHeight: 32,
-                  border: "1px solid var(--fw-muted)",
+                  border: "var(--fw-border-width) solid var(--fw-muted)",
                   background: "var(--fw-raised)",
-                  padding: "0 8px",
-                  borderRadius: 2,
+                  padding: "0 var(--fw-space-2)",
+                  borderRadius: "var(--fw-radius)",
                   fontSize: 13,
                   width: "100%",
                   boxSizing: "border-box",
@@ -516,10 +519,10 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
                 aria-label={`Path ${i + 1} URL`}
                 style={{
                   minHeight: 32,
-                  border: "1px solid var(--fw-muted)",
+                  border: "var(--fw-border-width) solid var(--fw-muted)",
                   background: "var(--fw-raised)",
-                  padding: "0 8px",
-                  borderRadius: 2,
+                  padding: "0 var(--fw-space-2)",
+                  borderRadius: "var(--fw-radius)",
                   fontFamily: "var(--fw-mono)",
                   fontSize: 12,
                   width: "100%",
@@ -534,10 +537,10 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
                 style={{
                   width: 32,
                   height: 32,
-                  border: "1px solid var(--fw-border)",
+                  border: "var(--fw-border-width) solid var(--fw-border)",
                   background: "transparent",
                   cursor: "pointer",
-                  borderRadius: 2,
+                  borderRadius: "var(--fw-radius)",
                 }}
               >
                 ✕
@@ -545,16 +548,16 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             </div>
           );
         })}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "var(--fw-space-2)", flexWrap: "wrap", alignItems: "center" }}>
           <button
             type="button"
             onClick={addPath}
             style={{
               minHeight: 32,
               padding: "0 10px",
-              border: "1px dashed var(--fw-muted)",
+              border: "var(--fw-border-width) dashed var(--fw-muted)",
               background: "transparent",
-              borderRadius: 2,
+              borderRadius: "var(--fw-radius)",
               fontSize: 13,
               cursor: "pointer",
             }}
@@ -568,9 +571,9 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             style={{
               minHeight: 32,
               padding: "0 10px",
-              border: "1px solid var(--fw-muted)",
+              border: "var(--fw-border-width) solid var(--fw-muted)",
               background: "transparent",
-              borderRadius: 2,
+              borderRadius: "var(--fw-radius)",
               fontSize: 13,
               cursor: "pointer",
             }}
@@ -588,20 +591,20 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 8,
+          gap: "var(--fw-space-2)",
         }}
       >
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
           <span style={{ fontSize: 12, fontWeight: "bold" }}>Switch after</span>
           <select
             value={failAfter}
             onChange={(e) => setFailAfter(Number(e.target.value))}
             style={{
               minHeight: 32,
-              border: "1px solid var(--fw-muted)",
+              border: "var(--fw-border-width) solid var(--fw-muted)",
               background: "var(--fw-raised)",
-              padding: "0 8px",
-              borderRadius: 2,
+              padding: "0 var(--fw-space-2)",
+              borderRadius: "var(--fw-radius)",
             }}
           >
             {FAIL_OPTIONS.map((o) => (
@@ -609,17 +612,17 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
           <span style={{ fontSize: 12, fontWeight: "bold" }}>Go back up when</span>
           <select
             value={returnAfter}
             onChange={(e) => setReturnAfter(Number(e.target.value))}
             style={{
               minHeight: 32,
-              border: "1px solid var(--fw-muted)",
+              border: "var(--fw-border-width) solid var(--fw-muted)",
               background: "var(--fw-raised)",
-              padding: "0 8px",
-              borderRadius: 2,
+              padding: "0 var(--fw-space-2)",
+              borderRadius: "var(--fw-radius)",
             }}
           >
             {RETURN_OPTIONS.map((o) => (
@@ -627,17 +630,17 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             ))}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
           <span style={{ fontSize: 12, fontWeight: "bold" }}>Filament use reported by</span>
           <select
             value={reporter}
             onChange={(e) => setReporter(e.target.value as "auto" | "moonraker" | "foreman")}
             style={{
               minHeight: 32,
-              border: "1px solid var(--fw-muted)",
+              border: "var(--fw-border-width) solid var(--fw-muted)",
               background: "var(--fw-raised)",
-              padding: "0 8px",
-              borderRadius: 2,
+              padding: "0 var(--fw-space-2)",
+              borderRadius: "var(--fw-radius)",
             }}
           >
             <option value="auto">Auto (Moonraker if linked to Spoolman)</option>
@@ -655,28 +658,28 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
           value={authValue}
           onChange={(e) => setAuthValue(e.target.value)}
           style={{
-            minHeight: 36,
-            border: "1px solid var(--fw-muted)",
+            minHeight: "var(--fw-control-h-sm)",
+            border: "var(--fw-border-width) solid var(--fw-muted)",
             background: "var(--fw-raised)",
             padding: "0 10px",
-            borderRadius: 2,
+            borderRadius: "var(--fw-radius)",
           }}
         />
       </label>
 
       {/* Save */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--fw-space-3)" }}>
         <button
           type="button"
           onClick={save}
           disabled={saving}
           style={{
-            minHeight: 36,
-            padding: "0 16px",
-            border: "1px solid transparent",
+            minHeight: "var(--fw-control-h-sm)",
+            padding: "0 var(--fw-space-4)",
+            border: "var(--fw-border-width) solid transparent",
             background: "var(--fw-accent-hover)",
             color: "var(--fw-on-accent)",
-            borderRadius: 2,
+            borderRadius: "var(--fw-radius)",
             cursor: "pointer",
             fontFamily: "var(--fw-mono)",
             fontWeight: "bold",

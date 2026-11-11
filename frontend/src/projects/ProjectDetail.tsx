@@ -100,7 +100,7 @@ export default function ProjectDetail() {
         <div className="prj-head__main">
           {editName != null ? (
             <form
-              style={{ display: "flex", gap: 8 }}
+              style={{ display: "flex", gap: "var(--fw-space-2)" }}
               onSubmit={(e) => {
                 e.preventDefault();
                 void run(() => projectsApi.update(pid, { name: editName, due_date: null, status: null })).then(() => setEditName(null));
@@ -195,7 +195,7 @@ export default function ProjectDetail() {
         </p>
       )}
       {swapAsk && (
-        <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)", alignItems: "center" }}>
           <span style={{ flex: "1 1 300px" }}>⚠ {swapAsk}</span>
           <button
             type="button"
@@ -326,7 +326,7 @@ export default function ProjectDetail() {
                         : `✓ Needs ${Math.round(s.need)} g · ${Math.round(left)} g left · ${Math.round(s.reserved)} g reserved`}
                   </div>
                   {swap === s.key && (
-                    <div role="listbox" aria-label={`Choose spool for ${s.key}`} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div role="listbox" aria-label={`Choose spool for ${s.key}`} style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
                       {!plan && <span className="prj-muted">Loading spools…</span>}
                       {options
                         .filter((o) => o.spool.id !== s.spool?.id)

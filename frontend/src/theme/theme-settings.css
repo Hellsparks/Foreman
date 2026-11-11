@@ -1,0 +1,32 @@
+/* Settings → Appearance: theme file, custom CSS, longest labels. Tokens only. */
+.ths { display: flex; flex-direction: column; gap: var(--fw-space-6); margin-top: var(--fw-space-6); }
+.ths__group { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--fw-space-3); min-width: 0; }
+.ths__legend {
+  font-family: var(--fw-font-mono); font-size: var(--fw-type-label); letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase; color: var(--fw-muted); padding: 0; margin-bottom: var(--fw-space-2);
+}
+.ths__current { margin: 0; font-size: var(--fw-font-size); }
+.ths__actions { display: flex; flex-wrap: wrap; gap: var(--fw-space-2); }
+.ths__help { margin: 0; font-size: var(--fw-type-label); line-height: var(--fw-line-height); color: var(--fw-muted); max-width: 72ch; }
+.ths__help code, .ths__check code { font-family: var(--fw-font-mono); }
+.ths__check { display: flex; align-items: center; gap: var(--fw-space-2); min-height: var(--fw-control-h); font-size: var(--fw-font-size); cursor: pointer; }
+.ths__check input { width: 20px; height: 20px; accent-color: var(--fw-accent-hover); }
+.ths__check input:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 3px; }
+.ths__msg { padding: var(--fw-space-3) var(--fw-space-4); border: var(--fw-border-width) solid; font-size: var(--fw-font-size); }
+.ths__msg ul { margin: var(--fw-space-2) 0 0; padding-left: var(--fw-space-5); }
+.ths__msg--bad { color: var(--fw-danger); background: var(--fw-danger-bg); border-color: var(--fw-danger); }
+.ths__msg--warn { color: var(--fw-warning); background: var(--fw-warning-bg); border-color: var(--fw-warning); }
+
+/* Longest labels */
+.ll { display: flex; flex-direction: column; gap: var(--fw-space-3); }
+.ll__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fw-space-2); }
+.ll__result { margin: 0; flex: 1 1 240px; font: 700 var(--fw-font-size) var(--fw-font-mono); }
+.ll__hits { margin: 0; padding-left: var(--fw-space-5); font-size: var(--fw-type-label); color: var(--fw-danger); }
+.ll__hits code { font-family: var(--fw-font-mono); overflow-wrap: anywhere; }
+.ll__stage { display: flex; flex-direction: column; gap: var(--fw-space-3); padding: var(--fw-space-4); border: var(--fw-border-width) dashed var(--fw-border); }
+/* The Fleet grid's narrowest column is 300 px. */
+.ll__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 300px)); gap: var(--fw-space-4); }
+.ll__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fw-space-2); }
+
+[data-clip-hit="clipped"] { outline: 2px dashed var(--fw-danger) !important; outline-offset: -2px; }
+[data-clip-hit="truncated"] { outline: 1px dotted var(--fw-warning) !important; outline-offset: -1px; }

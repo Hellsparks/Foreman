@@ -507,7 +507,7 @@ export default function ProjectNew() {
       </section>
 
       {confirmSwaps && (
-        <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)", alignItems: "center" }}>
           <span style={{ flex: "1 1 300px" }}>
             ⚠ {swapFiles.join(", ")} change{swapFiles.length === 1 ? "s" : ""} filament by hand (M600): someone has to swap spools during each print. Queue
             anyway?

@@ -334,7 +334,7 @@ export default function Filament() {
                   })}
                   {rows != null && shown.length === 0 && (
                     <tr>
-                      <td colSpan={4} style={{ padding: 16 }} className="fil-placeholder">
+                      <td colSpan={4} style={{ padding: "var(--fw-space-4)" }} className="fil-placeholder">
                         {all.length ? "No spool matches." : "No spools in Spoolman yet."}
                       </td>
                     </tr>
@@ -531,7 +531,7 @@ function FilamentsTab({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: 16 }} className="fil-placeholder">
+                <td colSpan={6} style={{ padding: "var(--fw-space-4)" }} className="fil-placeholder">
                   {total ? "No filament matches." : "No filaments yet. Add one, or add a spool and create its filament there."}
                 </td>
               </tr>
@@ -606,7 +606,7 @@ function VendorsTab({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ padding: 16 }} className="fil-placeholder">
+                <td colSpan={4} style={{ padding: "var(--fw-space-4)" }} className="fil-placeholder">
                   No vendors yet.
                 </td>
               </tr>
@@ -758,7 +758,7 @@ function SpoolInspector({
       {archErr && <p className="fil-note fil-note--bad" role="alert">{archErr}</p>}
 
       <section aria-label="Weigh" className="spool-insp__box">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--fw-space-2)" }}>
           <h3>Weigh · scale</h3>
           <span className="fil-sub">○ no scale yet</span>
         </div>

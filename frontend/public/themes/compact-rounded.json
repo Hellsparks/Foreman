@@ -1,0 +1,26 @@
+{
+  "name": "Compact rounded (test)",
+  "description": "Test theme for 6.1: 8 px corners, tighter spacing, serif body, DejaVu mono",
+  "tokens": {
+    "--fw-radius": "8px",
+    "--fw-border-width": "2px",
+    "--fw-control-h": "40px",
+    "--fw-control-h-md": "36px",
+    "--fw-control-h-sm": "32px",
+    "--fw-space-1": "2px",
+    "--fw-space-2": "6px",
+    "--fw-space-3": "8px",
+    "--fw-space-4": "12px",
+    "--fw-space-5": "16px",
+    "--fw-space-6": "18px",
+    "--fw-rail-w": "200px",
+    "--fw-font-body": "\"Foreman Test Serif\", \"DejaVu Serif\", Georgia, serif",
+    "--fw-font-mono": "\"Foreman Test Mono\", \"DejaVu Sans Mono\", \"Courier New\", monospace",
+    "--fw-font-size": "14px",
+    "--fw-line-height": "1.4"
+  },
+  "fonts": [
+    { "family": "Foreman Test Serif", "file": "foreman-test-serif.woff2", "weight": "400" },
+    { "family": "Foreman Test Mono", "file": "foreman-test-mono.woff2", "weight": "400" }
+  ]
+}
