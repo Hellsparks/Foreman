@@ -3,15 +3,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 44px;
+  gap: var(--fw-space-2);
+  min-height: var(--fw-control-h);
   min-width: 120px;
-  padding: 0 16px;
-  border: 1px solid var(--fw-muted);
-  border-radius: 2px;
+  padding: 0 var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
   background: transparent;
   color: var(--fw-text);
-  font: 14px/1 var(--fw-sans);
+  font: var(--fw-font-size)/1 var(--fw-sans);
   cursor: pointer;
   transition: background var(--fw-duration-fast), color var(--fw-duration-fast);
   white-space: nowrap;
@@ -51,7 +51,7 @@
 
 /* Small */
 .ui-btn--small {
-  min-height: 36px;
+  min-height: var(--fw-control-h-sm);
   min-width: 96px;
   font-size: 13px;
 }
@@ -72,8 +72,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--fw-border);
-  border-radius: 2px;
+  border: var(--fw-border-width) solid var(--fw-border);
+  border-radius: var(--fw-radius);
   background: transparent;
   color: var(--fw-muted);
   cursor: pointer;
@@ -95,14 +95,14 @@
 .ui-back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--fw-muted);
-  border-radius: 2px;
+  gap: var(--fw-space-2);
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
   background: transparent;
   color: var(--fw-text);
-  font: 14px/1 var(--fw-sans);
+  font: var(--fw-font-size)/1 var(--fw-sans);
   cursor: pointer;
   transition: background var(--fw-duration-fast);
 }
@@ -119,15 +119,15 @@
 /* ── Panel ────────────────────────────────────────────────────────────────── */
 .ui-panel {
   background: var(--fw-raised);
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
 }
 
 .ui-panel__header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--fw-border);
+  gap: var(--fw-space-3);
+  padding: 10px var(--fw-space-4);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
 }
 
 .ui-panel__title {
@@ -142,13 +142,13 @@
 
 .ui-panel__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--fw-space-2);
   align-items: center;
   flex-shrink: 0;
 }
 
 .ui-panel__body {
-  padding: 16px;
+  padding: var(--fw-space-4);
 }
 
 /* ── SectionLabel ─────────────────────────────────────────────────────────── */
@@ -168,7 +168,7 @@
   font-family: var(--fw-mono);
   font-size: 12px;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 3px var(--fw-space-2);
   line-height: 1.4;
 }
 
@@ -182,7 +182,7 @@
 .ui-swatch {
   display: inline-block;
   flex-shrink: 0;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   vertical-align: middle;
 }
 
@@ -216,7 +216,7 @@
 /* ── ProgressBar ──────────────────────────────────────────────────────────── */
 .ui-progress {
   background: var(--fw-surface);
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   overflow: hidden;
 }
 
@@ -234,7 +234,7 @@
   z-index: 200;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fw-space-2);
   width: 380px;
   max-width: calc(100vw - 48px);
   pointer-events: none;
@@ -243,10 +243,10 @@
 .ui-toast {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: var(--fw-space-3);
+  padding: var(--fw-space-3) 14px;
   background: var(--fw-raised);
-  border: 1px solid var(--fw-info);
+  border: var(--fw-border-width) solid var(--fw-info);
   box-shadow: var(--fw-shadow-overlay);
   pointer-events: all;
 }
@@ -259,10 +259,10 @@
 
 .ui-toast__undo {
   flex-shrink: 0;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--fw-muted);
-  border-radius: 2px;
+  min-height: var(--fw-control-h-sm);
+  padding: 0 var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
   background: transparent;
   color: var(--fw-text);
   font: 700 13px/1 var(--fw-sans);
@@ -284,13 +284,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: var(--fw-control-h-sm);
+  height: var(--fw-control-h-sm);
   border: 0;
   background: none;
   color: var(--fw-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--fw-font-size);
   transition: color var(--fw-duration-fast);
 }
 
@@ -307,7 +307,7 @@
 .ext-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--fw-space-1);
   min-height: 32px;
   color: var(--fw-info);
   text-decoration: underline;

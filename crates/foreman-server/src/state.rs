@@ -39,4 +39,6 @@ pub struct AppState {
     pub scheduler: Arc<Scheduler>,
     /// The built-in Spoolman, once it has started (empty while disabled).
     pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
+    /// Server data directory; theme fonts and custom.css are served from it.
+    pub data_dir: std::path::PathBuf,
 }

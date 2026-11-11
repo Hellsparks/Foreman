@@ -128,7 +128,7 @@ export default function LocationsTab({
             )}
             {data.locations.length === 0 && data.unplaced === 0 && (
               <tr>
-                <td colSpan={4} style={{ padding: 16 }} className="fil-placeholder">
+                <td colSpan={4} style={{ padding: "var(--fw-space-4)" }} className="fil-placeholder">
                   No locations yet. Set one on a spool (Edit spool → Location).
                 </td>
               </tr>

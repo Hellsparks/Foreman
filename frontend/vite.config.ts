@@ -9,6 +9,7 @@ export default defineConfig({
     // In production the same server serves both the frontend and the API.
     proxy: {
       "/api": "http://localhost:9090",
+      "/theme": "http://localhost:9090",
       "/ws": {
         target: "ws://localhost:9090",
         ws: true,

@@ -240,7 +240,7 @@ export default function TemplateEditor() {
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
 
       <div className="tpl-grid">
-        <main style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        <main style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-4)", minWidth: 0 }}>
           <section id="basics" aria-label="Basics" className="prj-sec">
             <h2 className="prj-sec__title">Basics</h2>
             <label className="prj-field">
@@ -276,8 +276,8 @@ export default function TemplateEditor() {
                   <li key={`${p.file_id}-${i}`} className="tpl-plate">
                     <span className="tpl-plate__n">{i + 1}</span>
                     <Thumb url={f?.thumb_url} />
-                    <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                      <input className="prj-input" aria-label={`Plate ${i + 1} name`} value={p.name} onChange={(e) => setPlate(i, { ...p, name: e.target.value })} style={{ minHeight: 36 }} />
+                    <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
+                      <input className="prj-input" aria-label={`Plate ${i + 1} name`} value={p.name} onChange={(e) => setPlate(i, { ...p, name: e.target.value })} style={{ minHeight: "var(--fw-control-h-sm)" }} />
                       <span className={`prj-muted${f?.missing ? " prj-tone--bad" : ""}`}>
                         {f?.file_name ?? `file #${p.file_id}`} · {plateMeta(f)}
                       </span>
@@ -405,7 +405,7 @@ export default function TemplateEditor() {
                         return (
                           <td key={pi}>
                             {list.map((x) => (
-                              <label key={x.index} style={{ display: "inline-flex", alignItems: "center", gap: 2, marginRight: 4 }}>
+                              <label key={x.index} style={{ display: "inline-flex", alignItems: "center", gap: 2, marginRight: "var(--fw-space-1)" }}>
                                 <input
                                   type="checkbox"
                                   checked={slotOf(p, x.index) === s.key}
@@ -449,7 +449,7 @@ export default function TemplateEditor() {
               </h2>
             </div>
             <Thumb url={thumbUrl} big alt={form.name ? `${form.name} thumbnail` : ""} />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)" }}>
               {form.plates.map((p, i) => (
                 <button
                   key={i}
@@ -469,7 +469,7 @@ export default function TemplateEditor() {
           </section>
         </main>
 
-        <aside style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        <aside style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-4)", minWidth: 0 }}>
           <section aria-label="Checklist" className="prj-sec">
             <h2 className="prj-sec__title">Ready to use? {done} of 4</h2>
             {checks.map(([ok, label, href], i) => (

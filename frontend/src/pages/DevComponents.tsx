@@ -27,7 +27,7 @@ const STATUS_CHIPS: { tone: Tone; symbol: string; word: string }[] = [
 
 function Row({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", ...style }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)", alignItems: "center", ...style }}>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ function Row({ children, style }: { children: React.ReactNode; style?: React.CSS
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: 40 }}>
-      <SectionLabel as="h2" style={{ marginBottom: 12 } as React.CSSProperties}>
+      <SectionLabel as="h2" style={{ marginBottom: "var(--fw-space-3)" } as React.CSSProperties}>
         {title}
       </SectionLabel>
       {children}
@@ -49,7 +49,7 @@ export default function DevComponents() {
   const { toasts, addToast, removeToast } = useToasts();
 
   return (
-    <div style={{ padding: "24px 32px 64px", maxWidth: 900 }}>
+    <div style={{ padding: "var(--fw-space-6) 32px 64px", maxWidth: 900 }}>
       <div className="page-header">
         <p className="page-header__eyebrow">Dev</p>
         <h1 className="page-header__title">Component Gallery</h1>
@@ -63,7 +63,7 @@ export default function DevComponents() {
           <Button variant="small">Small</Button>
           <Button variant="danger">Danger</Button>
         </Row>
-        <Row style={{ marginTop: 8 } as React.CSSProperties}>
+        <Row style={{ marginTop: "var(--fw-space-2)" } as React.CSSProperties}>
           <Button variant="primary" fixedWidth={148}>Fixed 148 px</Button>
           <Button variant="secondary" fixedWidth={148}>Fixed 148 px</Button>
           <Button variant="primary" disabled>Disabled</Button>
@@ -100,7 +100,7 @@ export default function DevComponents() {
 
       {/* Panel ───────────────────────────────────────────────────────────── */}
       <Section title="Panel">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-4)" }}>
           <Panel>
             Plain panel body, no header.
           </Panel>
@@ -156,11 +156,11 @@ export default function DevComponents() {
 
       {/* ProgressBar ─────────────────────────────────────────────────────── */}
       <Section title="ProgressBar">
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-3)" }}>
           <ProgressBar value={progressVal} label="Adjustable progress" />
           <ProgressBar value={100} label="Complete" color="var(--fw-success)" height={8} />
           <ProgressBar value={0}   label="Zero" height={4} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--fw-space-3)", marginTop: "var(--fw-space-1)" }}>
             <input
               type="range"
               min={0}
@@ -197,7 +197,7 @@ export default function DevComponents() {
             Add toast with Undo
           </Button>
         </Row>
-        <p style={{ marginTop: 8, fontSize: 13, color: "var(--fw-muted)", fontFamily: "var(--fw-mono)" }}>
+        <p style={{ marginTop: "var(--fw-space-2)", fontSize: 13, color: "var(--fw-muted)", fontFamily: "var(--fw-mono)" }}>
           Toasts appear fixed bottom-right.
         </p>
       </Section>

@@ -37,7 +37,7 @@ export default function PrinterSpoolsTab({ printerId }: { printerId: number }) {
   return (
     <div className="pspools" role="tabpanel" aria-label="Spools">
       <div className="pspools__main">
-        <p className="fil-muted" style={{ fontSize: 14 }}>
+        <p className="fil-muted" style={{ fontSize: "var(--fw-font-size)" }}>
           {anyWritable
             ? "Pick a slot to load or change its spool. Material, nozzle and remaining filament are checked in the panel."
             : slots?.[0]?.read_only_reason ?? "This printer reports no filament slots."}

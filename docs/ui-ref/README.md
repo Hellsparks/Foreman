@@ -18,6 +18,38 @@ These files are exported from the Foreman UI demo (claude.ai design artifact). T
 | `PhoneFleet.dc.html` | Phone layout (390 px): bottom tabs, compact cards. |
 | `Connect.dc.html` | Connect / sign in / backup routes / lost connection (Phase 2 end, not UI 1). Shows the custom window frame. |
 
+## Themeable tokens (Phase 6.1) — use these, never the literal
+A user theme (Settings → Appearance → Import) can change every token below, so a literal in CSS or an inline style is a bug: it will not follow the theme. Defaults equal the pre-6.1 literals. Defined in `frontend/src/theme/theme.css` (spacing 1–4 and 6 come from `design/tokens.css`, which stays unmodified).
+
+| Token | Default | Use for |
+|---|---|---|
+| `--fw-radius` | 2px | every `border-radius` that was 2 px (buttons, fields, chips with corners). `--fw-radius-control` follows it. |
+| `--fw-border-width` | 1px | every 1 px border: `border: var(--fw-border-width) solid var(--fw-border)`. Focus outlines stay 2 px. |
+| `--fw-control-h` | 44px | standard button / field / touch target height; `min-width: 44px` touch targets. `--fw-control-height` follows it. |
+| `--fw-control-h-md` | 40px | buttons in lists and rows |
+| `--fw-control-h-sm` | 36px | small buttons, inline controls |
+| `--fw-space-1` … `--fw-space-6` | 4, 8, 12, 16, 20, 24 px | gap, padding, margin. Odd values (6, 10, 14 px) are still literals; use the nearest token in new code. |
+| `--fw-rail-w` | 176px | sidebar rail width (expanded) |
+| `--fw-font-body` | Arial, Helvetica, sans-serif | body text; `--fw-sans` follows it, and so do `<button>`, `<input>`, `<select>` |
+| `--fw-font-mono` | ui-monospace, SFMono-Regular, Consolas, monospace | labels, chips, numbers; `--fw-mono` follows it. Must have tabular figures. |
+| `--fw-font-size` | 14px | UI text size (anything that was 14 px) |
+| `--fw-line-height` | 1.5 | body line height where it was 1.5 |
+| colours | per scheme | the semantic `--fw-*` colours in `tokens.css` (background, surface, raised, text, muted, border, accent, accent-hover, on-accent, button-hover, focus, success/warning/danger/info and their `-bg`) |
+
+Inline styles: `style={{ gap: "var(--fw-space-2)", borderRadius: "var(--fw-radius)" }}`, not `gap: 8`.
+
+Theme file format (validated on import; unknown keys rejected; contrast below 4.5:1 text / 3:1 UI and a mono font without tabular figures are warnings, not blocks):
+```json
+{
+  "name": "Compact rounded (test)",
+  "tokens": { "--fw-radius": "8px", "--fw-font-body": "\"My Sans\", Arial, sans-serif" },
+  "fonts": [{ "family": "My Sans", "file": "my-sans.woff2", "weight": "400" }]
+}
+```
+Font files go in `<data_dir>/fonts/` and are served at `/theme/fonts/<file>` (`.woff2` only). `<data_dir>/custom.css` is served at `/theme/custom.css` and loaded after the theme when the Settings toggle is on — **unsupported**: class names may change in any update. Sample theme: `frontend/public/themes/compact-rounded.json` (also served at `/themes/compact-rounded.json`).
+
+**Longest labels** (Settings → Appearance) renders worst-case strings in the real components and flags anything that clips; "Scan this page too" checks the rest of the open page. Run it after any font, spacing or layout change.
+
 ## Design rules (from the UI workshop — apply everywhere)
 1. **Fieldwork tokens only.** No new colours. Status colours: `--fw-success/-warning/-danger/-info` + `-bg`.
 2. **Buttons**: min-height 44 px (36 px small, 40 px in lists). Standard min-width 120 px; small 96 px. Buttons in a row of actions share one fixed width (Attention actions: 148 px, grid column layout) so they line up across rows. Primary = `--fw-accent-hover` bg + `--fw-on-accent` text + monospace bold. Secondary = 1 px `--fw-muted` border, transparent. Radius 2 px.
@@ -27,7 +59,7 @@ These files are exported from the Foreman UI demo (claude.ai design artifact). T
 6. **Labels/section heads**: monospace 12 px, uppercase, letter-spacing .06em, `--fw-muted`.
 7. **Status chips**: monospace 12 px bold, symbol + word (▶ Printing, ✓ Finished, ‖ Paused, ✖ Error, ○ Offline, ● Idle), coloured fg on its `-bg`.
 8. **Filament swatches**: single colour = square/circle fill; coextruded (multi_color_direction=coaxial) = split circle; gradient (longitudinal) = gradient bar; empty slot = dashed border.
-9. Font: Arial/Helvetica body 14 px / 1.5; headings tight letter-spacing (-0.025em); h1 32 px.
+9. Font: body 14 px / 1.5 (`--fw-font-body`, `--fw-font-size`, `--fw-line-height`; Arial/Helvetica by default); headings tight letter-spacing (-0.025em); h1 32 px.
 10. Every interactive element has a visible `:focus-visible` outline (`--fw-focus`).
 
 ## Printer page (UI 3)

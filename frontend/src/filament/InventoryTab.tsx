@@ -296,7 +296,7 @@ export default function InventoryTab({
               })}
               {tracked.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: 16 }} className="fil-placeholder">
+                  <td colSpan={8} style={{ padding: "var(--fw-space-4)" }} className="fil-placeholder">
                     No filament is tracked yet. Use + Track filament.
                   </td>
                 </tr>

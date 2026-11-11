@@ -5,22 +5,22 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px 12px;
-  border-bottom: 1px solid var(--fw-border);
+  gap: var(--fw-space-2) var(--fw-space-3);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
 }
 
 /* Title block portaled into the shell top bar. */
 .printer-title__back {
-  width: 36px;
-  height: 36px;
+  width: var(--fw-control-h-sm);
+  height: var(--fw-control-h-sm);
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
   color: var(--fw-text);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
 }
 
@@ -39,10 +39,10 @@
 }
 
 .printer-header__fw {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 11px;
   color: var(--fw-muted);
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   padding: 1px 6px;
   white-space: nowrap;
 }
@@ -52,13 +52,13 @@
 .printer-header__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding-bottom: 4px;
+  gap: var(--fw-space-2);
+  padding-bottom: var(--fw-space-1);
 }
 
 .printer-header__actions .ui-btn {
   min-height: 32px;
-  padding: 0 12px;
+  padding: 0 var(--fw-space-3);
   font-size: 13px;
 }
 
@@ -74,12 +74,12 @@
   min-height: 38px;
   padding: 0 14px;
   margin-right: -1px;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   border-bottom-color: var(--fw-border);
   background: transparent;
   cursor: pointer;
   font-weight: normal;
-  font-size: 14px;
+  font-size: var(--fw-font-size);
 }
 
 .printer-tab--active {
@@ -90,10 +90,10 @@
 
 /* Live tab: [webcam with overlays] [controls]; wraps on narrow screens */
 .printer-live {
-  padding: 16px 0 24px;
+  padding: var(--fw-space-4) 0 var(--fw-space-6);
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--fw-space-3);
   align-items: flex-start;
 }
 
@@ -110,8 +110,8 @@
   display: flex;
   justify-content: flex-end;
   align-items: stretch;
-  gap: 8px;
-  padding: 8px;
+  gap: var(--fw-space-2);
+  padding: var(--fw-space-2);
   pointer-events: none;
 }
 
@@ -121,9 +121,9 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--fw-border);
+  gap: var(--fw-space-2);
+  padding: 10px var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: color-mix(in srgb, var(--fw-raised) var(--cam-ov-alpha, 85%), transparent);
   box-shadow: var(--fw-shadow-overlay);
   animation: cam-ov-in var(--fw-duration-normal, 200ms) cubic-bezier(0.2, 0, 0, 1);
@@ -145,16 +145,16 @@
 .cam-ov__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .cam-ov__close {
   width: 28px;
   height: 28px;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   color: var(--fw-muted);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -169,7 +169,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--fw-space-2);
   overflow: auto;
 }
 
@@ -187,7 +187,7 @@
   min-width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--fw-space-3);
 }
 
 /* Webcam section */
@@ -196,7 +196,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0;
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
 }
 
 .webcam-bar__spacer { flex: 1; }
@@ -205,16 +205,16 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 8px;
+  padding: 0 var(--fw-space-2);
 }
 
 .webcam-bar__toggle {
   min-height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
   color: var(--fw-text);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
   font-size: 12px;
 }
@@ -229,7 +229,7 @@
   min-height: 40px;
   padding: 0 14px;
   border: 0;
-  border-right: 1px solid var(--fw-border);
+  border-right: var(--fw-border-width) solid var(--fw-border);
   border-bottom: 3px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -262,23 +262,23 @@
 
 /* Section panels (temps, toolhead, extruder, console, macros) */
 .live-panel {
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: var(--fw-raised);
-  padding: 10px 12px;
+  padding: 10px var(--fw-space-3);
   display: flex;
   flex-direction: column;
 }
 
 .live-panel--gap { gap: 10px; }
-.live-panel--gap-sm { gap: 8px; }
+.live-panel--gap-sm { gap: var(--fw-space-2); }
 
 /* Heater row */
 .heater-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fw-space-2);
   min-height: 48px;
-  border-top: 1px solid var(--fw-border);
+  border-top: var(--fw-border-width) solid var(--fw-border);
 }
 
 .heater-row__name {
@@ -287,7 +287,7 @@
 }
 
 .heater-row__now {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   width: 56px;
   text-align: right;
 }
@@ -298,49 +298,49 @@
 
 .heater-row__input {
   width: 64px;
-  min-height: 40px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h-md);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: var(--fw-raised);
   padding: 0 6px;
-  border-radius: 2px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 14px;
+  border-radius: var(--fw-radius);
+  font-family: var(--fw-font-mono);
+  font-size: var(--fw-font-size);
   color: var(--fw-text);
 }
 
 .heater-row__off {
-  min-height: 40px;
-  width: 40px;
-  border: 1px solid var(--fw-border);
+  min-height: var(--fw-control-h-md);
+  width: var(--fw-control-h-md);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   cursor: pointer;
   font-size: 11px;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
 }
 
 /* Preset buttons */
 .preset-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--fw-space-1);
   padding-bottom: 6px;
 }
 
 .preset-btn {
   min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--fw-border);
+  padding: 0 var(--fw-space-2);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   cursor: pointer;
   font-size: 11px;
-  border-radius: 2px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  border-radius: var(--fw-radius);
+  font-family: var(--fw-font-mono);
 }
 
 /* Toolhead: jog pad */
 .jog-layout {
   display: flex;
-  gap: 8px;
+  gap: var(--fw-space-2);
   align-items: flex-start;
 }
 
@@ -366,14 +366,14 @@
 }
 
 .jog-btn {
-  width: 44px;
-  height: 44px;
+  width: var(--fw-control-h);
+  height: var(--fw-control-h);
   padding: 0;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-weight: bold;
   font-size: 12px;
 }
@@ -384,7 +384,7 @@
 }
 
 .jog-btn--primary {
-  border: 1px solid transparent;
+  border: var(--fw-border-width) solid transparent;
   background: var(--fw-accent-hover);
   color: var(--fw-on-accent);
 }
@@ -402,13 +402,13 @@
 }
 
 .step-btn {
-  min-height: 36px;
+  min-height: var(--fw-control-h-sm);
   padding: 0;
   margin-left: -1px;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 12px;
 }
 
@@ -432,13 +432,13 @@
 
 .babystep-btn {
   flex: 1;
-  min-height: 36px;
+  min-height: var(--fw-control-h-sm);
   padding: 0;
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 11px;
 }
 
@@ -455,12 +455,12 @@
 
 .ext-btn {
   flex: 1;
-  min-height: 36px;
+  min-height: var(--fw-control-h-sm);
   margin-left: -1px;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   background: transparent;
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 12px;
 }
 
@@ -477,20 +477,20 @@
 
 .ext-actions button {
   flex: 1;
-  min-height: 44px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
 }
 
 /* Console */
 .console-output {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 12px;
   background: var(--fw-surface);
-  border: 1px solid var(--fw-border);
-  padding: 8px;
+  border: var(--fw-border-width) solid var(--fw-border);
+  padding: var(--fw-space-2);
   flex: 1;
   min-height: 120px;
   overflow: auto;
@@ -499,25 +499,25 @@
 
 .console-input {
   display: flex;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .console-input input {
   flex: 1;
-  min-height: 44px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: var(--fw-raised);
-  padding: 0 12px;
-  border-radius: 2px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  padding: 0 var(--fw-space-3);
+  border-radius: var(--fw-radius);
+  font-family: var(--fw-font-mono);
 }
 
 .console-input button {
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
 }
 
@@ -532,17 +532,17 @@
 .macro-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .macro-btn {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--fw-muted);
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-muted);
   background: transparent;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--fw-font-mono);
   font-size: 12px;
 }
 
@@ -566,13 +566,13 @@
 
 .cancel-dialog {
   background: var(--fw-raised);
-  border: 1px solid var(--fw-border);
-  padding: 24px;
+  border: var(--fw-border-width) solid var(--fw-border);
+  padding: var(--fw-space-6);
   max-width: 400px;
   width: 90%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--fw-space-4);
 }
 
 .cancel-dialog h2 {
@@ -582,7 +582,7 @@
 
 .cancel-dialog__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--fw-space-2);
   justify-content: flex-end;
 }
 
@@ -590,7 +590,7 @@
 .printer-config {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--fw-space-5);
   padding: 0 0 32px;
 }
 
@@ -600,10 +600,10 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: var(--fw-space-3);
+  padding: var(--fw-space-3) 0;
   background: var(--fw-background);
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
 }
 
 .printer-config__title {
@@ -613,12 +613,12 @@
 }
 
 .printer-config__save {
-  min-height: 40px;
-  padding: 0 20px;
-  border: 1px solid transparent;
+  min-height: var(--fw-control-h-md);
+  padding: 0 var(--fw-space-5);
+  border: var(--fw-border-width) solid transparent;
   background: var(--fw-accent-hover);
   color: var(--fw-on-accent);
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: pointer;
   font-family: var(--fw-mono);
   font-weight: bold;
@@ -631,11 +631,11 @@
 
 .printer-config__cols {
   column-width: 460px;
-  column-gap: 20px;
+  column-gap: var(--fw-space-5);
 }
 
 .printer-config__cols > * {
   break-inside: avoid;
   width: 100%;
-  margin: 0 0 20px;
+  margin: 0 0 var(--fw-space-5);
 }

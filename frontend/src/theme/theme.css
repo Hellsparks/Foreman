@@ -1,0 +1,46 @@
+/* Foreman themeable tokens (Phase 6.1).
+ *
+ * Loaded right after design/tokens.css (which stays unmodified). Every value
+ * here equals what the UI used as a literal before 6.1, so the default look is
+ * unchanged. A user theme (Settings → Appearance → Import) overrides these on
+ * <html> at a higher specificity; see theme/userTheme.ts.
+ *
+ * Use these in CSS and inline styles — never the literal values.
+ * The table of themeable tokens is in docs/ui-ref/README.md.
+ */
+:root {
+  /* Shape */
+  --fw-radius: 2px;
+  --fw-border-width: 1px;
+
+  /* Control heights: standard 44, list rows 40, small 36 */
+  --fw-control-h: 44px;
+  --fw-control-h-md: 40px;
+  --fw-control-h-sm: 36px;
+
+  /* Spacing. 1–4 and 6 come from tokens.css; 5 fills the gap. */
+  --fw-space-5: 20px;
+
+  /* Shell */
+  --fw-rail-w: 176px;
+
+  /* Type: two font slots, body and mono, changed independently */
+  --fw-font-body: Arial, Helvetica, sans-serif;
+  --fw-font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --fw-font-size: 14px;
+  --fw-line-height: 1.5;
+
+  /* Bridge Fieldwork's own names onto the themeable ones so the .fw-*
+     primitives in tokens.css follow a theme too. */
+  --fw-sans: var(--fw-font-body);
+  --fw-mono: var(--fw-font-mono);
+  --fw-radius-control: var(--fw-radius);
+  --fw-control-height: var(--fw-control-h);
+}
+
+/* Form controls take the browser's UI font by default, not the page's; point
+   them at the body slot so a theme's body font reaches every button and field.
+   :where() keeps this at zero specificity: any component rule still wins. */
+:where(button, input, select) {
+  font-family: var(--fw-font-body);
+}

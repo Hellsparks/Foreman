@@ -61,9 +61,9 @@ body {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  width: 176px;
+  width: var(--fw-rail-w);
   background: var(--fw-surface);
-  border-right: 1px solid var(--fw-border);
+  border-right: var(--fw-border-width) solid var(--fw-border);
   overflow: hidden;
   transition: width var(--fw-duration-expand, 240ms) cubic-bezier(0.2, 0, 0, 1);
 }
@@ -76,10 +76,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px;
+  padding: 0 var(--fw-space-4);
   height: var(--shell-bar-h);
-  border-bottom: 1px solid var(--fw-border);
-  margin-bottom: 8px;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+  margin-bottom: var(--fw-space-2);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -122,9 +122,9 @@ body {
 .rail__link {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  min-height: 44px;
+  gap: var(--fw-space-3);
+  padding: 0 var(--fw-space-4);
+  min-height: var(--fw-control-h);
   color: var(--fw-text);
   text-decoration: none;
   white-space: nowrap;
@@ -172,16 +172,16 @@ body {
 /* Footer: collapse toggle */
 .rail__footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--fw-border);
+  border-top: var(--fw-border-width) solid var(--fw-border);
   padding: var(--fw-space-2) 0;
 }
 
 .rail__toggle {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--fw-space-3);
   width: 100%;
-  min-height: 44px;
+  min-height: var(--fw-control-h);
   padding: 0 18px;
   background: transparent;
   border: none;
@@ -210,12 +210,12 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--fw-space-3);
   height: var(--shell-bar-h);
   padding: 0 32px;
   flex-shrink: 0;
   background: var(--fw-background);
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
   /* Prevent text/element selection and HTML drag-and-drop from hijacking
      the Wayland window-drag initiated via startDragging(). */
   user-select: none;
@@ -253,12 +253,12 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-3);
   background: var(--fw-raised);
-  border: 1px solid var(--fw-muted);
+  border: var(--fw-border-width) solid var(--fw-muted);
   box-sizing: border-box;
-  border-radius: 2px;
+  border-radius: var(--fw-radius);
   cursor: text;
   color: var(--fw-muted);
   transition: border-color var(--fw-duration-fast);
@@ -276,7 +276,7 @@ body {
   border: 0;
   background: transparent;
   color: var(--fw-text);
-  font: 14px / 1 var(--fw-sans);
+  font: var(--fw-font-size) / 1 var(--fw-sans);
   outline: none;
   /* Cancel browser search-field styling on WebKit */
   -webkit-appearance: none;
@@ -298,7 +298,7 @@ body {
   font: 12px / 1 var(--fw-mono);
   color: var(--fw-muted);
   background: transparent;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   padding: 2px 6px;
 }
 
@@ -308,7 +308,7 @@ body {
   font: var(--fw-type-label) / 1 var(--fw-mono);
   color: var(--fw-warning);
   background: var(--fw-warning-bg);
-  padding: 4px 8px;
+  padding: var(--fw-space-1) var(--fw-space-2);
   white-space: nowrap;
 }
 
@@ -316,14 +316,14 @@ body {
 .topbar__btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 16px;
+  gap: var(--fw-space-2);
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-4);
   background: transparent;
-  border: 1px solid var(--fw-muted);
-  border-radius: 2px;
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
   color: var(--fw-text);
-  font: 14px / 1 var(--fw-sans);
+  font: var(--fw-font-size) / 1 var(--fw-sans);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -425,7 +425,7 @@ body {
 .appearance-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: var(--fw-space-2);
 }
 
 .appearance-swatch {
@@ -433,9 +433,9 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 8px;
-  border: 1px solid var(--fw-border);
-  border-radius: 2px;
+  padding: var(--fw-space-2);
+  border: var(--fw-border-width) solid var(--fw-border);
+  border-radius: var(--fw-radius);
   background: transparent;
   cursor: pointer;
   color: var(--fw-muted);
@@ -461,7 +461,7 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1px solid var(--fw-border);
+  border: var(--fw-border-width) solid var(--fw-border);
   flex-shrink: 0;
 }
 
@@ -470,7 +470,7 @@ body {
   flex-shrink: 0;
   width: 400px;
   background: var(--fw-raised);
-  border-left: 1px solid var(--fw-border);
+  border-left: var(--fw-border-width) solid var(--fw-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -488,7 +488,7 @@ body {
   gap: var(--fw-space-3);
   padding: var(--fw-space-4) var(--fw-space-6);
   min-height: 56px;
-  border-bottom: 1px solid var(--fw-border);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
   flex-shrink: 0;
 }
 
@@ -564,7 +564,7 @@ body {
   font: var(--fw-type-body) / var(--fw-line-body) var(--fw-sans);
   margin: 0;
   padding: var(--fw-space-8) 0;
-  border-top: 1px solid var(--fw-border);
+  border-top: var(--fw-border-width) solid var(--fw-border);
 }
 
 /* ── Window controls (Tauri undecorated) ─────────────────────────────────── */
@@ -623,7 +623,7 @@ body {
     width: 100%;
     max-height: 60dvh;
     border-left: none;
-    border-top: 1px solid var(--fw-border);
+    border-top: var(--fw-border-width) solid var(--fw-border);
   }
 
   .inspector[data-open="false"] {
@@ -634,6 +634,7 @@ body {
   .phone-nav {
     display: flex;
   }
+
 }
 
 /* Phone bottom nav (hidden on desktop) */
@@ -642,7 +643,7 @@ body {
   align-items: stretch;
   flex-shrink: 0;
   background: var(--fw-surface);
-  border-top: 1px solid var(--fw-border);
+  border-top: var(--fw-border-width) solid var(--fw-border);
 }
 
 .phone-nav__btn {
@@ -651,9 +652,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: var(--fw-space-1);
   min-height: 56px;
-  padding: 8px 4px;
+  padding: var(--fw-space-2) var(--fw-space-1);
   background: transparent;
   border: none;
   color: var(--fw-muted);

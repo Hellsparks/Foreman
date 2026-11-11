@@ -589,7 +589,7 @@ export default function Fleet() {
 
 // ── PrinterCard ───────────────────────────────────────────────────────────────
 
-function PrinterCard({
+export function PrinterCard({
   printer,
   slots,
   onLoadSpool,
@@ -824,7 +824,7 @@ function PrinterInspector({
           <div className="fleet-insp__job-sub">{jobSubLine(status)}</div>
         )}
         {hasProgress && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: "var(--fw-space-2)" }}>
             <ProgressBar value={pct} height={8} />
           </div>
         )}
@@ -851,7 +851,7 @@ function PrinterInspector({
             </div>
           ))}
           {canLoad ? (
-            <button type="button" className="fleet-insp__btn" style={{ marginTop: 8 }} onClick={onLoadSpool}>
+            <button type="button" className="fleet-insp__btn" style={{ marginTop: "var(--fw-space-2)" }} onClick={onLoadSpool}>
               Load spool…
             </button>
           ) : (
