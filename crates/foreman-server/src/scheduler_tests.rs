@@ -879,6 +879,70 @@ mod jobs {
         );
         assert!(!r.plate(1).await);
     }
+
+    /// W9 (5.1): a queued project print that finishes on a (mock) printer marks
+    /// its own plate through the job engine; the job is linked to the plate.
+    #[tokio::test]
+    async fn finished_project_print_marks_its_plate() {
+        use foreman_core::{projects::ToolSlot, repo::project::NewProject};
+        let r = rig(None).await;
+        r.file(10, spool_file());
+        r.file(11, spool_file());
+        r.env.set_state(2, PrinterState::Offline);
+        let tools = vec![ToolSlot {
+            tool: 0,
+            slot: "PRIMARY".into(),
+        }];
+        let pid = repo::project::create_project(
+            &r.pool,
+            &NewProject {
+                name: "Clips",
+                template_id: None,
+                template_name: None,
+                sets: 1,
+                due_date: None,
+                slots: vec![("PRIMARY".into(), None, None, Some(7))],
+                plates: vec![
+                    ("A".into(), 10, 1, tools.clone()),
+                    ("B".into(), 11, 2, tools),
+                ],
+            },
+        )
+        .await
+        .expect("project");
+        let plates = repo::project::plates(&r.pool, pid).await.expect("plates");
+        let item = r.add(11, Some(1)).await;
+        repo::project::link_queue_item(&r.pool, item, plates[1].id)
+            .await
+            .expect("link");
+
+        assert_eq!(r.tick().await, 1);
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+
+        let after = repo::project::plates(&r.pool, pid).await.expect("plates");
+        assert_eq!(
+            (after[0].printed, after[1].printed),
+            (0, 1),
+            "plate B, not A"
+        );
+        let job_plate: Option<i64> =
+            sqlx::query_scalar("SELECT project_plate_id FROM job WHERE queue_item_id = ?")
+                .bind(item)
+                .fetch_one(&r.pool)
+                .await
+                .expect("job");
+        assert_eq!(job_plate, Some(plates[1].id));
+        assert_eq!(
+            repo::project::get_project(&r.pool, pid)
+                .await
+                .expect("p")
+                .status,
+            "active",
+            "B wants 2 copies, A none printed yet"
+        );
+    }
 }
 
 /// The live deduction path: spoolman-rs `use_weight` on a real SQLite Spoolman DB.

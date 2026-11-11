@@ -518,6 +518,9 @@ pub struct QueueItem {
     /// Why it failed (upload / start error, missing file).
     pub error: Option<String>,
     pub updated_at: String,
+    /// The project plate this print belongs to (W9), if any.
+    #[ts(type = "number | null")]
+    pub project_plate_id: Option<i64>,
 }
 
 // ---------------------------------------------------------------------------

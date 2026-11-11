@@ -12,6 +12,7 @@ pub mod filament;
 pub mod inventory;
 pub mod library;
 pub mod materials;
+pub mod projects;
 pub mod remote_fs;
 pub mod repo;
 pub mod secrets;

@@ -26,4 +26,8 @@ position: number,
 /**
  * Why it failed (upload / start error, missing file).
  */
-error: string | null, updated_at: string, };
+error: string | null, updated_at: string, 
+/**
+ * The project plate this print belongs to (W9), if any.
+ */
+project_plate_id: number | null, };

@@ -693,6 +693,24 @@ impl Scheduler {
                 None
             }
         };
+        // W9: a finished print counts for its project plate (and may close the project).
+        if let Some(item) = &item {
+            let printer_name = repo::printer::get(&self.pool, printer_id)
+                .await
+                .map(|p| p.name)
+                .unwrap_or_else(|_| format!("printer {printer_id}"));
+            if let Err(e) = crate::projects::print_ended(
+                &self.pool,
+                item,
+                end,
+                job.as_ref().map(|j| j.id),
+                &printer_name,
+            )
+            .await
+            {
+                warn!(item = item.id, "project plate update: {e}");
+            }
+        }
         if let Err(e) = repo::printer::set_plate_clear(&self.pool, printer_id, false).await {
             warn!(printer_id, "set plate_clear false: {e}");
         }

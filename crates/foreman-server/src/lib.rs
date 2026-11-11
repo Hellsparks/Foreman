@@ -12,6 +12,9 @@ mod inventory;
 mod inventory_tests;
 mod job_engine;
 mod net;
+mod projects;
+#[cfg(test)]
+mod projects_tests;
 mod scheduler;
 #[cfg(test)]
 mod scheduler_tests;
@@ -650,6 +653,39 @@ fn build_router(app_state: AppState) -> Router {
         .route(
             "/api/filaments/{id}",
             get(api::filaments::get_filament).patch(api::filaments::update_filament),
+        )
+        // Templates + projects (5.1)
+        .route(
+            "/api/templates",
+            get(api::projects::list_templates).post(api::projects::create_template),
+        )
+        .route(
+            "/api/templates/{id}",
+            get(api::projects::get_template)
+                .put(api::projects::update_template)
+                .delete(api::projects::delete_template),
+        )
+        .route("/api/templates/{id}/plan", get(api::projects::plan))
+        .route(
+            "/api/projects",
+            get(api::projects::list).post(api::projects::create),
+        )
+        .route(
+            "/api/projects/{id}",
+            get(api::projects::get).patch(api::projects::update),
+        )
+        .route(
+            "/api/projects/{id}/print-remaining",
+            post(api::projects::print_remaining),
+        )
+        .route(
+            "/api/projects/{id}/slots/{key}",
+            put(api::projects::set_slot),
+        )
+        .route("/api/project-plates/{id}", patch(api::projects::set_copies))
+        .route(
+            "/api/project-plates/{id}/done",
+            post(api::projects::mark_done),
         )
         // Inventory + locations (4.3)
         .route("/api/inventory", get(api::inventory::get))
