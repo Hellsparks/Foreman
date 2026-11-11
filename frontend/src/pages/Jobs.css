@@ -24,8 +24,8 @@
 
 .jobs-head__title {
   margin: 0;
-  font: 500 var(--fw-type-display) / var(--fw-line-display) var(--fw-sans);
-  letter-spacing: var(--fw-tracking-display);
+  font: 500 var(--fw-type-heading) / var(--fw-line-heading) var(--fw-sans);
+  letter-spacing: var(--fw-tracking-heading);
   color: var(--fw-text);
 }
 
@@ -195,7 +195,7 @@
 .jobs-card__file {
   flex: 1;
   min-width: 0;
-  font-weight: 700;
+  font: 700 var(--fw-type-ui) / 1.35 var(--fw-sans);
   overflow-wrap: anywhere;
   min-height: 24px;
 }

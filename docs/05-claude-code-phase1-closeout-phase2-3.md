@@ -226,14 +226,14 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 - [ ] Input: file facts + printer capabilities + loaded spools. Output per printer: Ready / Busy / Plate (needs clearing) / Colour / Material / No spool / Too big / Nozzle, with reason text and an optional quick fix (e.g. "Plate cleared", "Load matching spool"). Used by Send, fleet queue, MCP.
 
 ### 3.4 Send
-- [ ] Send endpoint: Print now / Queue on printer / Fleet queue; returns updated queue positions.
+- [x] Send endpoint: Print now / Queue on printer / Fleet queue; returns updated queue positions. *(queue modes: session 24)*
 - [x] OctoPrint-compatible upload endpoint for slicers (verify which routes OrcaSlicer/PrusaSlicer call: version + file upload with optional print), API-key protected; files land in Library "Slicer inbox".
 - [x] Print now: compat check, upload, `start_print` (session 23). `dry_run: true` runs compat + upload and stops before the start command (owner, 2026-11-11).
-- [ ] Backlog: `POST /api/send` with `mode: queue` and `mode: fleet_queue` still returns **501** ("coming in session 24"); wire both in 3.5.
+- [x] Backlog: `POST /api/send` with `mode: queue` and `mode: fleet_queue` still returns **501** ("coming in session 24"); wire both in 3.5. *(done session 24)*
 
 ### 3.5 Queues + scheduler (W5)
-- [ ] Per-printer queues (reorder, remove, move between printers) + **fleet queue** ("next compatible free printer"; prefer printers with the right filament loaded).
-- [ ] Scheduler reacts to events (idle, plate cleared, job added). Auto-start only after **plate cleared** confirmation.
+- [x] Per-printer queues (reorder, remove, move between printers) + **fleet queue** ("next compatible free printer"; prefer printers with the right filament loaded).
+- [x] Scheduler reacts to events (idle, plate cleared, job added). Auto-start only after **plate cleared** confirmation.
 
 ### 3.6 Job engine (W7)
 - [ ] Detect start/end/cancel/error per driver → job record → filament deduction → Attention item.
@@ -276,6 +276,18 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 24 — 2026-11-11 (3.5 queues + scheduler + Jobs queue board)
+
+- **Model.** One `queue_item` table; `printer_id` is the lane (NULL = fleet queue). Status `waiting → sending → printing → done | failed`, `cancelled` when removed during the upload. When the scheduler sends a fleet item, `printer_id` becomes that printer and `from_fleet` = 1. Moving a failed item puts it back to waiting (retry). After a restart, `sending` items go back to waiting (fleet ones to the fleet). Deleting a printer moves its waiting items to the fleet queue (`ON DELETE SET NULL`).
+- **Scheduler** (`crates/foreman-server/src/scheduler.rs`): one loop, woken by idle/online transitions, Plate cleared, add/move, and every 30 s. A printer with its own waiting items only takes its own head; a printer with an empty queue can take fleet items. Fleet items go in order to the Ready printer with the best loaded-filament match (`compat::filament_score`: material +2, colour +1, from AMS trays), then by sort order. Free = auto-start on + no sending/printing item + compat `Ready` (which already includes online, idle and plate clear). Ticks run under one lock and claim the item in the DB (`waiting → sending`, conditional update) before uploading, so two jobs can't reach one printer; Print now holds the same lock. Every decision is logged at debug (`skipped <printer>: <verdict> (<reason>)`).
+- **Plate gate.** A transition printing/paused → idle (or → error) finishes the queue item (done / failed), sets `plate_clear` false and raises Attention kind `print_finished` ("clear the plate"), also for prints started outside Foreman. `POST /api/printers/{id}/plate-cleared` sets it true, closes that item and wakes the loop. The Fleet Attention strip shows a **Plate cleared** button for it and now updates live. Dispatching also sets `plate_clear` false (as Print now does). Klipper `complete` and `cancelled` both map to idle, so a cancelled print marks its item done; the job engine (3.6) will tell them apart.
+- **Never started.** A `printing` item whose printer stays idle for 120 s without ever reporting printing is marked failed.
+- **Queue lanes refuse** only hard mismatches (too big, nozzle); material / no spool / busy / plate / offline are allowed, the card chip says why it waits. The fleet queue accepts anything; its chip says "✓ N printers can take it" (Ready, Busy or Plate) or "✖ No printer: <reason>".
+- **Start next now** (`POST /api/printers/{id}/queue/start-next`): the printer's queue head, or else the first fleet item it can print; ignores auto-start, needs a clear (or confirmed) plate; `dry_run` uploads and stops, the item stays waiting.
+- **Slicer:** `print=true` on the OctoPrint upload now adds the file to the fleet queue (source `slicer`).
+- **Not built** (reference shows them): Hold / Release hold and the job inspector panel on the Queue board. History and Stats tabs stay placeholders (session 25).
+- **Real printers:** HellV0 **and** the Bambu had `auto_start_from_queue` on; both set off before any live check, and both are left off. On HellV0: queue/fleet adds, reorder, moves, Plate cleared (nothing started: "skipped HellV0: auto_start_from_queue is off"), Start next now **dry run** (re-uploaded `Voron_Design_Cube_v7_ASA_47m42s.gcode`, already on the printer from session 23; printer stayed idle). Test items removed; HellV0 `plate_clear` restored to false.
 
 ### Plan change — 2026-11-10 (owner): Bambu Cloud the Orca way, several accounts (D11)
 

@@ -122,9 +122,10 @@ export default function Jobs() {
   const waitingCards = allCards.filter((c) => c.item.status === "waiting");
 
   const headline = useMemo(() => {
-    const printing = lanes.filter((l) => l.printer_id != null && statuses[l.printer_id]?.state === "printing").length;
+    const stOf = (l: QueueLane) => (l.printer_id != null ? (statuses[l.printer_id] ?? l.status) : null);
+    const printing = lanes.filter((l) => stOf(l)?.state === "printing").length;
     const plate = lanes.filter(
-      (l) => l.printer_id != null && !l.plate_clear && statuses[l.printer_id]?.state !== "printing",
+      (l) => l.printer_id != null && !l.plate_clear && !["printing", "paused"].includes(stOf(l)?.state ?? ""),
     ).length;
     const grams = waitingCards.reduce((a, c) => a + (c.grams ?? 0), 0);
     return [
@@ -281,7 +282,7 @@ export default function Jobs() {
             <div className="jobs-lanes">
               {lanes.map((lane) => {
                 const key = laneKey(lane);
-                const st = lane.printer_id != null ? statuses[lane.printer_id] : undefined;
+                const st = lane.printer_id != null ? (statuses[lane.printer_id] ?? lane.status ?? undefined) : undefined;
                 const ls = laneState(lane, st);
                 const waiting = lane.items.filter((x) => x.item.status === "waiting");
                 const active = lane.items.some((x) => x.item.status === "sending" || x.item.status === "printing");

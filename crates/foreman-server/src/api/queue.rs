@@ -20,6 +20,7 @@ use foreman_core::{
     compat::{self, CompatResult, Verdict},
     domain::{QueueItem, QueueSource, QueueStatus},
     error::AppError,
+    events::PrinterStatus,
     repo,
 };
 use serde::{Deserialize, Serialize};
@@ -73,6 +74,8 @@ pub struct QueueLane {
     pub name: String,
     pub plate_clear: bool,
     pub auto_start: bool,
+    /// Last known printer status (clients prefer newer `printer_status` events).
+    pub status: Option<PrinterStatus>,
     pub items: Vec<QueueCard>,
 }
 
@@ -231,6 +234,7 @@ pub async fn board(State(state): State<AppState>) -> Result<Json<QueueBoard>, Ap
         name: "Fleet queue".into(),
         plate_clear: true,
         auto_start: true,
+        status: None,
         items: Vec::new(),
     }];
     for s in &snaps {
@@ -239,6 +243,7 @@ pub async fn board(State(state): State<AppState>) -> Result<Json<QueueBoard>, Ap
             name: s.printer.name.clone(),
             plate_clear: s.printer.plate_clear,
             auto_start: s.printer.auto_start_from_queue,
+            status: s.status.clone(),
             items: Vec::new(),
         });
     }
