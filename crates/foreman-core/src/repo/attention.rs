@@ -155,3 +155,14 @@ pub async fn clear_by_printer_kind(
     .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }
+
+/// Change an item's title (e.g. a maintenance counter that kept accruing).
+pub async fn set_title(pool: &SqlitePool, id: i64, title: &str) -> Result<(), AppError> {
+    sqlx::query("UPDATE attention_item SET title = ? WHERE id = ?")
+        .bind(title)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}

@@ -2,6 +2,7 @@ pub mod attention;
 pub mod audit_log;
 pub mod job;
 pub mod macro_favourite;
+pub mod maintenance;
 pub mod printer;
 pub mod printer_path;
 pub mod printer_ssh;

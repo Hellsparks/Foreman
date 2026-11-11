@@ -19,6 +19,7 @@ import LoadSpoolPanel from "../filament/LoadSpoolPanel";
 import { StatusChip, ProgressBar, Swatch } from "../ui";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
+import { ATTENTION_PREFIX, everyText, maintenanceApi, type TaskTemplate } from "../api/maintenance";
 import "./Fleet.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -143,6 +144,7 @@ function attentionTone(kind: string): Tone {
   if (kind === "print_finished") return "warn";
   if (kind === "offline") return "off";
   if (kind === "paused") return "warn";
+  if (kind.startsWith(ATTENTION_PREFIX)) return "warn";
   return "warn";
 }
 
@@ -151,6 +153,7 @@ function attentionSymbol(kind: string): string {
   if (kind === "print_finished") return "◐";
   if (kind === "offline") return "○";
   if (kind === "paused") return "‖";
+  if (kind.startsWith(ATTENTION_PREFIX)) return "⚙";
   return "!";
 }
 
@@ -302,7 +305,7 @@ export default function Fleet() {
 
   const handleAdd = async (data: AddPrinterData) => {
     try {
-      await api.createPrinter({
+      const created = await api.createPrinter({
         name: data.name,
         firmware: data.firmware,
         primary_url: data.url || null,
@@ -316,6 +319,14 @@ export default function Fleet() {
         fail_after_checks: null,
         return_after_secs: null,
       });
+      // Common service tasks the user kept ticked; a new printer starts at zero.
+      if (data.templates.length > 0) {
+        try {
+          await maintenanceApi.fromTemplates(Number(created.id), data.templates, true);
+        } catch (e) {
+          console.error("Failed to add service tasks:", e);
+        }
+      }
       setShowAddPanel(false);
       loadPrinters();
     } catch (e) {
@@ -423,7 +434,7 @@ export default function Fleet() {
                   : null;
                 return (
                   <div key={item.id} className="fleet__attn-row">
-                    <StatusChip tone={tone} symbol={sym} word={item.kind === "offline" ? "Offline" : item.kind === "error" ? "Error" : item.kind === "print_finished" ? "Clear plate" : item.kind} />
+                    <StatusChip tone={tone} symbol={sym} word={item.kind === "offline" ? "Offline" : item.kind === "error" ? "Error" : item.kind === "print_finished" ? "Clear plate" : item.kind.startsWith(ATTENTION_PREFIX) ? "Service" : item.kind} />
                     <div className="fleet__attn-text">
                       <div className="fleet__attn-title">{item.title}</div>
                       {item.body && (
@@ -478,6 +489,15 @@ export default function Fleet() {
                           Plate cleared
                         </button>
                       )}
+                      {item.kind.startsWith(ATTENTION_PREFIX) && (
+                        <button
+                          type="button"
+                          className="fleet__attn-btn fleet__attn-btn--primary"
+                          onClick={() => navigate(`/service?task=${item.kind.slice(ATTENTION_PREFIX.length)}`)}
+                        >
+                          Open in Service
+                        </button>
+                      )}
                       {relatedPrinter && (
                         <button
                           type="button"
@@ -487,13 +507,16 @@ export default function Fleet() {
                           Open printer
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="fleet__attn-btn"
-                        onClick={() => dismissAttention(item.id)}
-                      >
-                        Dismiss
-                      </button>
+                      {/* A service item clears when the task is marked done. */}
+                      {!item.kind.startsWith(ATTENTION_PREFIX) && (
+                        <button
+                          type="button"
+                          className="fleet__attn-btn"
+                          onClick={() => dismissAttention(item.id)}
+                        >
+                          Dismiss
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -875,6 +898,8 @@ interface AddPrinterData {
   url: string;
   serial: string;
   accessCode: string;
+  /** Maintenance template keys to add (5.3). */
+  templates: string[];
 }
 
 function AddPrinterForm({ onSubmit }: { onSubmit: (data: AddPrinterData) => void }) {
@@ -884,12 +909,23 @@ function AddPrinterForm({ onSubmit }: { onSubmit: (data: AddPrinterData) => void
   const [serial, setSerial] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const isBambu = firmware === "bambu";
+  const [templates, setTemplates] = useState<TaskTemplate[]>([]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    maintenanceApi.templates().then(
+      (t) => {
+        setTemplates(t);
+        setPicked(new Set(t.map((x) => x.key)));
+      },
+      () => setTemplates([]),
+    );
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     if (isBambu ? (!url.trim() || !serial.trim() || !accessCode.trim()) : !url.trim()) return;
-    onSubmit({ name: name.trim(), firmware, url: url.trim(), serial: serial.trim(), accessCode: accessCode.trim() });
+    onSubmit({ name: name.trim(), firmware, url: url.trim(), serial: serial.trim(), accessCode: accessCode.trim(), templates: [...picked] });
   };
 
   return (
@@ -926,6 +962,30 @@ function AddPrinterForm({ onSubmit }: { onSubmit: (data: AddPrinterData) => void
         )}
         <button className="fleet__form-submit" type="submit">Add</button>
       </div>
+      {templates.length > 0 && (
+        <fieldset className="fleet__form-tasks">
+          <legend className="fleet__form-label">Service tasks to start with (optional)</legend>
+          {templates.map((t) => (
+            <label key={t.key} className="fleet__form-task">
+              <input
+                type="checkbox"
+                checked={picked.has(t.key)}
+                onChange={(e) =>
+                  setPicked((s) => {
+                    const n = new Set(s);
+                    if (e.target.checked) n.add(t.key);
+                    else n.delete(t.key);
+                    return n;
+                  })
+                }
+              />
+              <span>
+                {t.name} <span className="fleet__form-task-every">· every {everyText(t)}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
     </form>
   );
 }
