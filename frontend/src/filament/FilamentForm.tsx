@@ -25,6 +25,7 @@ import {
   type VendorRow,
 } from "../api/filaments";
 import { ColourSwatch } from "./SpoolSwatch";
+import { ExternalLink, safeHref } from "../ui";
 
 type SecId = "fil" | "col" | "prt" | "ext";
 const ORDER: SecId[] = ["fil", "col", "prt", "ext"];
@@ -376,6 +377,7 @@ export function FilamentSections({
           <span className="fil-field__label">Product URL</span>
           <input className="fil-input" type="url" value={d.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://" />
         </label>
+        {safeHref(d.url) && <ExternalLink href={d.url} label="Open product page" />}
         <label className="fil-field">
           <span className="fil-field__label">Comment</span>
           <textarea className="fil-input ff-textarea" rows={2} value={d.comment} onChange={(e) => set({ comment: e.target.value })} />

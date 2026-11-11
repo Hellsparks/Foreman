@@ -258,6 +258,7 @@
 .fil-sub { font-size: 12px; color: var(--fw-muted); }
 .fil-mono { font: 12px var(--fw-mono); }
 .fil-abrasive { font-size: 11px; color: var(--fw-warning); }
+.fil-extras { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .fil-bar { display: flex; height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border); }
 .fil-bar--big { height: 12px; }
 .fil-bar__fill { background: var(--fw-muted); }

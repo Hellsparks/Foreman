@@ -1,6 +1,7 @@
 /** Vendor form (task 4.2). Reference: docs/ui-ref/Filament.dc.html lines 399–420. */
 import { useState } from "react";
 import { filamentApi, parseNumber, type VendorRow } from "../api/filaments";
+import { ExternalLink, safeHref } from "../ui";
 
 export default function VendorPanel({
   vendor,
@@ -74,6 +75,7 @@ export default function VendorPanel({
         <label className="fil-field">
           <span className="fil-field__label">Website / store</span>
           <input className="fil-input" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />
+          {safeHref(url) && <ExternalLink href={url} label="Open vendor website" />}
           <span className="fil-sub">Used for the shopping list's store link when a filament has no link of its own.</span>
         </label>
         <label className="fil-field">

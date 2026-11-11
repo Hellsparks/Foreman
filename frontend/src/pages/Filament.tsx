@@ -34,6 +34,7 @@ import {
   type VendorRow,
 } from "../api/filaments";
 import "../filament/filament.css";
+import { ExternalLink } from "../ui";
 
 const TABS = [
   ["spools", "Spools"],
@@ -475,7 +476,16 @@ function FilamentsTab({
                   {f.spool_count > 0 ? ` · ${Math.round(f.grams_left)} g` : ""}
                 </td>
                 <td className="fil-sub">
-                  {[f.abrasive ? "⚠ abrasive" : "", f.url ? "URL" : "", f.price != null ? f.price.toFixed(2) : ""].filter(Boolean).join(" · ") || "—"}
+                  <span className="fil-extras">
+                    {f.abrasive && <span className="fil-abrasive">⚠ abrasive</span>}
+                    {f.url && (
+                      <ExternalLink href={f.url} label={`Product page for ${f.name}`}>
+                        Link
+                      </ExternalLink>
+                    )}
+                    {f.price != null && <span>{f.price.toFixed(2)}</span>}
+                    {!f.abrasive && !f.url && f.price == null && "—"}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -551,7 +561,7 @@ function VendorsTab({
                 </td>
                 <td className="fil-mono">{v.empty_spool_weight != null ? `${v.empty_spool_weight} g` : "—"}</td>
                 <td>{v.filament_count}</td>
-                <td className="fil-sub">{v.website ?? "—"}</td>
+                <td className="fil-sub">{v.website ? <ExternalLink href={v.website} label={`${v.name} website`} /> : "—"}</td>
               </tr>
             ))}
             {rows.length === 0 && (

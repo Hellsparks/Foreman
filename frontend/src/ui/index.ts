@@ -16,3 +16,5 @@ export { default as ProgressBar } from "./ProgressBar";
 
 export { ToastStack, useToasts } from "./Toast";
 export type { ToastItem } from "./Toast";
+
+export { default as ExternalLink, safeHref, hostLabel } from "./ExternalLink";
