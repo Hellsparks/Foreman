@@ -41,14 +41,18 @@ body {
 
 .shell__content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   min-height: 0;
 }
 
+/* The page scrolls on its own; the inspector beside it stays in view and has
+   its own scroll (.inspector__body). */
 .shell__work {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--fw-space-4) var(--fw-space-8) var(--fw-space-8);
 }
 
