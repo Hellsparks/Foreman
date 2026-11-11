@@ -414,7 +414,7 @@ pub async fn stats(pool: &SqlitePool, from: &str, to: &str) -> Result<JobStats, 
     let usage_sql = |group: &str| {
         format!(
             "SELECT {group}, ROUND(SUM(COALESCE(json_extract(t.value, '$.grams_used'), 0)), 2) AS grams, \
-               COUNT(DISTINCT job.id) AS jobs \
+               COUNT(DISTINCT CASE WHEN COALESCE(json_extract(t.value, '$.grams_used'), 0) > 0 THEN job.id END) AS jobs \
              FROM job, json_each(job.tools_json) t \
              WHERE job.started_at >= ? AND job.started_at <= ? AND job.end_state != 'running' \
              GROUP BY 1, 2 HAVING grams > 0 ORDER BY grams DESC"
@@ -883,6 +883,31 @@ mod tests {
             spool,
             [(Some(7), 50.0, 2), (Some(8), 5.0, 1), (None, 4.0, 1)]
         );
+
+        // A job that used 0 g of a spool does not count as a job for it.
+        job(
+            p,
+            1,
+            "aborted.gcode",
+            "2026-11-04T12:00:00+00:00",
+            60,
+            vec![JobTool {
+                grams_used: Some(0.0),
+                ..tool("PLA", 0.0, Some(7))
+            }],
+            JobEnd::Cancelled,
+            Some(JobOutcome::Cancelled),
+        )
+        .await;
+        let s2 = stats(p, "2026-11-01T00:00:00+00:00", "2026-11-05T00:00:00+00:00")
+            .await
+            .expect("stats");
+        let s7 = s2
+            .by_spool
+            .iter()
+            .find(|u| u.spool_id == Some(7))
+            .expect("#7");
+        assert_eq!((s7.grams, s7.jobs), (50.0, 2));
 
         // Empty period.
         let e = stats(p, "2025-01-01T00:00:00+00:00", "2025-01-02T00:00:00+00:00")
