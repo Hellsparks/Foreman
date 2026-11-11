@@ -140,6 +140,15 @@ const MIGRATIONS: &[&str] = &[
        notes TEXT, prev_since TEXT, prev_snooze REAL NOT NULL DEFAULT 0)",
     "CREATE INDEX IF NOT EXISTS ix_maintenance_log_task ON maintenance_log (task_id)",
     "CREATE INDEX IF NOT EXISTS ix_maintenance_log_printer ON maintenance_log (printer_id)",
+    // 0015: open Attention items unique per (printer, kind) (session 32, see
+    // migrations/0015_attention_unique.sql). Clear duplicates (keep the oldest
+    // open one), then enforce it.
+    "UPDATE attention_item SET cleared_at = COALESCE(cleared_at, created_at) \
+     WHERE cleared_at IS NULL AND id NOT IN (\
+       SELECT MIN(id) FROM attention_item WHERE cleared_at IS NULL \
+       GROUP BY COALESCE(printer_id, -1), kind)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_attention_item_open \
+     ON attention_item (COALESCE(printer_id, -1), kind) WHERE cleared_at IS NULL",
 ];
 
 /// Foreman-native database handle.

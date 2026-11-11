@@ -129,16 +129,19 @@ async fn raise_host_key_attention(state: &AppState, printer_id: i64, presented: 
     )
     .await
     {
-        Ok(item) => {
-            let _ = state.bus_tx.send(ServerEvent::AttentionAdded {
-                item: AttentionItemEvent {
+        Ok(raised) => {
+            let created = raised.created;
+            let item = raised.item;
+            let _ = state.bus_tx.send(ServerEvent::attention_raised(
+                created,
+                AttentionItemEvent {
                     id: item.id,
                     printer_id: Some(printer_id),
                     kind: HOST_KEY_ATTENTION_KIND.to_owned(),
                     title: item.title,
                     body: item.body,
                 },
-            });
+            ));
         }
         Err(e) => warn!(printer_id, "raise host-key attention: {e}"),
     }

@@ -152,7 +152,7 @@ pub async fn sync_attention(
         let body = task.notes.clone();
         match active {
             None => {
-                let a = repo::attention::raise(
+                let raised = repo::attention::raise(
                     pool,
                     Some(task.printer_id),
                     &kind,
@@ -160,16 +160,19 @@ pub async fn sync_attention(
                     body.as_deref(),
                 )
                 .await?;
+                let created = raised.created;
+                let a = raised.item;
                 info!(task = task.id, printer_id = task.printer_id, "{title}");
-                let _ = bus.send(ServerEvent::AttentionAdded {
-                    item: AttentionItemEvent {
+                let _ = bus.send(ServerEvent::attention_raised(
+                    created,
+                    AttentionItemEvent {
                         id: a.id,
                         printer_id: Some(task.printer_id),
                         kind,
                         title: a.title,
                         body: a.body,
                     },
-                });
+                ));
             }
             Some(a) if a.title != title => {
                 repo::attention::set_title(pool, a.id, &title).await?;
