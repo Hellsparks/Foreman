@@ -478,6 +478,25 @@ pub async fn link_job(pool: &SqlitePool, job_id: i64, plate_id: i64) -> Result<(
     Ok(())
 }
 
+/// Per-slot use of a project's finished jobs (one `Vec<JobTool>` per job).
+pub async fn job_tools(
+    pool: &SqlitePool,
+    project_id: i64,
+) -> Result<Vec<Vec<crate::domain::JobTool>>, AppError> {
+    let rows: Vec<String> = sqlx::query_scalar(
+        "SELECT tools_json FROM job WHERE end_state != 'running' AND project_plate_id IN \
+         (SELECT id FROM project_plate WHERE project_id = ?)",
+    )
+    .bind(project_id)
+    .fetch_all(pool)
+    .await
+    .map_err(db)?;
+    Ok(rows
+        .iter()
+        .map(|j| serde_json::from_str(j).unwrap_or_default())
+        .collect())
+}
+
 /// Finished jobs of a project: (seconds, grams used).
 pub async fn job_totals(pool: &SqlitePool, project_id: i64) -> Result<(i64, f64), AppError> {
     let r = sqlx::query(

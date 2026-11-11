@@ -3,6 +3,10 @@ import type { ProjectTotals } from "./ProjectTotals";
 
 export type ProjectSummary = { id: number, name: string, template_name: string | null, due_date: string | null, status: string, closed_at: string | null, totals: ProjectTotals, 
 /**
+ * Spoolman's currency (for `cost_used`).
+ */
+currency: string | null, 
+/**
  * Slot colours (`RRGGBB`): the assigned spool's, else the preferred one.
  */
 swatches: Array<string>, };

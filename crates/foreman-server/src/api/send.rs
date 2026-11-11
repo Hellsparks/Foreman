@@ -52,6 +52,9 @@ pub struct SendRequest {
     /// command and report what would have happened. Changes no printer state.
     #[serde(default)]
     pub dry_run: bool,
+    /// The file swaps filament by hand (M600); send / queue it anyway.
+    #[serde(default)]
+    pub accept_manual_swaps: bool,
 }
 
 /// Successful `print_now` response.
@@ -93,6 +96,20 @@ pub async fn send_file(
     Extension(ctx): Extension<AuthCtx>,
     Json(req): Json<SendRequest>,
 ) -> Result<(StatusCode, Json<SendResult>), (StatusCode, Json<serde_json::Value>)> {
+    if !req.accept_manual_swaps {
+        if let Some(n) = crate::projects::manual_swap_colours(&state, req.file_id).await {
+            let name = state
+                .library
+                .get(req.file_id)
+                .await
+                .map(|e| e.name)
+                .unwrap_or_default();
+            return Err((
+                StatusCode::CONFLICT,
+                Json(crate::projects::manual_swaps_body(&name, n)),
+            ));
+        }
+    }
     match req.mode.as_str() {
         "print_now" => print_now(state, req).await,
         "queue" | "fleet_queue" => {

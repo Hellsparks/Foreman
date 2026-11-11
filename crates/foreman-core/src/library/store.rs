@@ -144,7 +144,7 @@ macro_rules! select_entries {
     ($rest:literal) => {
         concat!(
             "SELECT e.id, e.path, e.kind, e.size, e.hash, e.added_at, e.starred, e.deleted_at, \
-             m.format, m.thumb_file, m.print_time_secs, m.tools_json \
+             m.format, m.thumb_file, m.print_time_secs, m.tools_json, m.slot_kind, m.slots_json \
              FROM library_entry e LEFT JOIN file_meta m ON m.entry_id = e.id ",
             $rest
         )
@@ -163,6 +163,15 @@ fn entry_from_row(r: &sqlx::sqlite::SqliteRow) -> Result<LibraryEntry, AppError>
         print_time_secs: r.try_get("print_time_secs").map_err(db)?,
         tools: tools
             .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default(),
+        slot_kind: r
+            .try_get::<Option<String>, _>("slot_kind")
+            .map_err(db)?
+            .map(|k| SlotKind::parse(&k)),
+        slots: r
+            .try_get::<Option<String>, _>("slots_json")
+            .map_err(db)?
+            .and_then(|j| serde_json::from_str(&j).ok())
             .unwrap_or_default(),
         name: name_of(&path).to_owned(),
         kind: if kind == "folder" {

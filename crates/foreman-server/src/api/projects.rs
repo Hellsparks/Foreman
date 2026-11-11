@@ -20,7 +20,8 @@ use super::spools::{err, ApiErr};
 use crate::{
     auth::AuthCtx,
     projects::{
-        self, CreateProject, ProjectPlan, ProjectSummary, ProjectView, TemplateView, UpdateProject,
+        self, CreateFromFiles, CreateProject, ProjectPlan, ProjectSummary, ProjectView, SlotNeed,
+        SlotOptions, TemplateView, UpdateProject,
     },
     state::AppState,
 };
@@ -109,6 +110,27 @@ pub async fn create(
         .map_err(err)
 }
 
+pub async fn create_from_files(
+    State(s): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
+    Json(req): Json<CreateFromFiles>,
+) -> Result<(StatusCode, Json<ProjectView>), ApiErr> {
+    projects::create_from_files(&s, &req, &ctx.username)
+        .await
+        .map(|v| (StatusCode::CREATED, Json(v)))
+        .map_err(err)
+}
+
+pub async fn spool_options(
+    State(s): State<AppState>,
+    Json(needs): Json<Vec<SlotNeed>>,
+) -> Result<Json<Vec<SlotOptions>>, ApiErr> {
+    projects::spool_options(&s, &needs)
+        .await
+        .map(Json)
+        .map_err(err)
+}
+
 pub async fn update(
     State(s): State<AppState>,
     Path(id): Path<i64>,
@@ -118,11 +140,30 @@ pub async fn update(
     get(State(s), Path(id)).await
 }
 
+#[derive(Deserialize, Default)]
+pub struct RemainingBody {
+    #[serde(default)]
+    accept_manual_swaps: bool,
+}
+
 pub async fn print_remaining(
     State(s): State<AppState>,
     Extension(ctx): Extension<AuthCtx>,
     Path(id): Path<i64>,
+    body: Option<Json<RemainingBody>>,
 ) -> Result<Json<Value>, ApiErr> {
+    let accept = body.map(|b| b.accept_manual_swaps).unwrap_or(false);
+    if !accept {
+        if let Some((file, n)) = projects::remaining_manual_swaps(&s, id)
+            .await
+            .map_err(err)?
+        {
+            return Err((
+                StatusCode::CONFLICT,
+                Json(projects::manual_swaps_body(&file, n)),
+            ));
+        }
+    }
     let added = projects::print_all_remaining(&s, id, &ctx.username)
         .await
         .map_err(err)?;

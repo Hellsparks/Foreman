@@ -2,11 +2,12 @@
  * Templates: list + editor (task 5.1). Reference: docs/ui-ref/TemplateEditor.dc.html
  * lines 1–207, behaviour in renderVals (208+).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { lib, type LibraryEntry } from "../api/library";
+import type { LibraryEntry } from "../api/library";
 import {
   hours,
+  kindLabel,
   MAX_COPIES,
   nextSlotKey,
   printsPerSet,
@@ -21,19 +22,28 @@ import {
   type TemplateView,
 } from "../api/projects";
 import Thumb, { Dot } from "./Thumb";
+import LibraryPicker from "./LibraryPicker";
+import { entrySlots } from "./grouping";
 
 const EMPTY: TemplateForm = { name: "", category: null, notes: null, thumb_file_id: null, slots: [], plates: [] };
 
 function fileFacts(e: LibraryEntry): PlateFile {
-  return { file_id: e.id, file_name: e.name, thumb_url: e.thumb_url, print_time_secs: e.print_time_secs, tools: e.tools, missing: false };
+  return {
+    file_id: e.id,
+    file_name: e.name,
+    thumb_url: e.thumb_url,
+    print_time_secs: e.print_time_secs,
+    slot_kind: e.slot_kind ?? "tool",
+    slots: entrySlots(e),
+    missing: false,
+  };
 }
 
 function plateMeta(f: PlateFile | undefined): string {
   if (!f) return "";
   if (f.missing) return "file missing";
-  const g = f.tools.reduce((a, t) => a + (t.grams ?? 0), 0);
-  const tools = f.tools.length > 1 ? ` · ${f.tools.length} tools` : "";
-  return [hours(f.print_time_secs), g ? `${Math.round(g)} g` : null].filter(Boolean).join(" · ") + tools;
+  const g = f.slots.reduce((a, t) => a + (t.grams ?? 0), 0);
+  return [hours(f.print_time_secs), g ? `${Math.round(g)} g` : null, kindLabel(f.slot_kind, f.slots.length)].filter(Boolean).join(" · ");
 }
 
 // ── Template list ────────────────────────────────────────────────────────────
@@ -135,28 +145,32 @@ export default function TemplateEditor() {
   };
   const setPlate = (i: number, p: TemplatePlate) => edit({ ...form, plates: form.plates.map((x, j) => (j === i ? p : x)) });
 
-  const addPlate = (e: LibraryEntry) => {
-    const f = fileFacts(e);
-    setFiles(new Map(files).set(e.id, f));
+  const addPlates = (es: LibraryEntry[]) => {
+    const fm = new Map(files);
     let next = { ...form };
-    const nTools = Math.max(1, f.tools.length);
-    // First plate: create one slot per tool so the matrix starts filled in.
-    while (next.slots.length < nTools && next.plates.length === 0) {
-      const t = f.tools[next.slots.length];
-      next = {
-        ...next,
-        slots: [
-          ...next.slots,
-          { key: nextSlotKey(next), hex: t?.colour?.replace(/^#/, "") ?? null, label: [t?.material, null].filter(Boolean).join(" ") || null, allow_swap: true },
-        ],
-      };
+    for (const e of es) {
+      const f = fileFacts(e);
+      fm.set(e.id, f);
+      // First plate: one colour slot per filament so the matrix starts filled in.
+      if (next.plates.length === 0) {
+        for (const sl of f.slots) {
+          if (next.slots.length > sl.index) continue;
+          next = {
+            ...next,
+            slots: [...next.slots, { key: nextSlotKey(next), hex: sl.colour?.replace(/^#/, "") ?? null, label: sl.material ?? null, allow_swap: true }],
+          };
+        }
+      }
+      const tools = f.slots
+        .map((sl, i) => ({ tool: sl.index, slot: next.slots[Math.min(i, next.slots.length - 1)]?.key ?? "" }))
+        .filter((t) => t.slot);
+      const name = e.name.replace(/\.(gcode|bgcode|3mf)$/i, "").replace(/\.gcode$/i, "").replace(/[_-]+/g, " ");
+      next = { ...next, plates: [...next.plates, { name, file_id: e.id, copies: 1, tools }] };
     }
-    const tools = Array.from({ length: nTools }, (_, i) => ({ tool: i, slot: next.slots[Math.min(i, next.slots.length - 1)]?.key ?? "" })).filter(
-      (t) => t.slot,
-    );
-    const name = e.name.replace(/\.(gcode|bgcode|3mf)$/i, "").replace(/[_-]+/g, " ");
-    edit({ ...next, plates: [...next.plates, { name, file_id: e.id, copies: 1, tools }] });
+    setFiles(fm);
+    edit(next);
   };
+  const [picker, setPicker] = useState(false);
 
   const save = async (): Promise<number | null> => {
     setBusy(true);
@@ -267,6 +281,7 @@ export default function TemplateEditor() {
                       <span className={`prj-muted${f?.missing ? " prj-tone--bad" : ""}`}>
                         {f?.file_name ?? `file #${p.file_id}`} · {plateMeta(f)}
                       </span>
+                      {f?.slot_kind === "change" && <span className="prj-flag">⚠ manual filament swaps during the print</span>}
                     </span>
                     <span className="prj-step" role="group" aria-label={`Copies of ${p.name} per set`}>
                       <button type="button" aria-label="Fewer copies" disabled={p.copies <= 1} onClick={() => setPlate(i, { ...p, copies: p.copies - 1 })}>
@@ -324,7 +339,7 @@ export default function TemplateEditor() {
               </button>
             </div>
             <p className="prj-muted" style={{ margin: 0 }}>
-              Tick which slots each plate uses (multi-tool plates: per tool). Preferred colour is only a suggestion when someone starts a project; untick
+              Tick which slots each plate uses (several filaments: per tool, AMS tray or colour). Preferred colour is only a suggestion when someone starts a project; untick
               “swap” to keep a slot to that colour.
             </p>
             <div className="tpl-matrix-wrap">
@@ -384,18 +399,20 @@ export default function TemplateEditor() {
                         />
                       </td>
                       {form.plates.map((p, pi) => {
-                        const n = Math.max(1, files.get(p.file_id)?.tools.length ?? 1);
+                        const fs = files.get(p.file_id)?.slots ?? [];
+                        const list = fs.length ? fs.map((x) => ({ index: x.index, label: x.label })) : [{ index: 0, label: "T0" }];
+                        const n = list.length;
                         return (
                           <td key={pi}>
-                            {Array.from({ length: n }, (_, tool) => (
-                              <label key={tool} style={{ display: "inline-flex", alignItems: "center", gap: 2, marginRight: 4 }}>
+                            {list.map((x) => (
+                              <label key={x.index} style={{ display: "inline-flex", alignItems: "center", gap: 2, marginRight: 4 }}>
                                 <input
                                   type="checkbox"
-                                  checked={slotOf(p, tool) === s.key}
-                                  aria-label={`${s.key} used on ${p.name}${n > 1 ? ` T${tool}` : ""}`}
-                                  onChange={(e) => setPlate(pi, setPlateSlot(p, tool, e.target.checked ? s.key : null))}
+                                  checked={slotOf(p, x.index) === s.key}
+                                  aria-label={`${s.key} used on ${p.name}${n > 1 ? ` ${x.label}` : ""}`}
+                                  onChange={(e) => setPlate(pi, setPlateSlot(p, x.index, e.target.checked ? s.key : null))}
                                 />
-                                {n > 1 && <span className="prj-mono" style={{ fontSize: 11 }}>T{tool}</span>}
+                                {n > 1 && <span className="prj-mono" style={{ fontSize: 11 }}>{x.label}</span>}
                               </label>
                             ))}
                           </td>
@@ -462,65 +479,27 @@ export default function TemplateEditor() {
               </a>
             ))}
           </section>
-          <LibraryPicker added={new Set(form.plates.map((p) => p.file_id))} onAdd={addPlate} />
+          <section aria-label="Add plates" className="prj-sec">
+            <h2 className="prj-sec__title">Plates</h2>
+            <span className="prj-muted">
+              {form.plates.length} plate{form.plates.length === 1 ? "" : "s"} in this template
+            </span>
+            <button type="button" className="prj-btn prj-btn--primary" onClick={() => setPicker(true)}>
+              Add plates from Library…
+            </button>
+          </section>
         </aside>
+        {picker && (
+          <LibraryPicker
+            taken={new Set(form.plates.map((p) => p.file_id))}
+            onClose={() => setPicker(false)}
+            onAdd={(es) => {
+              addPlates(es);
+              setPicker(false);
+            }}
+          />
+        )}
       </div>
     </div>
-  );
-}
-
-function LibraryPicker({ added, onAdd }: { added: Set<number>; onAdd: (e: LibraryEntry) => void }) {
-  const [path, setPath] = useState("");
-  const [rows, setRows] = useState<LibraryEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    lib.list(path).then(
-      (r) => {
-        setRows(r.entries);
-        setError(null);
-      },
-      (e) => setError(e instanceof Error ? e.message : String(e)),
-    );
-  }, [path]);
-  const shown = useMemo(
-    () => rows.filter((e) => e.kind === "folder" || ["gcode", "bgcode", "3mf"].includes(e.format ?? "")),
-    [rows],
-  );
-  const up = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-  return (
-    <section aria-label="Add plates" className="prj-sec">
-      <h2 className="prj-sec__title">Library · {path || "root"}</h2>
-      {error && <p className="prj-note prj-note--bad">{error}</p>}
-      <div className="tpl-lib">
-        {path && (
-          <button type="button" className="prj-btn prj-btn--small" onClick={() => setPath(up)}>
-            ↑ Up
-          </button>
-        )}
-        {shown.map((e) =>
-          e.kind === "folder" ? (
-            <div key={e.id} className="tpl-lib__row">
-              <span>📁 {e.name}</span>
-              <button type="button" className="prj-btn prj-btn--small" onClick={() => setPath(e.path)}>
-                Open
-              </button>
-            </div>
-          ) : (
-            <div key={e.id} className="tpl-lib__row">
-              <span>
-                {e.name}
-                <br />
-                <span className="prj-muted">{hours(e.print_time_secs)} · {Math.round(e.tools.reduce((a, t) => a + (t.grams ?? 0), 0))} g{e.tools.length > 1 ? ` · ${e.tools.length} tools` : ""}</span>
-              </span>
-              <button type="button" className="prj-btn prj-btn--small" disabled={added.has(e.id)} onClick={() => onAdd(e)}>
-                {added.has(e.id) ? "Added" : "Add"}
-              </button>
-            </div>
-          ),
-        )}
-        {shown.length === 0 && <span className="prj-muted">No printable files here.</span>}
-      </div>
-      <span className="prj-muted">Press Add to make a file a plate.</span>
-    </section>
   );
 }

@@ -100,15 +100,15 @@ pub async fn demands(
             continue;
         };
         let tools: Vec<ToolDemand> = meta
-            .tools
-            .iter()
+            .filament_slots()
+            .into_iter()
             .filter_map(|t| {
                 let slot_spool = item
                     .project_plate_id
                     .and_then(|p| plate_spools.get(&p))
                     .and_then(|m| m.get(&t.index).copied());
                 Some(ToolDemand {
-                    tool: t.index,
+                    tool: t.tool,
                     grams: t.grams.filter(|g| *g > 0.0)?,
                     spool_id: slot_spool.or(t.spool_id),
                 })

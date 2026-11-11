@@ -352,6 +352,10 @@ pub struct LibraryEntry {
     pub print_time_secs: Option<i64>,
     /// Parsed per-tool filament use, for grid cards.
     pub tools: Vec<ToolUsage>,
+    /// tool | ams | change (null until parsed).
+    pub slot_kind: Option<SlotKind>,
+    /// Filaments the file needs (5.2).
+    pub slots: Vec<FilamentSlot>,
 }
 
 /// Filament use for one tool / extruder / AMS slot.
@@ -428,6 +432,26 @@ pub struct FilamentSlot {
     pub tray: Option<String>,
 }
 
+/// Slots from per-tool facts, for files parsed before slots existed.
+pub fn slots_from_tools(tools: &[ToolUsage]) -> Vec<FilamentSlot> {
+    tools
+        .iter()
+        .filter(|t| t.grams.map(|g| g > 0.0).unwrap_or(true))
+        .map(|t| FilamentSlot {
+            index: t.index,
+            tool: t.index,
+            label: format!("T{}", t.index),
+            material: t.material.clone(),
+            colour: t.colour.clone(),
+            grams: t.grams,
+            mm: t.mm,
+            preset: t.preset.clone(),
+            spool_id: t.spool_id,
+            tray: None,
+        })
+        .collect()
+}
+
 /// One sliced plate of a 3MF project.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -471,6 +495,17 @@ pub struct FileMeta {
     /// The filaments this file needs (see [`FilamentSlot`]).
     #[serde(default)]
     pub slots: Vec<FilamentSlot>,
+}
+
+impl FileMeta {
+    /// The file's filament slots (falls back to its tools for old rows).
+    pub fn filament_slots(&self) -> Vec<FilamentSlot> {
+        if self.slots.is_empty() {
+            slots_from_tools(&self.tools)
+        } else {
+            self.slots.clone()
+        }
+    }
 }
 
 /// `GET /api/library/files/{id}`.

@@ -21,6 +21,7 @@ import {
   type StorageEntry,
   type TransferInfo,
 } from "../api/library";
+import { isManualSwaps, kindLabel } from "../api/projects";
 import "./Library.css";
 
 /** Library page — one browser for the Library and each Klipper printer's G-code storage. */
@@ -237,6 +238,8 @@ export default function Library() {
   const [rname, setRname] = useState("");
   const [xfers, setXfers] = useState<TransferInfo[]>([]);
   const [notice, setNotice] = useState("");
+  /** Send / queue refused because the file swaps filament by hand: message + retry. */
+  const [swapAsk, setSwapAsk] = useState<{ msg: string; retry: () => void } | null>(null);
   const [undoIds, setUndoIds] = useState<number[]>([]);
   const [bulkArm, setBulkArm] = useState(false);
   const [delArm, setDelArm] = useState(false);
@@ -400,8 +403,9 @@ export default function Library() {
 
   const selIsPrintable = sel && !sel.isDir && sel.kind !== "STL" && sel.kind !== "folder";
 
-  const doPrintNow = async (printerId: number) => {
+  const doPrintNow = async (printerId: number, acceptSwaps = false) => {
     if (!sel?.libId || sendBusy) return;
+    setSwapAsk(null);
     setSendBusy(true);
     try {
       const r = await send.send({
@@ -409,16 +413,19 @@ export default function Library() {
         printer_id: printerId,
         mode: "print_now",
         plate_confirm: plateConfirm,
+        accept_manual_swaps: acceptSwaps,
       });
       setNotice(r.message);
     } catch (e) {
+      if (isManualSwaps(e)) setSwapAsk({ msg: e.message, retry: () => void doPrintNow(printerId, true) });
       setNotice(errText(e));
     } finally {
       setSendBusy(false);
     }
   };
 
-  const doQueue = async (printerId: number | null) => {
+  const doQueue = async (printerId: number | null, acceptSwaps = false) => {
+    setSwapAsk(null);
     if (!sel?.libId || sendBusy) return;
     setSendBusy(true);
     try {
@@ -426,9 +433,11 @@ export default function Library() {
         file_id: sel.libId,
         mode: printerId == null ? "fleet_queue" : "queue",
         ...(printerId == null ? {} : { printer_id: printerId }),
+        accept_manual_swaps: acceptSwaps,
       });
       setNotice(r.message);
     } catch (e) {
+      if (isManualSwaps(e)) setSwapAsk({ msg: e.message, retry: () => void doQueue(printerId, true) });
       setNotice(errText(e));
     } finally {
       setSendBusy(false);
@@ -830,6 +839,19 @@ export default function Library() {
       { k: "TIME", v: fmtTime(sel.time) },
       { k: "GRAMS", v: fmtGrams(sel.grams) },
       { k: "COLOURS", v: swatches },
+      ...(meta?.slot_kind
+        ? [
+            {
+              k: "FILAMENTS",
+              v:
+                meta.slot_kind === "change" ? (
+                  <span style={{ color: "var(--fw-warning)" }}>⚠ {kindLabel(meta.slot_kind, meta.slots.length)}</span>
+                ) : (
+                  kindLabel(meta.slot_kind, meta.slots.length)
+                ),
+            },
+          ]
+        : []),
       { k: "SLICER", v: slicer ? `${slicer}${slicerV ? ` ${slicerV}` : ""}` : "—" },
       { k: "PROFILE", v: meta?.printer_settings_id ?? "—" },
       { k: "FILAMENT PRESET", v: preset ?? "—" },
@@ -1408,6 +1430,17 @@ export default function Library() {
           <span>{footCount}</span>
           <span role="status">
             {notice}
+            {swapAsk && (
+              <>
+                {" "}
+                <button type="button" className="fb-button fb-tiny" onClick={swapAsk.retry}>
+                  Send anyway
+                </button>
+                <button type="button" className="fb-button fb-tiny" onClick={() => setSwapAsk(null)}>
+                  Cancel
+                </button>
+              </>
+            )}
             {undoIds.length > 0 && (
               <button type="button" className="fb-button fb-tiny" onClick={() => void restore(undoIds, "Restored.")}>
                 Undo

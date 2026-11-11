@@ -12,4 +12,8 @@ due_date: string | null, sets: number, spools: Array<SlotSpool>,
 /**
  * Also put every print on the fleet queue.
  */
-queue_all: boolean, };
+queue_all: boolean, 
+/**
+ * Needed with `queue_all` when a plate swaps filament by hand (M600).
+ */
+accept_manual_swaps: boolean, };

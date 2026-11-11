@@ -8,4 +8,8 @@ export type ProjectView = { id: number, name: string, template_id: number | null
 /**
  * `active` | `done` | `archived`.
  */
-status: string, created_at: string, closed_at: string | null, plates: Array<ProjectPlate>, slots: Array<ProjectSlot>, totals: ProjectTotals, events: Array<ProjectEvent>, };
+status: string, created_at: string, closed_at: string | null, plates: Array<ProjectPlate>, slots: Array<ProjectSlot>, totals: ProjectTotals, events: Array<ProjectEvent>, 
+/**
+ * Spoolman's currency (for `cost_used`).
+ */
+currency: string | null, };
