@@ -295,6 +295,21 @@ async fn print_all_remaining_queues_one_item_per_print() {
     let inv = w.inventory().await;
     assert_eq!(reserved_on(&inv, w.teal), 90.0);
     assert_eq!(reserved_on(&inv, w.white), 90.0);
+    // Marking a copy done by hand takes one queued copy off the fleet queue.
+    let (s, v) = call(
+        &w.app,
+        "POST",
+        &format!("/api/project-plates/{}/done", pawns.expect("p")),
+        &w.auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["plates"][0]["counts"],
+        json!({"copies":3,"printed":1,"printing":0,"queued":2,"remaining":0})
+    );
+    assert_eq!(w.fleet_items().await.len(), 5);
     // Nothing left: a second press adds nothing.
     let (_, v) = call(
         &w.app,
@@ -305,7 +320,7 @@ async fn print_all_remaining_queues_one_item_per_print() {
     )
     .await;
     assert_eq!(v["added"], 0);
-    assert_eq!(w.fleet_items().await.len(), 6);
+    assert_eq!(w.fleet_items().await.len(), 5);
 }
 
 #[tokio::test]

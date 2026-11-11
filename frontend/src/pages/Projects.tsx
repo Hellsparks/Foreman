@@ -1,14 +1,20 @@
-/** Projects page — placeholder. Full implementation in Phase 6 (W9). */
+/** Projects (task 5.1, W9): list, templates, new project, project detail. */
+import { Route, Routes } from "react-router-dom";
+import ProjectList from "../projects/ProjectList";
+import TemplateEditor, { TemplateList } from "../projects/TemplateEditor";
+import ProjectNew from "../projects/ProjectNew";
+import ProjectDetail from "../projects/ProjectDetail";
+import "../projects/projects.css";
+
 export default function Projects() {
   return (
-    <div>
-      <div className="page-header">
-        <p className="page-header__eyebrow">Projects</p>
-        <h1 className="page-header__title">Projects</h1>
-      </div>
-      <p className="page-placeholder">
-        Templates, projects, and plates — coming in phase 6.
-      </p>
-    </div>
+    <Routes>
+      <Route index element={<ProjectList />} />
+      <Route path="templates" element={<TemplateList />} />
+      <Route path="templates/new" element={<TemplateEditor />} />
+      <Route path="templates/:id" element={<TemplateEditor />} />
+      <Route path="new" element={<ProjectNew />} />
+      <Route path=":id" element={<ProjectDetail />} />
+    </Routes>
   );
 }

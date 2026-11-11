@@ -925,12 +925,23 @@ pub async fn mark_done(state: &AppState, plate_id: i64) -> Result<(), AppError> 
     let pool = &state.foreman_db.pool;
     let p = repo::project::plate(pool, plate_id).await?;
     active(&repo::project::get_project(pool, p.project_id).await?)?;
-    let (c, _) = counts_of(pool, &p).await?;
+    let (c, items) = counts_of(pool, &p).await?;
     if c.printed + c.printing >= c.copies {
         return Err(bad(format!(
             "{}: every copy is printed or printing.",
             p.name
         )));
+    }
+    // Every other copy is on a queue: the one printed by hand comes off it.
+    if c.remaining == 0 {
+        if let Some((qid, _, _)) = items
+            .iter()
+            .filter(|(_, st, _)| matches!(st, QueueStatus::Waiting | QueueStatus::Failed))
+            .max_by_key(|(id, _, _)| *id)
+        {
+            repo::queue::remove(pool, *qid).await?;
+            state.scheduler.queue_changed(None);
+        }
     }
     repo::project::add_printed(pool, plate_id).await?;
     repo::project::add_event(
