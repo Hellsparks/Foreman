@@ -4,6 +4,7 @@ pub mod macro_favourite;
 pub mod printer;
 pub mod printer_path;
 pub mod printer_ssh;
+pub mod queue;
 pub mod setting;
 pub mod shell_macro;
 pub mod temp_preset;

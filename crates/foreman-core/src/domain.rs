@@ -409,3 +409,105 @@ pub struct LibraryFileDetails {
     pub entry: LibraryEntry,
     pub meta: Option<FileMeta>,
 }
+
+// ---------------------------------------------------------------------------
+// Queues (task 3.5)
+// ---------------------------------------------------------------------------
+
+/// Lifecycle of a queue item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueStatus {
+    Waiting,
+    Sending,
+    Printing,
+    Done,
+    Failed,
+    Cancelled,
+}
+
+impl QueueStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Waiting => "waiting",
+            Self::Sending => "sending",
+            Self::Printing => "printing",
+            Self::Done => "done",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "sending" => Self::Sending,
+            "printing" => Self::Printing,
+            "done" => Self::Done,
+            "failed" => Self::Failed,
+            "cancelled" => Self::Cancelled,
+            _ => Self::Waiting,
+        }
+    }
+
+    /// Sending or printing: the item occupies its printer.
+    pub fn is_active(self) -> bool {
+        matches!(self, Self::Sending | Self::Printing)
+    }
+}
+
+/// Where a queue item came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueSource {
+    Manual,
+    Slicer,
+    Project,
+}
+
+impl QueueSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Slicer => "slicer",
+            Self::Project => "project",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "slicer" => Self::Slicer,
+            "project" => Self::Project,
+            _ => Self::Manual,
+        }
+    }
+}
+
+/// One job waiting in (or dispatched from) a printer queue or the fleet queue.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct QueueItem {
+    #[ts(type = "number")]
+    pub id: i64,
+    /// Library entry to print.
+    #[ts(type = "number")]
+    pub file_id: i64,
+    /// File name when it was queued (kept if the Library entry goes away).
+    pub file_name: String,
+    pub source: QueueSource,
+    pub added_by: String,
+    pub added_at: String,
+    pub status: QueueStatus,
+    /// Lane: `null` = fleet queue, else that printer's queue. Once a fleet item is
+    /// dispatched this is the printer it went to and `from_fleet` is true.
+    #[ts(type = "number | null")]
+    pub printer_id: Option<i64>,
+    pub from_fleet: bool,
+    /// Order inside the lane (lower first).
+    #[ts(type = "number")]
+    pub position: i64,
+    /// Why it failed (upload / start error, missing file).
+    pub error: Option<String>,
+    pub updated_at: String,
+}

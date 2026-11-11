@@ -386,7 +386,7 @@ pub async fn octoprint_server() -> Json<serde_json::Value> {
 }
 
 /// `POST /api/files/local` — multipart `file` (+ `path`, `print`, `select`).
-/// Files land in the Library's "Slicer inbox"; `print` is accepted but Send isn't built yet.
+/// Files land in the Library's "Slicer inbox"; `print=true` adds them to the fleet queue.
 pub async fn octoprint_upload(
     State(state): State<AppState>,
     Extension(ctx): Extension<AuthCtx>,
@@ -411,7 +411,24 @@ pub async fn octoprint_upload(
         info!(path = %e.path, user = %ctx.username, print, plate = plate.as_deref().unwrap_or("-"), "slicer upload");
     }
     if print {
-        info!("slicer asked to print after upload: Send not built yet, file kept in the Library");
+        // "Upload and print" from the slicer: the file joins the fleet queue; the
+        // scheduler starts it on a free, compatible printer with a clear plate.
+        for e in &entries {
+            match crate::api::queue::enqueue(
+                &state,
+                e.id,
+                None,
+                foreman_core::domain::QueueSource::Slicer,
+                &ctx.username,
+            )
+            .await
+            {
+                Ok(p) => {
+                    info!(path = %e.path, position = p.position, "slicer print: added to the fleet queue")
+                }
+                Err(err) => warn!(path = %e.path, "slicer print: could not queue: {err}"),
+            }
+        }
     }
     let first = &entries[0];
     let resource = format!("/api/library/files/{}", first.id);

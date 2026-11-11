@@ -2,20 +2,22 @@
 //!
 //! Modes:
 //! - `print_now`: start the print immediately (upload to printer + start).
-//! - `queue`: add to the printer's queue (returns 501 — session 24).
-//! - `fleet_queue`: add to the fleet queue (returns 501 — session 24).
+//! - `queue`: add to the printer's queue (session 24).
+//! - `fleet_queue`: add to the fleet queue (session 24).
+//!
+//! Both queue modes return the item's position and the lane's order.
 //!
 //! `GET /api/send/check/{file_id}` returns per-printer compatibility results.
 
+use axum::Extension;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::IntoResponse,
     Json,
 };
 use foreman_core::{
     compat::{self, CompatResult, PrinterSnapshot, Verdict},
-    domain::FileMeta,
+    domain::{FileMeta, QueueSource},
     error::AppError,
     repo,
 };
@@ -24,7 +26,11 @@ use serde_json::json;
 use tracing::info;
 use ts_rs::TS;
 
-use crate::state::AppState;
+use crate::{
+    api::queue::{enqueue, QueuePositions},
+    auth::AuthCtx,
+    state::AppState,
+};
 
 // ---------------------------------------------------------------------------
 // DTOs
@@ -58,8 +64,11 @@ pub struct SendResult {
     pub dry_run: bool,
     /// Name of the file on the printer that was (or, on a dry run, would be) started.
     pub file: String,
-    /// Printer the file was sent to.
-    pub printer_id: i64,
+    /// Printer the file was sent to (null for the fleet queue).
+    #[ts(type = "number | null")]
+    pub printer_id: Option<i64>,
+    /// Queue modes: where the item landed and the lane's new order.
+    pub queue: Option<QueuePositions>,
 }
 
 // ---------------------------------------------------------------------------
@@ -81,20 +90,54 @@ pub async fn check_file(
 /// `POST /api/send` — send a file to a printer.
 pub async fn send_file(
     State(state): State<AppState>,
+    Extension(ctx): Extension<AuthCtx>,
     Json(req): Json<SendRequest>,
-) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<(StatusCode, Json<SendResult>), (StatusCode, Json<serde_json::Value>)> {
     match req.mode.as_str() {
         "print_now" => print_now(state, req).await,
-        "queue" => Err((
-            StatusCode::NOT_IMPLEMENTED,
-            Json(json!({ "error": "queue mode is not yet implemented (coming in session 24)" })),
-        )),
-        "fleet_queue" => Err((
-            StatusCode::NOT_IMPLEMENTED,
-            Json(
-                json!({ "error": "fleet_queue mode is not yet implemented (coming in session 24)" }),
-            ),
-        )),
+        "queue" | "fleet_queue" => {
+            let lane = if req.mode == "queue" {
+                Some(req.printer_id.ok_or_else(|| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({ "error": "printer_id required for queue" })),
+                    )
+                })?)
+            } else {
+                None
+            };
+            let entry = state.library.get(req.file_id).await.map_err(api_err)?;
+            let p = enqueue(
+                &state,
+                req.file_id,
+                lane,
+                QueueSource::Manual,
+                &ctx.username,
+            )
+            .await
+            .map_err(crate::api::queue::err)?;
+            let lane_name = match lane {
+                Some(id) => repo::printer::get(&state.foreman_db.pool, id)
+                    .await
+                    .map(|p| format!("{}'s queue", p.name))
+                    .unwrap_or_else(|_| "the printer queue".into()),
+                None => "the fleet queue".into(),
+            };
+            Ok((
+                StatusCode::OK,
+                Json(SendResult {
+                    ok: true,
+                    message: format!(
+                        "Queued {} in {lane_name} at position {}",
+                        entry.name, p.position
+                    ),
+                    dry_run: false,
+                    file: entry.name,
+                    printer_id: lane,
+                    queue: Some(p),
+                }),
+            ))
+        }
         other => Err((
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": format!("unknown mode: {other}") })),
@@ -106,13 +149,24 @@ pub async fn send_file(
 async fn print_now(
     state: AppState,
     req: SendRequest,
-) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<(StatusCode, Json<SendResult>), (StatusCode, Json<serde_json::Value>)> {
     let printer_id = req.printer_id.ok_or_else(|| {
         (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "printer_id required for print_now" })),
         )
     })?;
+
+    // No scheduler tick may dispatch to this printer while Print now runs.
+    let _hold = state.scheduler.hold().await;
+    if let Ok(Some(a)) = repo::queue::active_for_printer(&state.foreman_db.pool, printer_id).await {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": format!("printer already has a queued job: {} is {}", a.file_name, a.status.as_str()),
+            })),
+        ));
+    }
 
     // 1. Fetch file details.
     let meta = get_file_meta(&state, req.file_id).await.map_err(api_err)?;
@@ -133,8 +187,9 @@ async fn print_now(
         Verdict::Ready => {}
         Verdict::Plate if req.plate_confirm && req.dry_run => {}
         Verdict::Plate if req.plate_confirm => {
-            // User says plate is clear — mark it.
+            // User says plate is clear — mark it and close the "clear the plate" item.
             let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, true).await;
+            let _ = state.scheduler.clear_plate_attention(printer_id).await;
         }
         other => {
             return Err((
@@ -191,7 +246,8 @@ async fn print_now(
                 ),
                 dry_run: true,
                 file: dest_name,
-                printer_id,
+                printer_id: Some(printer_id),
+                queue: None,
             }),
         ));
     }
@@ -218,6 +274,7 @@ async fn print_now(
 
     // 6. Mark plate as not clear (a print is starting).
     let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, false).await;
+    state.scheduler.queue_changed(Some(printer_id));
 
     Ok((
         StatusCode::OK,
@@ -226,7 +283,8 @@ async fn print_now(
             message: format!("Printing {} on printer {}", dest_name, printer_id),
             dry_run: false,
             file: dest_name,
-            printer_id,
+            printer_id: Some(printer_id),
+            queue: None,
         }),
     ))
 }
@@ -244,7 +302,10 @@ async fn get_file_meta(state: &AppState, file_id: i64) -> Result<FileMeta, AppEr
 }
 
 /// Build a compatibility snapshot for a single printer.
-async fn build_snapshot_for(state: &AppState, printer_id: i64) -> Option<PrinterSnapshot> {
+pub(crate) async fn build_snapshot_for(
+    state: &AppState,
+    printer_id: i64,
+) -> Option<PrinterSnapshot> {
     let printer = repo::printer::get(&state.foreman_db.pool, printer_id)
         .await
         .ok()?;
@@ -258,7 +319,7 @@ async fn build_snapshot_for(state: &AppState, printer_id: i64) -> Option<Printer
 }
 
 /// Build compatibility snapshots for all printers.
-async fn build_snapshots(state: &AppState) -> Vec<PrinterSnapshot> {
+pub(crate) async fn build_snapshots(state: &AppState) -> Vec<PrinterSnapshot> {
     let printers = repo::printer::list(&state.foreman_db.pool)
         .await
         .unwrap_or_default();

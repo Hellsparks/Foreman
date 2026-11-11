@@ -5,6 +5,9 @@ mod auth_api_tests;
 pub mod config;
 mod driver_manager;
 mod net;
+mod scheduler;
+#[cfg(test)]
+mod scheduler_tests;
 mod ssh_pool;
 mod state;
 #[cfg(test)]
@@ -220,6 +223,17 @@ pub async fn serve_with(
         Arc::clone(&tx),
     );
 
+    let scheduler = scheduler::Scheduler::new(
+        foreman_db.pool.clone(),
+        Arc::clone(&tx),
+        Arc::new(scheduler::LiveEnv {
+            pool: foreman_db.pool.clone(),
+            drivers: driver_manager.clone(),
+            library: Arc::clone(&library),
+        }),
+    );
+    scheduler.spawn();
+
     let app_state = AppState {
         foreman_db,
         bus_tx: Arc::clone(&tx),
@@ -232,6 +246,7 @@ pub async fn serve_with(
         info: server_info,
         library,
         transfers,
+        scheduler,
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -600,6 +615,18 @@ fn build_router(app_state: AppState) -> Router {
         // Send (3.4): print-now + compat check
         .route("/api/send/check/{file_id}", get(api::send::check_file))
         .route("/api/send", post(api::send::send_file))
+        // Queues (3.5)
+        .route("/api/queue", get(api::queue::board).post(api::queue::add))
+        .route("/api/queue/{id}", delete(api::queue::remove))
+        .route("/api/queue/{id}/move", post(api::queue::move_item))
+        .route(
+            "/api/printers/{id}/queue/start-next",
+            post(api::queue::start_next),
+        )
+        .route(
+            "/api/printers/{id}/plate-cleared",
+            post(api::queue::plate_cleared),
+        )
         // Locations (printer G-code storage) + transfers
         .route("/api/locations", get(api::storage::locations))
         .route("/api/printers/{id}/storage", get(api::storage::list))
