@@ -29,18 +29,21 @@ export default function ExternalLink({
   href,
   children,
   label,
+  className,
 }: {
   href: string | null | undefined;
   /** Link text; defaults to the host name. */
   children?: ReactNode;
   /** Accessible name when the text alone is unclear ("Open product page"). */
   label?: string;
+  /** Extra classes (e.g. to look like a button). */
+  className?: string;
 }) {
   const safe = safeHref(href);
   if (!safe) return href ? <span>{href}</span> : null;
   return (
     <a
-      className="ext-link"
+      className={className ? `ext-link ${className}` : "ext-link"}
       href={safe}
       target="_blank"
       rel="noopener noreferrer"

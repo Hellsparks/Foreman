@@ -1,8 +1,8 @@
 /**
- * Filament page — Spools, Filaments, Vendors (tasks 4.1, 4.2).
- * Reference: docs/ui-ref/Filament.dc.html lines 65–147 (lists), 196–208 (vendors),
- * 222–260 (spool inspector), 261–420 (filament + vendor forms), 443–554 (new spool).
- * Inventory / Locations come later.
+ * Filament page — Spools, Filaments, Inventory, Vendors, Locations (tasks 4.1–4.3).
+ * Reference: docs/ui-ref/Filament.dc.html lines 65–147 (lists), 148–195 (inventory),
+ * 196–208 (vendors), 222–260 (spool inspector), 261–420 (filament + vendor forms),
+ * 443–554 (new spool).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -35,6 +35,9 @@ import {
 } from "../api/filaments";
 import "../filament/filament.css";
 import { ExternalLink } from "../ui";
+import InventoryTab from "../filament/InventoryTab";
+import LocationsTab, { NO_LOCATION } from "../filament/LocationsTab";
+import { inventoryApi, type Inventory, type Locations } from "../api/inventory";
 
 const TABS = [
   ["spools", "Spools"],
@@ -50,7 +53,7 @@ type Panel =
   | { kind: "spool"; id: number }
   | { kind: "load"; id: number }
   | { kind: "edit"; id: number }
-  | { kind: "new-spool"; filamentId: number | null }
+  | { kind: "new-spool"; filamentId: number | null; qty?: number }
   | { kind: "filament"; id: number | null; vendor?: string }
   | { kind: "vendor"; id: number | null };
 
@@ -62,6 +65,9 @@ export default function Filament() {
   const [fils, setFils] = useState<FilamentRow[] | null>(null);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
+  const [inv, setInv] = useState<Inventory | null>(null);
+  const [locs, setLocs] = useState<Locations | null>(null);
+  const [loc, setLoc] = useState("");
   const [catalogue, setCatalogue] = useState<MaterialCatalogue | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -74,16 +80,20 @@ export default function Filament() {
 
   const load = useCallback(async () => {
     try {
-      const [sp, fl, vd, lc] = await Promise.all([
+      const [sp, fl, vd, lc, iv, ls] = await Promise.all([
         spools.list(showArchived),
         filamentApi.filaments(),
         filamentApi.vendors(),
         filamentApi.locations(),
+        inventoryApi.get(),
+        inventoryApi.locations(),
       ]);
       setRows(sp);
       setFils(fl);
       setVendors(vd);
       setLocations(lc);
+      setInv(iv);
+      setLocs(ls);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -120,6 +130,7 @@ export default function Filament() {
     const s = r.spool;
     if (mat !== "all" && (s.material ?? "").toUpperCase() !== mat) return false;
     if (low && !(s.remaining_weight != null && s.remaining_weight < LOW_GRAMS)) return false;
+    if (loc === NO_LOCATION ? !!s.location?.trim() : loc && s.location !== loc) return false;
     if (!q.trim()) return true;
     const hay = [`#${s.id}`, s.name, s.vendor, s.material, s.modifier, s.location, s.color_hex, s.lot_nr, ...r.loaded.map((l) => l.printer_name)]
       .filter(Boolean)
@@ -189,10 +200,28 @@ export default function Filament() {
             onOpen={(v) => show({ kind: "vendor", id: v.id })}
             onAdd={() => show({ kind: "vendor", id: null })}
           />
-        ) : tab !== "spools" ? (
-          <p className="fil-placeholder">
-            {TABS.find((t) => t[0] === tab)?.[1]} comes in a later session.
-          </p>
+        ) : tab === "inventory" ? (
+          <InventoryTab
+            inv={inv}
+            filaments={filaments}
+            vendors={vendors}
+            onChange={setInv}
+            onToast={setToast}
+            onBought={(r) => show({ kind: "new-spool", filamentId: r.filament.id, qty: r.buy })}
+          />
+        ) : tab === "locations" ? (
+          <LocationsTab
+            data={locs}
+            onShow={(l) => {
+              setLoc(l);
+              setTab("spools");
+            }}
+            onRenamed={(m) => {
+              setToast(m);
+              setLoc("");
+              void load();
+            }}
+          />
         ) : (
           <>
             <div className="fil-filters">
@@ -222,6 +251,16 @@ export default function Filament() {
               <button type="button" className="fil-seg" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>
                 Show archived
               </button>
+              <select className="fil-input fil-select" aria-label="Location" value={loc} onChange={(e) => setLoc(e.target.value)}>
+                <option value="">All locations</option>
+                {(locs?.locations ?? []).map((l) => (
+                  <option key={l.name} value={l.name}>
+                    {l.name} · {l.spool_count}
+                  </option>
+                ))}
+                {loc && loc !== NO_LOCATION && !locs?.locations.some((l) => l.name === loc) && <option value={loc}>{loc}</option>}
+                <option value={NO_LOCATION}>No location</option>
+              </select>
             </div>
             <div className="fil-count">{shown.length} shown</div>
             <div className="fil-table-wrap">
@@ -339,12 +378,13 @@ export default function Filament() {
             />
           ) : panel.kind === "new-spool" ? (
             <NewSpoolPanel
-              key={`new-${panel.filamentId ?? "x"}`}
+              key={`new-${panel.filamentId ?? "x"}-${panel.qty ?? 1}`}
               catalogue={catalogue}
               vendors={vendors}
               filaments={filaments}
               locations={locations}
               preset={filaments.find((f) => f.id === panel.filamentId) ?? null}
+              presetQty={panel.qty}
               onClose={close}
               onCreated={(c) => {
                 setToast(`Added ${c.spools.length} spool${c.spools.length === 1 ? "" : "s"} of ${[c.filament.vendor, c.filament.name].filter(Boolean).join(" ")}`);
