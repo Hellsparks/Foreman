@@ -3,4 +3,16 @@
 /**
  * Successful `print_now` response.
  */
-export type SendResult = { ok: boolean, message: string, };
+export type SendResult = { ok: boolean, message: string, 
+/**
+ * True when this was a dry run: the file was uploaded but no print started.
+ */
+dry_run: boolean, 
+/**
+ * Name of the file on the printer that was (or, on a dry run, would be) started.
+ */
+file: string, 
+/**
+ * Printer the file was sent to.
+ */
+printer_id: bigint, };

@@ -42,6 +42,10 @@ pub struct SendRequest {
     /// For `print_now`: the user confirms the plate is clear.
     #[serde(default)]
     pub plate_confirm: bool,
+    /// For `print_now`: run compat and the upload, then stop before the start
+    /// command and report what would have happened. Changes no printer state.
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 /// Successful `print_now` response.
@@ -50,6 +54,12 @@ pub struct SendRequest {
 pub struct SendResult {
     pub ok: bool,
     pub message: String,
+    /// True when this was a dry run: the file was uploaded but no print started.
+    pub dry_run: bool,
+    /// Name of the file on the printer that was (or, on a dry run, would be) started.
+    pub file: String,
+    /// Printer the file was sent to.
+    pub printer_id: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +131,7 @@ async fn print_now(
     // Allow Ready, or Plate if the user confirmed.
     match &compat_result.verdict {
         Verdict::Ready => {}
+        Verdict::Plate if req.plate_confirm && req.dry_run => {}
         Verdict::Plate if req.plate_confirm => {
             // User says plate is clear — mark it.
             let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, true).await;
@@ -169,6 +180,22 @@ async fn print_now(
             )
         })?;
 
+    if req.dry_run {
+        info!(printer_id, file = %dest_name, "print_now dry run: uploaded, start skipped");
+        return Ok((
+            StatusCode::OK,
+            Json(SendResult {
+                ok: true,
+                message: format!(
+                    "Dry run: uploaded {dest_name} to printer {printer_id}; would start printing it (start command not sent)"
+                ),
+                dry_run: true,
+                file: dest_name,
+                printer_id,
+            }),
+        ));
+    }
+
     // 5. Start the print.
     let driver = state
         .driver_manager
@@ -197,6 +224,9 @@ async fn print_now(
         Json(SendResult {
             ok: true,
             message: format!("Printing {} on printer {}", dest_name, printer_id),
+            dry_run: false,
+            file: dest_name,
+            printer_id,
         }),
     ))
 }
