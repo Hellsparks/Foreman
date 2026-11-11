@@ -665,6 +665,18 @@ mod tests {
             effective_bind_host("0.0.0.0", true, true, false),
             "127.0.0.1"
         );
+        // Desktop with the 0.0.0.0 default: still loopback before setup / toggle.
+        assert_eq!(
+            effective_bind_host("0.0.0.0", false, true, true),
+            "127.0.0.1"
+        );
+        assert_eq!(effective_bind_host("0.0.0.0", true, true, true), "0.0.0.0");
+        // Headless server with the default: all interfaces even before setup (the
+        // router answers only health / info / setup until an admin exists).
+        assert_eq!(
+            effective_bind_host("0.0.0.0", false, false, false),
+            "0.0.0.0"
+        );
     }
 
     fn ctx() -> AuthCtx {

@@ -349,8 +349,8 @@ pub async fn serve_with(
     Ok(())
 }
 
-/// Listeners for `host`, dual-stack so `localhost` works whichever family a client
-/// resolves first: `0.0.0.0`/`::` → one `[::]` socket that also takes IPv4;
+/// Listeners for `host`, dual-stack so a client works whichever family it resolves
+/// first: wildcard (`0.0.0.0`/`::`) → `0.0.0.0` plus `[::]` (v6-only, best effort);
 /// loopback → `127.0.0.1` plus `::1` (best effort); anything else as given.
 async fn bind_listeners(
     host: &str,
@@ -366,15 +366,15 @@ async fn bind_listeners(
     let v4 = |ip: Ipv4Addr| SocketAddr::from((ip, port));
     let mut out = Vec::new();
     if ip.is_unspecified() {
-        match bind_with_retry(v6(Ipv6Addr::UNSPECIFIED), false).await {
+        // Two sockets, `0.0.0.0` and `[::]` (v6-only), like loopback: clearer in
+        // `ss` and works where dual-stack sockets are disabled.
+        out.push((
+            v4(Ipv4Addr::UNSPECIFIED),
+            bind_with_retry(v4(Ipv4Addr::UNSPECIFIED), true).await?,
+        ));
+        match bind_with_retry(v6(Ipv6Addr::UNSPECIFIED), true).await {
             Ok(l) => out.push((v6(Ipv6Addr::UNSPECIFIED), l)),
-            Err(e) => {
-                warn!("dual-stack [::] bind failed ({e}); IPv4 only");
-                out.push((
-                    v4(Ipv4Addr::UNSPECIFIED),
-                    bind_with_retry(v4(Ipv4Addr::UNSPECIFIED), true).await?,
-                ));
-            }
+            Err(e) => warn!("[::] bind failed ({e}); IPv4 only"),
         }
     } else if ip.is_loopback() {
         out.push((

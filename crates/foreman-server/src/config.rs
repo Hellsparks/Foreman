@@ -16,7 +16,10 @@ pub struct ServerConfig {
     #[serde(default = "default_port")]
     pub port: u16,
 
-    /// Host address to bind. Default: `127.0.0.1`.
+    /// Host address to bind. Default: `0.0.0.0` (all interfaces, IPv4 and IPv6: LAN
+    /// and Tailscale). An unclaimed server still answers only health, info and
+    /// setup; desktop Mode A stays on loopback until "Let other devices connect".
+    /// Override with `FOREMAN__HOST`, e.g. `127.0.0.1` for localhost only.
     #[serde(default = "default_host")]
     pub host: String,
 
@@ -50,7 +53,7 @@ fn default_spoolman_enabled() -> bool {
 }
 
 fn default_host() -> String {
-    "127.0.0.1".to_string()
+    "0.0.0.0".to_string()
 }
 
 /// Returns the OS-standard application data directory for Foreman.
@@ -77,7 +80,7 @@ impl ServerConfig {
         builder = builder
             .set_default("port", 9090u16)
             .expect("default port is valid")
-            .set_default("host", "127.0.0.1")
+            .set_default("host", default_host())
             .expect("default host is valid");
 
         // 2. Config file (optional — missing file is not an error)

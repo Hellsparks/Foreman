@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Filament</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Filament</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="padding: 20px 32px 0; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--fw-border)">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+<div style="flex: 1 1 300px"><h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Filament</h1>
+<p style="margin: 4px 0 0; color: var(--fw-muted)">{{headline}}</p></div>
+<a href="Settings.dc.html" aria-label="Devices: scale online, TD1 adapter online. Open device settings" style="min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px; border: 1px solid var(--fw-border); color: var(--fw-text); text-decoration: none; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"><span><span style="color: var(--fw-success)">●</span> Scale</span><span><span style="color: var(--fw-success)">●</span> TD1</span></a>
+<button type="button" onClick="{{startStock}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Stock-take</button>
+<button type="button" onClick="{{scan}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Scan spool</button>
+<button type="button" onClick="{{startFil}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Add filament</button>
+<button type="button" onClick="{{startNew}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Add spool</button>
+</div>
+<div role="tablist" aria-label="Filament sections" style="display: flex; flex-wrap: wrap; margin-bottom: -1px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+<button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 0 18px; background: {{t.bg}}; border: 1px solid {{t.border}}; border-bottom-color: {{t.bottom}}; margin-right: -1px; cursor: pointer; font-weight: {{t.weight}}">{{t.label}}</button>
+</sc-for>
+</div>
+</header>
+
+<main style="padding: 20px 32px 48px; display: flex; flex-direction: column; gap: 14px; min-width: 0">
+<sc-if value="{{isSpools}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<label style="flex: 1 1 220px; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search spools</span><input type="search" placeholder="#id, name, colour, location…" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<div role="group" aria-label="Material" style="display: flex">
+<sc-for list="{{matFilters}}" as="f" hint-placeholder-count="5">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="min-height: 44px; padding: 0 12px; margin-left: -1px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; cursor: pointer; font-size: 13px">{{f.label}}</button>
+</sc-for>
+</div>
+<button type="button" onClick="{{toggleLow}}" aria-pressed="{{lowOn}}" style="min-height: 44px; padding: 0 12px; border: 1px solid {{lowBorder}}; background: {{lowBg}}; color: {{lowFg}}; cursor: pointer; font-size: 13px; border-radius: 2px">Low · under 150 g</button>
+</div>
+<sc-if value="{{hasRecent}}" hint-placeholder-val="{{ true }}">
+<section aria-label="Recent TD1 readings" style="border: 1px solid var(--fw-border); background: var(--fw-surface); padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted); margin-right: 4px">TD1 readings</span>
+<sc-for list="{{recent}}" as="r" hint-placeholder-count="2">
+<span style="display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 4px 4px 4px 8px">
+<span aria-hidden="true" style="width: 20px; height: 20px; background: {{r.hex}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{r.hex}} · TD {{r.td}} · {{r.at}}</span>
+<button type="button" onClick="{{r.find}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 12px; border-radius: 2px">Find spools</button>
+<button type="button" onClick="{{r.make}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 12px; border-radius: 2px">New filament</button>
+<button type="button" onClick="{{r.drop}}" aria-label="Discard reading" style="width: 32px; min-height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</span>
+</sc-for>
+</section>
+</sc-if>
+<sc-if value="{{colourOn}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 10px; border: 1px solid var(--fw-info); background: var(--fw-info-bg); padding: 8px 12px; font-size: 13px"><span aria-hidden="true" style="width: 20px; height: 20px; background: {{colourQ}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span><span style="flex: 1">Sorted by closeness to <b style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{colourQ}}</b>. Distance shown under each spool.</span><button type="button" onClick="{{clearColour}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; border-radius: 2px">Clear</button></div>
+</sc-if>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{countLabel}}</div>
+<div style="overflow-x: auto; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<table style="width: 100%; border-collapse: collapse; min-width: 760px">
+<thead><tr>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Spool</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Material</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border); width: 220px">Left · reserved</th>
+<th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Where</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{spools}}" as="sp" hint-placeholder-count="8">
+<tr style="background: {{sp.rowBg}}">
+<td style="padding: 6px 12px; border-bottom: 1px solid var(--fw-border)">
+<button type="button" onClick="{{sp.open}}" style="display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-height: 48px">
+<span aria-hidden="true" style="width: 28px; height: 28px; flex: none; background: {{sp.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<span><b>#{{sp.id}} {{sp.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{sp.vendor}}{{sp.dist}}</span></span>
+</button>
+</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border)"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{sp.mat}}</span><sc-if value="{{sp.multi}}" hint-placeholder-val="{{ false }}"><br><span style="font-size: 11px; color: var(--fw-muted)">{{sp.colourKind}}</span></sc-if><sc-if value="{{sp.abrasive}}" hint-placeholder-val="{{ false }}"><br><span style="font-size: 11px; color: var(--fw-warning)">abrasive</span></sc-if></td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border)">
+<div aria-hidden="true" style="display: flex; height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="width: {{sp.freePct}}%; background: {{sp.barFg}}"></div><div style="width: {{sp.resPct}}%; background: var(--fw-warning)"></div></div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; margin-top: 2px; color: {{sp.leftFg}}">{{sp.leftLabel}}</div>
+</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-size: 13px">{{sp.where}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</sc-if>
+<sc-if value="{{isFils}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<label style="flex: 1 1 220px; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search filaments</span><input type="search" placeholder="Name, vendor, material, colour…" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<button type="button" onClick="{{startFil}}" style="min-height: 44px; padding: 0 14px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Add filament</button>
+</div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{filCount}}</div>
+<div style="overflow-x: auto; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<table style="width: 100%; border-collapse: collapse; min-width: 760px">
+<thead><tr>
+<sc-for list="{{filHead}}" as="h" hint-placeholder-count="6"><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">{{h}}</th></sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{fils}}" as="f" hint-placeholder-count="8">
+<tr style="background: {{f.rowBg}}">
+<td style="padding: 6px 12px; border-bottom: 1px solid var(--fw-border)"><button type="button" onClick="{{f.open}}" style="display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-height: 48px"><span aria-hidden="true" style="width: 28px; height: 28px; flex: none; background: {{f.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span><span><b>{{f.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{f.vendor}}</span></span></button></td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{f.mat}}<br><span style="font-size: 11px; color: var(--fw-muted)">{{f.kind}}</span></td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{f.temps}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{f.td}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-size: 13px">{{f.stock}}</td>
+<td style="padding: 0 12px; border-bottom: 1px solid var(--fw-border); font-size: 12px; color: var(--fw-muted)">{{f.extras}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</sc-if>
+<sc-if value="{{isInv}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px">
+<sc-for list="{{inv.tiles}}" as="t" hint-placeholder-count="4">
+<div style="border: 1px solid {{t.border}}; background: var(--fw-raised); padding: 12px 14px"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 24px; font-weight: bold; color: {{t.fg}}">{{t.v}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{t.k}}</div></div>
+</sc-for>
+</div>
+<section aria-label="Shopping list" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--fw-border)"><h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Shopping list · {{inv.shopCount}}</h2><button type="button" onClick="{{inv.copy}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">Copy list</button></div>
+<sc-if value="{{inv.shopEmpty}}" hint-placeholder-val="{{ false }}"><div style="padding: 16px 14px; color: var(--fw-muted); font-size: 13px">Nothing to buy. Everything tracked is at or above its buy-below level.</div></sc-if>
+<sc-for list="{{inv.shop}}" as="r" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; min-height: 56px; padding: 0 14px; border-bottom: 1px solid var(--fw-border)">
+<span aria-hidden="true" style="width: 28px; height: 28px; background: {{r.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<span style="min-width: 0"><b>{{r.name}}</b> <span style="color: var(--fw-muted); font-size: 12px">— {{r.size}}</span><br><span style="font-size: 12px; color: var(--fw-muted)">{{r.meta}}</span></span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; font-weight: bold">× {{r.buy}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; min-width: 70px; text-align: right">{{r.cost}}</span>
+<span style="display: flex; gap: 6px"><sc-if value="{{r.hasUrl}}" hint-placeholder-val="{{ true }}"><a href="{{r.url}}" target="_blank" rel="noopener" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">Store<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg></a></sc-if><sc-if value="{{r.noUrl}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--fw-muted); align-self: center">No store link</span></sc-if><button type="button" onClick="{{r.bought}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">Bought → add {{r.buy}}</button></span>
+</div>
+</sc-for>
+<sc-if value="{{inv.hasCost}}" hint-placeholder-val="{{ true }}"><div style="display: flex; justify-content: flex-end; gap: 12px; padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px"><span style="color: var(--fw-muted)">Estimated total</span><b>{{inv.total}}</b></div></sc-if>
+</section>
+<section aria-label="Tracked filaments" style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--fw-border)"><h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Tracked filaments · {{inv.trackedCount}}</h2><button type="button" onClick="{{inv.togglePicker}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">+ Track filament</button></div>
+<sc-if value="{{inv.pickerOpen}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 10px 14px; border-bottom: 1px solid var(--fw-border); background: var(--fw-surface); display: flex; flex-wrap: wrap; gap: 6px; align-items: center"><span style="font-size: 12px; color: var(--fw-muted)">Not tracked:</span>
+<sc-for list="{{inv.untracked}}" as="u" hint-placeholder-count="3"><button type="button" onClick="{{u.track}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none"><span aria-hidden="true" style="width: 14px; height: 14px; background: {{u.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>{{u.label}}</button></sc-for>
+<sc-if value="{{inv.noUntracked}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--fw-muted)">All filaments are tracked.</span></sc-if>
+</div>
+</sc-if>
+<div style="overflow-x: auto"><table style="width: 100%; border-collapse: collapse; min-width: 760px">
+<thead><tr><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Filament</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Material</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Size</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border); text-align: center">In stock</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border); text-align: center">Target</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border); text-align: center">Buy below</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Status</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)"></th></tr></thead>
+<tbody><sc-for list="{{inv.rows}}" as="r" hint-placeholder-count="5"><tr>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px"><span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 24px; height: 24px; flex: none; background: {{r.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span><span><b>{{r.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{r.vendor}}</span></span></span></td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{r.mat}}</td><td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px">{{r.size}}</td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; text-align: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; color: {{r.haveFg}}">{{r.have}}</td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; text-align: center"><span style="display: inline-flex"><button type="button" onClick="{{r.tDown}}" aria-label="Lower target" style="width: 32px; min-height: 32px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">−</button><output style="width: 34px; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--fw-muted); border-bottom: 1px solid var(--fw-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{r.t}}</output><button type="button" onClick="{{r.tUp}}" aria-label="Raise target" style="width: 32px; min-height: 32px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">+</button></span></td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; text-align: center"><span style="display: inline-flex"><button type="button" onClick="{{r.mDown}}" aria-label="Lower buy-below" style="width: 32px; min-height: 32px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">−</button><output style="width: 34px; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--fw-muted); border-bottom: 1px solid var(--fw-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{r.min}}</output><button type="button" onClick="{{r.mUp}}" aria-label="Raise buy-below" style="width: 32px; min-height: 32px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">+</button></span></td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; padding: 2px 8px; border: 1px solid {{r.stFg}}; color: {{r.stFg}}; background: {{r.stBg}}">{{r.status}}</span></td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; text-align: right"><button type="button" onClick="{{r.untrack}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">Untrack</button></td>
+</tr></sc-for></tbody>
+</table></div>
+<div style="padding: 10px 14px; font-size: 12px; color: var(--fw-muted)">Target = how many spools you want on hand. Buy below = when it goes on the shopping list. Reserved grams for projects count against stock.</div>
+</section>
+<details style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<summary style="cursor: pointer; min-height: 48px; display: flex; align-items: center; padding: 0 14px; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Spool storage · {{inv.storeCount}} spools not loaded</summary>
+<sc-for list="{{inv.storage}}" as="g" hint-placeholder-count="3"><div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-top: 1px solid var(--fw-border); font-size: 13px"><b style="width: 90px">{{g.loc}}</b><span style="flex: 1; color: var(--fw-muted)">{{g.list}}</span></div></sc-for>
+</details>
+</sc-if>
+
+<sc-if value="{{isVend}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<label style="flex: 1 1 220px; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search vendors</span><input type="search" placeholder="Vendor name…" style="flex: 1; min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<button type="button" onClick="{{startVend}}" style="min-height: 44px; padding: 0 14px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Add vendor</button>
+</div>
+<div style="overflow-x: auto; border: 1px solid var(--fw-border); background: var(--fw-raised)"><table style="width: 100%; border-collapse: collapse; min-width: 640px">
+<thead><tr><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Vendor</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Empty spool</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Filaments</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Spools</th><th style="text-align: left; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Website</th></tr></thead>
+<tbody><sc-for list="{{vends}}" as="v" hint-placeholder-count="6"><tr style="background: {{v.rowBg}}">
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px"><button type="button" onClick="{{v.open}}" style="background: none; border: 0; padding: 0; cursor: pointer; text-align: left; min-height: 44px; font-weight: bold; color: var(--fw-text)">{{v.name}}</button></td>
+<td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{v.empty}}</td><td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px">{{v.fils}}</td><td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px">{{v.spools}}</td><td style="padding: 0 12px; height: 52px; border-bottom: 1px solid var(--fw-border); font-size: 13px; font-size: 12px; color: var(--fw-muted)">{{v.url}}</td>
+</tr></sc-for></tbody>
+</table></div>
+</sc-if>
+<sc-if value="{{isOther}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px dashed var(--fw-border); padding: 32px; color: var(--fw-muted)">{{otherText}}</div>
+</sc-if>
+<sc-if value="{{isSpools}}" hint-placeholder-val="{{ true }}">
+<aside aria-label="Demo: act as the device" style="margin-top: 12px; border: 1px dashed var(--fw-muted); padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<span style="flex: 1 1 220px; font-size: 12px; color: var(--fw-muted)">Demo only — pretend you are standing at the device. Readings go to whatever flow is open; otherwise to TD1 readings.</span>
+<button type="button" onClick="{{devCapture}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Press capture on TD1 adapter</button>
+<button type="button" onClick="{{devPlace}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Put spool on scale</button>
+</aside>
+</sc-if>
+</main>
+</div>
+
+<sc-if value="{{inspOpen}}" hint-placeholder-val="{{ true }}">
+<aside aria-label="Inspector" style="flex: 1 1 400px; max-width: 460px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 16px">
+
+<sc-if value="{{mSpool}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<span aria-hidden="true" style="width: 44px; height: 44px; flex: none; background: {{cur.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<div style="flex: 1; min-width: 0"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Spool #{{cur.id}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{cur.name}}</h2><div style="font-size: 13px; color: var(--fw-muted)">{{cur.vendor}} · {{cur.mat}}</div></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close inspector" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; height: 12px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="width: {{cur.freePct}}%; background: {{cur.barFg}}"></div><div style="width: {{cur.resPct}}%; background: var(--fw-warning)"></div></div>
+<div style="display: flex; justify-content: space-between; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px"><span>{{cur.g}} g left</span><span style="color: var(--fw-warning)">{{cur.res}} g reserved</span><span style="color: var(--fw-muted)">of {{cur.of}} g</span></div>
+<div style="font-size: 12px; color: var(--fw-muted)">{{cur.resNote}}</div>
+</div>
+<section aria-label="Weigh" style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><h3 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Weigh · Teamster scale</h3><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-success)">● {{scaleState}}</span></div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)">Scale screen: {{scaleScreen}}</div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px">Scale {{scaleGross}} g − empty spool {{cur.empty}} g = <b style="font-size: 18px">{{scaleNet}} g</b></div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{useScale}}" style="flex: 1; min-height: 44px; padding: 0 12px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Use {{scaleNet}} g</button>
+<button type="button" onClick="{{tare}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Tare</button>
+</div>
+<span style="font-size: 12px; color: var(--fw-muted)">Nothing changes until you press Use. Or type a weight: <input type="number" aria-label="Measured gross weight in grams" placeholder="g" style="width: 72px; min-height: 32px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 6px; border-radius: 2px"></span>
+<button type="button" onClick="{{learnEmpty}}" style="align-self: flex-start; min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Spool is empty? Save {{scaleGross}} g as {{cur.vendor}}'s empty spool weight</button>
+</section>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px; background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 8px 12px"><span aria-hidden="true" style="width: 24px; height: 24px; background: {{cur.swatch}}; border: 1px solid var(--fw-muted)"></span><span style="flex: 1; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{cur.hex}} · TD {{cur.tdShow}}</span><button type="button" onClick="{{editFil}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; border-radius: 2px; font-size: 12px">Edit filament<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M9 5l7 7-7 7"/></svg></button></div>
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+<sc-for list="{{cur.facts}}" as="f" hint-placeholder-count="6">
+<div style="display: flex; justify-content: space-between; gap: 12px; min-height: 28px; align-items: center"><span style="color: var(--fw-muted)">{{f.k}}</span><span style="text-align: right">{{f.v}}</span></div>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<a href="Printer.dc.html" style="min-height: 44px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center; justify-content: center">Load onto…</a>
+<button type="button" onClick="{{label}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Print label</button>
+<button type="button" onClick="{{nfc}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Write NFC tag</button>
+<button type="button" onClick="{{archive}}" style="min-height: 44px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer">Archive</button>
+</div>
+</sc-if>
+
+<sc-if value="{{mFil}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<span aria-hidden="true" style="width: 44px; height: 44px; flex: none; background: {{ff.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<div style="flex: 1; min-width: 0"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{ff.kicker}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{ff.title}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-if value="{{ff.isNew}}" hint-placeholder-val="{{ true }}">
+<section aria-label="Start from · optional" style="border: 1px solid {{fs.start.border}}; background: var(--fw-raised); min-width: 0">
+<button type="button" onClick="{{fs.start.toggle}}" aria-expanded="{{fs.start.open}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid {{fs.start.markBorder}}; background: {{fs.start.markBg}}; color: {{fs.start.markFg}}; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{fs.start.mark}}</span>
+<span style="flex: 1; min-width: 0"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Start from · optional</span><sc-if value="{{fs.start.closed}}" hint-placeholder-val="{{ true }}"><br><span style="font-size: 13px; color: var(--fw-text)">{{fs.start.sum}}</span></sc-if></span>
+<span aria-hidden="true" style="color: var(--fw-muted)">{{fs.start.chev}}</span>
+</button>
+<sc-if value="{{fs.start.open}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px">
+<input type="search" value="{{ff.q}}" onInput="{{ff.setQ}}" aria-label="Search the SpoolmanDB catalogue" placeholder="Search SpoolmanDB, e.g. prusament petg" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box; min-height: 44px">
+<sc-for list="{{ff.hits}}" as="h" hint-placeholder-count="3">
+<button type="button" onClick="{{h.pick}}" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 10px; background: var(--fw-surface); border: 1px solid var(--fw-border); cursor: pointer; text-align: left"><span aria-hidden="true" style="width: 22px; height: 22px; flex: none; background: {{h.hex}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span><span style="flex: 1; font-size: 13px"><b>{{h.label}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{h.sub}}</span></span></button>
+</sc-for>
+<span style="font-size: 12px; color: var(--fw-muted)">Picking one fills every section and folds them up. Skip to fill it in yourself.</span>
+<div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{fs.start.next}}" disabled="{{fs.start.nextOff}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">{{fs.start.nextLabel}}</button></div>
+</div>
+</sc-if>
+</section>
+</sc-if>
+<section aria-label="Filament" style="border: 1px solid {{fs.fil.border}}; background: var(--fw-raised); min-width: 0">
+<button type="button" onClick="{{fs.fil.toggle}}" aria-expanded="{{fs.fil.open}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid {{fs.fil.markBorder}}; background: {{fs.fil.markBg}}; color: {{fs.fil.markFg}}; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{fs.fil.mark}}</span>
+<span style="flex: 1; min-width: 0"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Filament</span><sc-if value="{{fs.fil.closed}}" hint-placeholder-val="{{ true }}"><br><span style="font-size: 13px; color: var(--fw-text)">{{fs.fil.sum}}</span></sc-if></span>
+<span aria-hidden="true" style="color: var(--fw-muted)">{{fs.fil.chev}}</span>
+</button>
+<sc-if value="{{fs.fil.open}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px">
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Vendor</span><input type="text" value="{{ff.vendor}}" onInput="{{ff.setVendor}}" placeholder="Type to find or create…" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+<sc-for list="{{ff.vChips}}" as="v" hint-placeholder-count="3"><button type="button" onClick="{{v.pick}}" aria-pressed="{{v.on}}" style="min-height: 32px; padding: 0 10px; border: 1px solid {{v.border}}; background: {{v.bg}}; color: {{v.fg}}; cursor: pointer; font-size: 12px; border-radius: 2px">{{v.label}}</button></sc-for>
+<span style="font-size: 12px; color: {{ff.vendorFg}}">{{ff.vendorHint}}</span>
+</div>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Name</span><input type="text" value="{{ff.name}}" onInput="{{ff.setName}}" placeholder="e.g. PETG Galaxy Black" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Material</span><select onChange="{{ff.setMat}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"><sc-for list="{{ff.mats}}" as="o" hint-placeholder-count="8"><option value="{{o.v}}" selected="{{o.on}}">{{o.v}}</option></sc-for></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Article no.</span><input type="text" value="{{ff.art}}" onInput="{{ff.setArt}}" placeholder="optional" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; font-weight: bold">Modifiers <span style="font-weight: normal; color: var(--fw-muted)">· pick any</span></span>
+<sc-for list="{{ff.modGroups}}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted); width: 74px">{{g.label}}</span>
+<sc-for list="{{g.items}}" as="m" hint-placeholder-count="5"><button type="button" onClick="{{m.pick}}" aria-pressed="{{m.on}}" style="min-height: 32px; padding: 0 9px; border: 1px solid {{m.border}}; background: {{m.bg}}; color: {{m.fg}}; cursor: pointer; font-size: 12px; border-radius: 2px">{{m.label}}</button></sc-for>
+</div>
+</sc-for>
+<span style="font-size: 12px; color: var(--fw-muted)">Saved as <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{ff.matFull}}</code>. Modifiers go in the material_modifier field, same as today.</span>
+</div>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px; border: 1px solid {{ff.abrBorder}}; padding: 0 10px"><input type="checkbox" checked="{{ff.abr}}" onChange="{{ff.toggleAbr}}" style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"><span style="flex: 1">Abrasive · needs a hardened nozzle</span><span style="font-size: 11px; color: var(--fw-muted)">{{ff.abrWhy}}</span></label>
+<sc-if value="{{ff.dup}}" hint-placeholder-val="{{ false }}"><div style="border: 1px solid var(--fw-warning); background: var(--fw-warning-bg); color: var(--fw-warning); padding: 8px 10px; font-size: 13px">You already have “{{ff.dupName}}”. <button type="button" onClick="{{ff.openDup}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Open it</button> instead?</div></sc-if>
+<div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{fs.fil.next}}" disabled="{{fs.fil.nextOff}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">{{fs.fil.nextLabel}}</button></div>
+</div>
+</sc-if>
+</section>
+<section aria-label="Colour" style="border: 1px solid {{fs.col.border}}; background: var(--fw-raised); min-width: 0">
+<button type="button" onClick="{{fs.col.toggle}}" aria-expanded="{{fs.col.open}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid {{fs.col.markBorder}}; background: {{fs.col.markBg}}; color: {{fs.col.markFg}}; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{fs.col.mark}}</span>
+<span style="flex: 1; min-width: 0"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Colour</span><sc-if value="{{fs.col.closed}}" hint-placeholder-val="{{ true }}"><br><span style="font-size: 13px; color: var(--fw-text)">{{fs.col.sum}}</span></sc-if></span>
+<span aria-hidden="true" style="color: var(--fw-muted)">{{fs.col.chev}}</span>
+</button>
+<sc-if value="{{fs.col.open}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px">
+<div role="radiogroup" aria-label="Colour type" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<sc-for list="{{nc.kinds}}" as="k" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{k.on}}" onClick="{{k.pick}}" style="min-height: 44px; margin-left: -1px; border: 1px solid {{k.border}}; background: {{k.bg}}; color: {{k.fg}}; cursor: pointer; font-size: 13px">{{k.label}}</button></sc-for>
+</div>
+<span style="font-size: 12px; color: var(--fw-muted)">{{nc.help}}</span>
+<span aria-hidden="true" style="align-self: {{nc.pvAlign}}; width: {{nc.pvW}}; height: {{nc.pvH}}; border-radius: {{nc.pvR}}; border: 1px solid var(--fw-muted); background: {{nc.swatch}}"></span>
+<sc-for list="{{nc.colours}}" as="c" hint-placeholder-count="1">
+<div style="display: flex; align-items: center; gap: 6px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted); width: 18px">{{c.n}}</span>
+<input type="color" value="{{c.hex}}" onChange="{{c.set}}" aria-label="Colour {{c.n}}" style="width: 44px; height: 40px; border: 1px solid var(--fw-muted); padding: 0; background: none">
+<input type="text" value="{{c.hex}}" onChange="{{c.set}}" aria-label="Colour {{c.n}} hex" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box; width: 110px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">
+<button type="button" onClick="{{c.measure}}" aria-label="Measure colour {{c.n}} with TD1" style="min-height: 40px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 12px; border-radius: 2px; white-space: nowrap"><span style="color: var(--fw-success)">●</span> TD1</button>
+<sc-if value="{{c.canRemove}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{c.remove}}" aria-label="Remove colour {{c.n}}" style="width: 32px; height: 40px; border: 0; background: none; cursor: pointer">✕</button></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{nc.canAdd}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{nc.add}}" style="align-self: flex-start; min-height: 40px; padding: 0 10px; border: 1px dashed var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px">+ Colour</button></sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">HueForge TD</span><input type="number" step="0.1" value="{{nc.td}}" onInput="{{ff.setTd}}" disabled="{{nc.tdDisabled}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Colour name</span><input type="text" value="{{ff.cname}}" onInput="{{ff.setCname}}" placeholder="e.g. Galaxy Black" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+</div>
+<span style="font-size: 12px; color: var(--fw-muted)">{{nc.tdHelp}} <span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px">TD1 screen: {{tdScreen}}</span></span>
+<div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{fs.col.next}}" disabled="{{fs.col.nextOff}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">{{fs.col.nextLabel}}</button></div>
+</div>
+</sc-if>
+</section>
+<section aria-label="Print settings" style="border: 1px solid {{fs.prt.border}}; background: var(--fw-raised); min-width: 0">
+<button type="button" onClick="{{fs.prt.toggle}}" aria-expanded="{{fs.prt.open}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid {{fs.prt.markBorder}}; background: {{fs.prt.markBg}}; color: {{fs.prt.markFg}}; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{fs.prt.mark}}</span>
+<span style="flex: 1; min-width: 0"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Print settings</span><sc-if value="{{fs.prt.closed}}" hint-placeholder-val="{{ true }}"><br><span style="font-size: 13px; color: var(--fw-text)">{{fs.prt.sum}}</span></sc-if></span>
+<span aria-hidden="true" style="color: var(--fw-muted)">{{fs.prt.chev}}</span>
+</button>
+<sc-if value="{{fs.prt.open}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Diameter mm</span><input type="number" step="0.05" value="{{ff.dia}}" onInput="{{ff.setDia}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Density g/cm³</span><input type="number" step="0.01" value="{{ff.dens}}" onInput="{{ff.setDens}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Nozzle °C</span><input type="number" value="{{ff.tN}}" onInput="{{ff.setTN}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Bed °C</span><input type="number" value="{{ff.tB}}" onInput="{{ff.setTB}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+</div>
+<span style="font-size: 12px; color: var(--fw-muted)">{{ff.matHint}}</span>
+<div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{fs.prt.next}}" disabled="{{fs.prt.nextOff}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">{{fs.prt.nextLabel}}</button></div>
+</div>
+</sc-if>
+</section>
+<section aria-label="Extras · optional" style="border: 1px solid {{fs.ext.border}}; background: var(--fw-raised); min-width: 0">
+<button type="button" onClick="{{fs.ext.toggle}}" aria-expanded="{{fs.ext.open}}" style="display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 12px; background: none; border: 0; cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 22px; height: 22px; flex: none; display: flex; align-items: center; justify-content: center; border: 1px solid {{fs.ext.markBorder}}; background: {{fs.ext.markBg}}; color: {{fs.ext.markFg}}; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{fs.ext.mark}}</span>
+<span style="flex: 1; min-width: 0"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Extras · optional</span><sc-if value="{{fs.ext.closed}}" hint-placeholder-val="{{ true }}"><br><span style="font-size: 13px; color: var(--fw-text)">{{fs.ext.sum}}</span></sc-if></span>
+<span aria-hidden="true" style="color: var(--fw-muted)">{{fs.ext.chev}}</span>
+</button>
+<sc-if value="{{fs.ext.open}}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px">
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Price per spool</span><input type="text" value="{{ff.price}}" onInput="{{ff.setPrice}}" placeholder="€" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Product URL</span><input type="url" value="{{ff.url}}" onInput="{{ff.setUrl}}" placeholder="https://" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">OrcaSlicer profile</span><select style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"><option>None</option><option>Prusament PETG @Generic</option><option>Generic PETG</option><option>Generic PLA</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span style="font-size: 12px; font-weight: bold">Comment</span><textarea rows="2" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box; padding: 8px"></textarea></label>
+<span style="font-size: 12px; color: var(--fw-muted)">Shrinkage is set from Tools → Calibration (saved in the Orca profile). Spool weights are entered when you add a spool.</span>
+<div style="display: flex; justify-content: flex-end"><button type="button" onClick="{{fs.ext.next}}" disabled="{{fs.ext.nextOff}}" style="min-height: 40px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">{{fs.ext.nextLabel}}</button></div>
+</div>
+</sc-if>
+</section>
+</div>
+<div style="flex: 1"></div>
+<div style="position: sticky; bottom: 0; background: var(--fw-surface); border-top: 1px solid var(--fw-border); padding-top: 12px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; color: var(--fw-muted)">{{ff.summary}}</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" onClick="{{ff.save}}" disabled="{{ff.saveOff}}" style="flex: 1 1 160px; min-height: 44px; padding: 0 14px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{ff.saveLabel}}</button>
+<sc-if value="{{ff.showSaveSpool}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ff.saveSpool}}" disabled="{{ff.saveOff}}" style="flex: 1 1 160px; min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Save + add spool of it</button></sc-if>
+<button type="button" onClick="{{closeInsp}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Cancel</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{mVend}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1; min-width: 0"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{vf.kicker}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{vf.title}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px; display: flex; flex-direction: column; gap: 10px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Name</span><input type="text" value="{{vf.name}}" onInput="{{vf.setName}}" placeholder="e.g. Sunlu" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"></label>
+<sc-if value="{{vf.dup}}" hint-placeholder-val="{{ false }}"><div style="border: 1px solid var(--fw-warning); background: var(--fw-warning-bg); color: var(--fw-warning); padding: 8px 10px; font-size: 13px">“{{vf.name}}” already exists.</div></sc-if>
+<sc-if value="{{vf.hasHits}}" hint-placeholder-val="{{ false }}"><div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center"><span style="font-size: 12px; color: var(--fw-muted)">In SpoolmanDB:</span><sc-for list="{{vf.hits}}" as="h" hint-placeholder-count="2"><button type="button" onClick="{{h.pick}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; text-decoration: none">{{h.label}}</button></sc-for></div></sc-if>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Empty spool weight g</span><input type="number" value="{{vf.empty}}" onInput="{{vf.setEmpty}}" placeholder="e.g. 200" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"><span style="font-size: 12px; color: var(--fw-muted)">Default for this vendor's spools. The scale uses it to work out how much filament is left. Weigh an empty one to get it exact.</span></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Website / store</span><input type="url" value="{{vf.url}}" onInput="{{vf.setUrl}}" placeholder="https://" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box"><span style="font-size: 12px; color: var(--fw-muted)">Used for “Store ↗” on the shopping list when a filament has no link of its own.</span></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Comment</span><textarea rows="2" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; width: 100%; box-sizing: border-box; padding: 8px"></textarea></label>
+</section>
+<sc-if value="{{vf.isEdit}}" hint-placeholder-val="{{ false }}"><div style="font-size: 13px; color: var(--fw-muted)">{{vf.usage}}</div></sc-if>
+<div style="flex: 1"></div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 12px">
+<button type="button" onClick="{{vf.save}}" disabled="{{vf.saveOff}}" style="flex: 1 1 160px; min-height: 44px; padding: 0 14px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{vf.saveLabel}}</button>
+<sc-if value="{{vf.isNew}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{vf.saveFil}}" disabled="{{vf.saveOff}}" style="flex: 1 1 160px; min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Save + add filament</button></sc-if>
+<button type="button" onClick="{{closeInsp}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Cancel</button>
+</div>
+</sc-if>
+
+<sc-if value="{{mStock}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Stock-take · {{st.pos}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{st.title}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Location</span><select onChange="{{st.setLoc}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><sc-for list="{{st.locs}}" as="l" hint-placeholder-count="3"><option value="{{l.v}}" selected="{{l.on}}">{{l.v}}</option></sc-for></select></label>
+<sc-if value="{{st.active}}" hint-placeholder-val="{{ true }}">
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-info); padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 32px; height: 32px; background: {{st.swatch}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span><span style="flex: 1"><b>Put #{{st.id}} {{st.name}} on the scale</b><br><span style="font-size: 12px; color: var(--fw-muted)">Was {{st.was}} g. Saves on the next stable reading and moves on.</span><br><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)">Scale screen: {{scaleScreen}}</span></span></div>
+<div style="display: flex; gap: 8px"><button type="button" onClick="{{st.skip}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Skip</button><button type="button" onClick="{{st.missing}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Not here</button></div>
+</div>
+</sc-if>
+<sc-if value="{{st.finished}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px solid var(--fw-success); background: var(--fw-success-bg); padding: 12px; color: var(--fw-success); font-weight: bold">✓ {{st.loc}} done · {{st.doneCount}} weighed</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{st.rows}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 8px; border: 1px solid var(--fw-border); background: var(--fw-raised); font-size: 13px"><span style="flex: 1">#{{r.id}} {{r.name}}</span><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: {{r.fg}}">{{r.text}}</span><sc-if value="{{r.canUndo}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{r.undo}}" style="min-height: 32px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 12px; border-radius: 2px">Undo</button></sc-if></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{mNew}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">New spool</div><h2 style="margin: 2px 0 0; font-size: 22px">{{newTitle}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+
+<sc-if value="{{nSearch}}" hint-placeholder-val="{{ true }}">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Search the SpoolmanDB catalogue</span>
+<input type="search" value="{{dbq}}" onInput="{{setDbq}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{dbHits}}" as="d" hint-placeholder-count="4">
+<button type="button" onClick="{{d.pick}}" style="display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 6px 10px; background: var(--fw-raised); border: 1px solid var(--fw-border); cursor: pointer; text-align: left">
+<span aria-hidden="true" style="width: 24px; height: 24px; flex: none; background: {{d.hex}}; border: 1px solid var(--fw-muted); border-radius: 50%"></span>
+<span style="flex: 1"><b>{{d.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{d.sub}}</span></span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-muted)">{{d.owned}}</span>
+</button>
+</sc-for>
+</div>
+<button type="button" onClick="{{goManual}}" style="align-self: flex-start; min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Not in the catalogue? Enter it manually</button>
+</sc-if>
+
+<sc-if value="{{nForm}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 6px; position: relative">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Filament</span>
+<input type="text" role="combobox" aria-expanded="{{comboOpen}}" value="{{fq}}" onInput="{{setFq}}" onFocus="{{openCombo}}" placeholder="Type to find or create…" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<sc-if value="{{comboOpen}}" hint-placeholder-val="{{ false }}">
+<div role="listbox" aria-label="Filaments" style="border: 1px solid var(--fw-muted); background: var(--fw-raised); box-shadow: var(--fw-shadow-overlay); display: flex; flex-direction: column">
+<sc-for list="{{fOpts}}" as="o" hint-placeholder-count="3">
+<button type="button" role="option" onClick="{{o.pick}}" style="min-height: 40px; padding: 0 12px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--fw-border); cursor: pointer; display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 14px; height: 14px; background: {{o.hex}}; border: 1px solid var(--fw-muted)"></span>{{o.label}}</button>
+</sc-for>
+<sc-if value="{{canCreate}}" hint-placeholder-val="{{ false }}">
+<button type="button" role="option" onClick="{{createF}}" style="min-height: 44px; padding: 0 12px; text-align: left; background: var(--fw-surface); border: 0; cursor: pointer; font-weight: bold; color: var(--fw-info)">+ Create “{{fq}}”</button>
+</sc-if>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{creatingF}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px solid var(--fw-info); background: var(--fw-raised); padding: 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-info)">New filament · saved with the spool</div>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Vendor</span><input type="text" value="{{vq}}" onInput="{{setVq}}" placeholder="Type to find or create…" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 10px; border-radius: 2px"><span style="font-size: 12px; color: var(--fw-muted)">{{vendorHint}}</span></label>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Material</span><select style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>PLA</option><option>PETG</option><option>ABS</option><option>ASA</option><option>PA12-CF</option></select></label>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Colour preview</span><span aria-hidden="true" style="height: 40px; border: 1px solid var(--fw-muted); background: {{nc.swatch}}"></span></div>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Diameter mm</span><input type="number" value="1.75" step="0.05" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Density g/cm³</span><input type="number" value="1.24" step="0.01" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+</div>
+<fieldset style="border: 1px solid var(--fw-border); margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 12px; font-weight: bold; padding: 0 4px">Colour type</legend>
+<div role="radiogroup" aria-label="Colour type" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))">
+<sc-for list="{{nc.kinds}}" as="k" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{k.on}}" onClick="{{k.pick}}" style="min-height: 44px; margin-left: -1px; border: 1px solid {{k.border}}; background: {{k.bg}}; color: {{k.fg}}; cursor: pointer; font-size: 13px">{{k.label}}</button>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: var(--fw-muted)">{{nc.help}}</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center">
+<sc-for list="{{nc.colours}}" as="c" hint-placeholder-count="2">
+<span style="display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--fw-border); padding: 2px">
+<input type="color" value="{{c.hex}}" onChange="{{c.set}}" aria-label="Colour {{c.n}}" style="width: 40px; height: 36px; border: 0; padding: 0; background: none">
+<sc-if value="{{c.canRemove}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{c.remove}}" aria-label="Remove colour {{c.n}}" style="width: 28px; height: 36px; border: 0; background: none; cursor: pointer">✕</button></sc-if>
+</span>
+</sc-for>
+<sc-if value="{{nc.canAdd}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{nc.add}}" style="min-height: 40px; padding: 0 10px; border: 1px dashed var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px">+ Colour</button></sc-if>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 8px">
+<button type="button" onClick="{{nc.measure}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: var(--fw-success)">● TD1</span> {{nc.measureLabel}}</button>
+<label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: bold">HueForge TD<input type="number" step="0.1" value="{{nc.td}}" disabled="{{nc.tdDisabled}}" aria-label="HueForge transmission distance" style="width: 72px; min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 6px; border-radius: 2px"></label>
+<span style="flex: 1 1 100%; font-size: 12px; color: var(--fw-muted)">{{nc.tdHelp}}</span>
+</div>
+</fieldset>
+</div>
+</sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Net weight g</span><input type="number" value="{{nf.weight}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Empty spool g</span><input type="number" value="{{nf.empty}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Price per spool</span><input type="text" value="{{nf.price}}" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Location</span><select style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>Shelf B2</option><option>Shelf A1</option><option>Dry box 1</option><option>Dry box 2</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Lot number</span><input type="text" placeholder="optional" style="min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"></label>
+<div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">How many spools</span>
+<div style="display: flex"><button type="button" onClick="{{qtyDown}}" aria-label="Fewer" style="width: 40px; min-height: 40px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">−</button><output style="flex: 1; min-height: 40px; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--fw-muted); border-bottom: 1px solid var(--fw-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{qty}}</output><button type="button" onClick="{{qtyUp}}" aria-label="More" style="width: 40px; min-height: 40px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">+</button></div></div>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 16px">
+<button type="button" onClick="{{saveNew}}" disabled="{{saveDisabled}}" style="flex: 1; min-height: 44px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{saveLabel}}</button>
+<button type="button" onClick="{{backSearch}}" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Back</button>
+</div>
+</sc-if>
+
+<sc-if value="{{nDone}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px solid var(--fw-success); background: var(--fw-success-bg); padding: 12px; color: var(--fw-success); font-weight: bold">✓ {{doneText}}</div>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">What next?</p>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<button type="button" onClick="{{label}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Print {{qty}} label(s)</button>
+<button type="button" onClick="{{nfc}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Write NFC tag(s)</button>
+<a href="Printer.dc.html" style="min-height: 44px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center; justify-content: center">Load onto a printer…</a>
+<button type="button" onClick="{{startNew}}" style="min-height: 44px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Add another spool</button>
+</div>
+</sc-if>
+</sc-if>
+</aside>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<sc-if value="{{t.canUndo}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button></sc-if>
+<button type="button" onClick="{{t.dismiss}}" aria-label="Dismiss" style="width: 36px; height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'spools', mat: 'all', low: false, sel: 42, mode: 'spool', grams: {}, archived: {}, tare: false, dbq: 'prusament petg', fq: '', vq: '', combo: false, creatingF: false, picked: null, qty: 1, nextId: 72, done: '', toasts: [], cKind: 'single', cols: ['#3a6ea5'], rm: null, recent: [{ hex: '#1F8A8A', td: 4.1, at: '09:12' }], colourQ: null, capN: 0, capIdx: 0, newTd: '', fil: {}, stLoc: 'Shelf A1', stRows: {}, flashS: '', flashT: '', ff: {}, newFils: [], filEdits: {}, newVendors: [], filSel: null, ffOpen: null, ffDone: {}, vendRecs: {}, vf: {}, invT: {}, untrackedSet: {}, invPicker: false };
+    this.tid = 0;
+  }
+  capture(fromUi) {
+    const s = this.state;
+    const READ = [['#E2621F', 3.4], ['#C9C2B0', 5.8], ['#1F8A8A', 4.1], ['#1D1E24', 0.6], ['#3A6EA5', 2.9]];
+    const [hex, td] = READ[s.capN % READ.length];
+    const pre = fromUi ? 'Adapter scanned · ' : 'TD1 button · ';
+    if ((s.mode === 'form' && s.creatingF) || s.mode === 'fil') {
+      const idx = s.capIdx % s.cols.length; const c = s.cols.slice(); c[idx] = hex;
+      this.setState({ capN: s.capN + 1, cols: c, capIdx: idx + 1, newTd: s.cKind === 'single' ? String(td) : '', flashT: 'Got colour ' + (idx + 1) + ' ' + hex });
+      this.toast(pre + 'colour ' + (idx + 1) + ' = ' + hex + (s.cKind === 'single' ? ', TD ' + td : ''), null); return;
+    }
+    if (s.mode === 'spool' && s.rm === 'wait') { this.setState({ capN: s.capN + 1, rm: { hex, td } }); return; }
+    const at = '09:' + String(20 + s.capN).padStart(2, '0');
+    this.setState({ capN: s.capN + 1, recent: [{ hex, td, at }, ...s.recent].slice(0, 4) });
+    this.toast(pre + hex + ' TD ' + td + ' · no flow open, kept under TD1 readings', null);
+  }
+  toast(text, undo) { const id = ++this.tid; this.setState({ toasts: [...this.state.toasts, { id, text, undo }].slice(-2) }); }
+  renderVals() {
+    const s = this.state;
+    const tone = { info: ['var(--fw-info)', 'var(--fw-info-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'] };
+    const S = [
+      { id: 42, name: 'PETG Galaxy Black', vendor: 'Prusament', mat: 'PETG', matKey: 'PETG', hex: '#1d1d22', g: 812, of: 1000, res: 0, empty: 201, where: 'Loaded · Voron 2.4 350 T0', price: '€27.99', lot: 'B-2209-14', last: 'Printing now' },
+      { id: 57, name: 'PolyLite PLA Teal', vendor: 'Polymaker', mat: 'PLA', matKey: 'PLA', hex: '#1f8a8a', g: 120, of: 1000, res: 58, empty: 230, where: 'Loaded · Sovol SV08', price: '€19.90', lot: '—', last: 'Printing now', resFor: 'Chess set plate 4' },
+      { id: 58, name: 'PolyLite PLA Teal', vendor: 'Polymaker', mat: 'PLA', matKey: 'PLA', hex: '#1f8a8a', g: 1000, of: 1000, res: 61, empty: 230, where: 'Shelf B1', price: '€19.90', lot: '—', last: 'Never', resFor: 'Chess set plate 5' },
+      { id: 61, name: 'PLA Basic White', vendor: 'Bambu Lab', mat: 'PLA', matKey: 'PLA', hex: '#f4f4ef', g: 946, of: 1000, res: 54, empty: 250, where: 'Loaded · Prusa MK4', price: '€19.99', lot: '—', last: 'Today 09:41', resFor: 'Chess set plate 6' },
+      { id: 63, name: 'ABS+ Grey', vendor: 'eSun', mat: 'ABS', matKey: 'ABS', hex: '#8a8f94', g: 690, of: 1000, res: 0, empty: 220, where: 'Loaded · Bambu P1S AMS 1', price: '€18.50', lot: '—', last: 'Sat' },
+      { id: 64, name: 'PLA Basic White', vendor: 'Bambu Lab', mat: 'PLA', matKey: 'PLA', hex: '#f4f4ef', g: 640, of: 1000, res: 0, empty: 250, where: 'Shelf B2', price: '€19.99', lot: '—', last: 'Mon' },
+      { id: 70, name: 'PA12-CF', vendor: 'Fiberlogy', mat: 'PA12-CF', matKey: 'PA', hex: '#2b2b2b', g: 480, of: 500, res: 118, empty: 180, where: 'Dry box 2', price: '€54.00', lot: 'F-0611', last: 'Oct', abrasive: true, resFor: 'gear_pa12cf (fleet queue)' },
+      { id: 66, name: 'Silk Dual Copper/Silver', vendor: 'Generic', mat: 'PLA Silk', matKey: 'PLA', hex: '#b87333', multi: ['#b87333', '#c0c0c0'], dir: 'coaxial', g: 760, of: 1000, res: 0, empty: 180, where: 'Shelf A1', price: '€22.00', lot: '—', last: 'Fri' },
+      { id: 67, name: 'Rainbow PLA Sunset', vendor: 'Generic', mat: 'PLA', matKey: 'PLA', hex: '#e8505b', multi: ['#e8505b', '#f9a03f', '#f3d34a', '#7bc67b', '#4a90d9'], dir: 'longitudinal', g: 1000, of: 1000, res: 0, empty: 180, where: 'Shelf A1', price: '€21.00', lot: '—', last: 'Never' },
+      { id: 71, name: 'PolyTerra PLA Charcoal', vendor: 'Polymaker', mat: 'PLA', matKey: 'PLA', hex: '#3b3b3b', g: 1000, of: 1000, res: 0, empty: 230, where: 'Shelf A1', price: '€17.90', lot: '—', last: 'Never' }
+    ];
+    const extra = [];
+    for (let i = 72; i < s.nextId; i++) extra.push({ id: i, name: s.addedName || 'New spool', vendor: s.addedVendor || '', mat: s.addedMat || 'PETG', matKey: s.addedMat || 'PETG', hex: s.addedHex || '#e46a1a', g: 1000, of: 1000, res: 0, empty: 201, where: 'Shelf B2', price: '€27.99', lot: '—', last: 'Never' });
+    const TD = { 42: 0.6, 57: 4.1, 58: 4.1, 61: 5.8, 63: 2.2, 64: 5.8, 70: 0.4, 71: 0.8 };
+    const all = S.concat(extra).filter(x => !s.archived[x.id]).map(x => { const o = s.fil[x.vendor + x.name]; return { ...x, td: TD[x.id], ...(o || {}), g: s.grams[x.id] !== undefined ? s.grams[x.id] : x.g }; });
+    const rgb = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const dist = (a, b) => { const A = rgb(a), B = rgb(b); return Math.round(Math.sqrt(A.reduce((t, v, i) => t + (v - B[i]) ** 2, 0)) / 4.4); };
+    const minDist = (x) => Math.min(...(x.multi || [x.hex]).map(h => dist(h.toUpperCase(), s.colourQ)));
+    let shown = all.filter(x => (s.mat === 'all' || x.matKey === s.mat) && (!s.low || x.g < 150));
+    if (s.colourQ) shown = shown.slice().sort((a, b) => minDist(a) - minDist(b));
+    const swatchOf = (x) => {
+      if (!x.multi || x.multi.length < 2) return x.hex;
+      if (x.dir === 'coaxial') { const n = x.multi.length; return 'conic-gradient(' + x.multi.map((h, i) => h + ' ' + Math.round(i / n * 100) + '% ' + Math.round((i + 1) / n * 100) + '%').join(', ') + ')'; }
+      return 'linear-gradient(90deg, ' + x.multi.join(', ') + ')';
+    };
+    const kindOf = (x) => !x.multi ? 'Single colour' : x.dir === 'coaxial' ? 'Coextruded · ' + x.multi.length + ' colours side by side' : 'Gradient · ' + x.multi.length + ' colours along the spool';
+    const decorate = (x) => {
+      const free = Math.max(0, x.g - x.res); const low = x.g < 150;
+      return { ...x, swatch: swatchOf(x), multi: !!x.multi, colourKind: kindOf(x), freePct: Math.round(free / x.of * 100), resPct: Math.round(Math.min(x.res, x.g) / x.of * 100), barFg: low ? 'var(--fw-danger)' : 'var(--fw-muted)',
+        leftLabel: x.g + ' g' + (x.res ? ' · ' + x.res + ' reserved' : '') + (low ? ' · low' : ''), leftFg: low ? 'var(--fw-danger)' : 'var(--fw-text)' };
+    };
+    const spools = shown.map(x => ({ ...decorate(x), dist: s.colourQ ? ' · Δ ' + minDist(x) : '', rowBg: s.mode === 'spool' && s.sel === x.id ? 'var(--fw-info-bg)' : 'transparent', open: () => this.setState({ sel: x.id, mode: 'spool', tare: false, rm: null, flashS: '', flashT: '' }) }));
+    const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const matFilters = [['all', 'All'], ['PLA', 'PLA'], ['PETG', 'PETG'], ['ABS', 'ABS'], ['PA', 'PA']].map(([id, label]) => ({ label, ...seg(s.mat === id), pick: () => this.setState({ mat: id }) }));
+    const curRaw = all.find(x => x.id === s.sel) || all[0];
+    const cur = curRaw ? { ...decorate(curRaw), resNote: curRaw.res ? 'Reserved for ' + curRaw.resFor + '. Released as plates finish.' : 'Nothing reserved.',
+      facts: [{ k: 'Colour', v: kindOf(curRaw) + (curRaw.multi ? ' · ' + curRaw.multi.join(' ') : ' · ' + curRaw.hex) }, { k: 'Where', v: curRaw.where }, { k: 'Diameter', v: '1.75 mm' }, { k: 'Price', v: curRaw.price }, { k: 'Lot', v: curRaw.lot }, { k: 'Last used', v: curRaw.last }, { k: 'NFC tag', v: curRaw.id === 42 ? 'Linked · 04:A2:3F:…' : 'None' }], tdShow: curRaw.multi ? '— (multi-colour)' : (curRaw.td !== undefined ? curRaw.td : 'not set'), sameCount: all.filter(y => y.name === curRaw.name && y.vendor === curRaw.vendor).length } : null;
+    const gross = curRaw ? (s.tare ? 0 : curRaw.empty + (curRaw.id === 42 ? 804 : curRaw.g - 4)) : 0;
+    const net = curRaw ? Math.max(0, gross - curRaw.empty) : 0;
+    const DB = [
+      { name: 'Prusament PETG Galaxy Black', sub: 'Prusa Research · PETG · 1 kg · 1.27 g/cm³', hex: '#1d1d22', vendor: 'Prusament', mat: 'PETG', owned: '1 in stock' },
+      { name: 'Prusament PETG Prusa Orange', sub: 'Prusa Research · PETG · 1 kg', hex: '#e46a1a', vendor: 'Prusament', mat: 'PETG', owned: 'new to you' },
+      { name: 'Prusament PETG Jet Black', sub: 'Prusa Research · PETG · 1 kg', hex: '#111111', vendor: 'Prusament', mat: 'PETG', owned: 'new to you' },
+      { name: 'Prusament PETG Urban Grey', sub: 'Prusa Research · PETG · 1 kg', hex: '#7b7f84', vendor: 'Prusament', mat: 'PETG', owned: 'new to you' }
+    ];
+    const q = s.dbq.toLowerCase().split(/\s+/).filter(Boolean);
+    const dbHits = DB.filter(d => q.every(w => d.name.toLowerCase().includes(w) || d.sub.toLowerCase().includes(w))).map(d => ({ ...d,
+      pick: () => this.setState({ mode: 'form', picked: d, fq: d.name, creatingF: false, combo: false }) }));
+    const known = ['Prusament PETG Galaxy Black', 'Polymaker PolyLite PLA Teal', 'Bambu Lab PLA Basic White', 'eSun ABS+ Grey', 'Fiberlogy PA12-CF', 'Polymaker PolyTerra PLA Charcoal'];
+    const hexOf = { 'Prusament PETG Galaxy Black': '#1d1d22', 'Polymaker PolyLite PLA Teal': '#1f8a8a', 'Bambu Lab PLA Basic White': '#f4f4ef', 'eSun ABS+ Grey': '#8a8f94', 'Fiberlogy PA12-CF': '#2b2b2b', 'Polymaker PolyTerra PLA Charcoal': '#3b3b3b' };
+    const fql = s.fq.toLowerCase();
+    const fOpts = known.filter(k => !fql || k.toLowerCase().includes(fql)).slice(0, 4).map(k => ({ label: k, hex: hexOf[k], pick: () => this.setState({ fq: k, combo: false, creatingF: false, picked: { name: k, vendor: k.split(' ')[0], mat: k.includes('PETG') ? 'PETG' : k.includes('ABS') ? 'ABS' : k.includes('PA12') ? 'PA' : 'PLA', hex: hexOf[k] } }) }));
+    const canCreate = s.fq.trim().length > 2 && !known.some(k => k.toLowerCase() === fql);
+    const vendors = ['Prusament', 'Polymaker', 'Bambu Lab', 'eSun', 'Fiberlogy'];
+    const vMatch = vendors.find(v => s.vq && v.toLowerCase() === s.vq.toLowerCase());
+    const vSome = vendors.filter(v => s.vq && v.toLowerCase().startsWith(s.vq.toLowerCase()));
+    const vendorHint = !s.vq ? 'Existing: ' + vendors.join(', ') : vMatch ? '✓ Existing vendor' : vSome.length ? 'Did you mean ' + vSome.join(', ') + '?' : 'New vendor “' + s.vq + '” will be created with the filament.';
+    const nf = s.picked ? { weight: 1000, empty: s.picked.vendor === 'Prusament' ? 201 : 230, price: s.picked.vendor === 'Prusament' ? '€27.99' : '' } : { weight: 1000, empty: '', price: '' };
+    const tabDefs = [['spools', 'Spools'], ['filaments', 'Filaments'], ['vendors', 'Vendors'], ['inventory', 'Inventory'], ['locations', 'Locations']];
+    const tabs = tabDefs.map(([id, label]) => { const on = s.tab === id; return { label, sel: on ? 'true' : 'false', bg: on ? 'var(--fw-background)' : 'transparent', border: on ? 'var(--fw-border)' : 'transparent', bottom: on ? 'var(--fw-background)' : 'transparent', weight: on ? 'bold' : 'normal', pick: () => this.setState({ tab: id }) }; });
+    const otherText = { filaments: 'Filaments: one row per filament type with spool count, colour, material settings and extra fields (Orca profile, HueForge TD, shrinkage). Not drawn yet.', vendors: 'Vendors: name, empty spool weight, filament count. Not drawn yet.', inventory: 'Inventory: stock per filament with reorder threshold and reserved vs free grams. Not drawn yet.', locations: 'Locations: shelves and dry boxes with what is in each, NFC/QR per location. Not drawn yet.' }[s.tab] || '';
+    const totalKg = (all.reduce((a, x) => a + x.g, 0) / 1000).toFixed(1);
+    const resG = all.reduce((a, x) => a + x.res, 0);
+    const newCount = s.qty;
+    const MATDEF = { PLA: [215, 60, 1.24], 'PLA+': [220, 60, 1.24], PETG: [240, 80, 1.27], ABS: [250, 100, 1.04], ASA: [255, 100, 1.07], TPU: [225, 50, 1.21], PA: [270, 90, 1.08], PC: [270, 110, 1.2], HIPS: [235, 100, 1.04], PVA: [200, 60, 1.23] };
+    const MODG = [['Finish', ['Silk', 'Matte', 'Glitter', 'Galaxy', 'Glow', 'Metal', 'Translucent']], ['Filled', ['CF', 'GF', 'AF']], ['Performance', ['HF', 'HS', 'HT', 'Tough', 'Pro']], ['Shore', ['95A', '85A', '70A', '60A']]];
+    const ABRMOD = { CF: 'carbon fibre', GF: 'glass fibre', AF: 'aramid fibre', Metal: 'metal-filled', Glow: 'glow pigment' };
+    const splitMat = (m) => { const base = Object.keys(MATDEF).sort((a, b) => b.length - a.length).find(k => (m || '').toUpperCase().startsWith(k.toUpperCase())) || 'PLA'; const rest = (m || '').slice(base.length).replace(/^[\s\-]*\d*[\s\-]*/, ''); return { base, mods: rest ? rest.split(/[\s\-]+/).filter(Boolean) : [] }; };
+    const MATHINT = { PA: 'Nylon: dry before use.', PVA: 'Water-soluble support: keep dry.', HIPS: 'Support for ABS; needs an enclosure.', TPU: 'Flexible: slow speeds; direct drive only.', ABS: 'Needs an enclosure.', ASA: 'Needs an enclosure.', PC: 'Needs an enclosure and high bed temp.' };
+    const VEMPTY = { Prusament: 201, Polymaker: 230, 'Bambu Lab': 250, eSun: 220, Fiberlogy: 180, Generic: 180 };
+    const VURL = { Prusament: 'https://www.prusa3d.com/', Polymaker: 'https://polymaker.com/', 'Bambu Lab': 'https://store.bambulab.com/' };
+    Object.entries(s.vendRecs).forEach(([k, v]) => { if (v.empty) VEMPTY[k] = +v.empty; if (v.url) VURL[k] = v.url; });
+    const baseF = {};
+    S.forEach(x => { const k = x.vendor + '|' + x.name; if (!baseF[k]) baseF[k] = { key: k, vendor: x.vendor, name: x.name, mat: splitMat(x.mat).base, mods: splitMat(x.mat).mods, hex: x.hex, multi: x.multi || null, dir: x.dir || null, td: TD[x.id], abr: !!x.abrasive, wt: x.of, empty: x.empty, price: x.price, url: '' }; });
+    s.newFils.forEach(f => { baseF[f.key] = f; });
+    Object.keys(s.filEdits).forEach(k => { if (baseF[k]) baseF[k] = { ...baseF[k], ...s.filEdits[k] }; });
+    const FL = Object.values(baseF);
+    const fVendors = ['Prusament', 'Polymaker', 'Bambu Lab', 'eSun', 'Fiberlogy', 'Generic'].concat(s.newVendors);
+    const fils = FL.map(f => { const sp = all.filter(x => x.vendor + '|' + x.name === f.key); const d = MATDEF[f.mat] || ['—', '—'];
+      return { name: f.name, vendor: f.vendor, mat: f.mat + (f.mods && f.mods.length ? ' ' + f.mods.join(' ') : '') + (f.abr ? ' · abrasive' : ''), swatch: swatchOf(f), kind: kindOf(f), temps: (f.tN || d[0]) + ' / ' + (f.tB || d[1]) + ' °C', td: f.multi ? '— multi' : (f.td !== undefined && f.td !== '' ? f.td : 'not set'),
+        stock: sp.length ? sp.length + ' spool' + (sp.length > 1 ? 's' : '') + ' · ' + sp.reduce((a, x) => a + x.g, 0) + ' g' : 'none in stock', extras: [f.url ? 'URL' : '', f.td !== undefined && f.td !== '' && !f.multi ? 'HueForge TD' : '', f.key.includes('Prusament') ? 'Orca profile' : ''].filter(Boolean).join(' · ') || '—',
+        rowBg: s.mode === 'fil' && s.ff.editKey === f.key ? 'var(--fw-info-bg)' : 'transparent', open: () => openFil(f) }; });
+    const openFil = (f) => this.setState({ mode: 'fil', tab: 'filaments', ffOpen: null, ffDone: { fil: 1, col: 1, prt: 1, ext: 1 }, ff: { editKey: f.key, mods: (f.mods || []).slice(), vendor: f.vendor, name: f.name, mat: f.mat, art: f.art || '', cname: f.cname || '', dia: '1.75', dens: String(f.dens || (MATDEF[f.mat] || [0, 0, 1.24])[2]), tN: String(f.tN || (MATDEF[f.mat] || [215])[0]), tB: String(f.tB || (MATDEF[f.mat] || [0, 60])[1]), abr: !!f.abr, wt: String(f.wt || 1000), empty: String(f.empty || ''), price: f.price || '', reorder: '200', url: f.url || '', src: '', q: '' },
+      cKind: f.multi ? f.dir : 'single', cols: f.multi ? f.multi.slice() : [f.hex], newTd: f.td !== undefined ? String(f.td) : '', capIdx: 0, flashT: '' });
+    const blankFF = (extra) => ({ mods: [], vendor: '', name: '', mat: 'PLA', art: '', cname: '', dia: '1.75', dens: '1.24', tN: '215', tB: '60', abr: false, wt: '1000', empty: '', price: '', reorder: '200', url: '', src: '', q: '', ...(extra || {}) });
+    const startFil = (extra) => this.setState({ mode: 'fil', ffOpen: 'start', ffDone: {}, ff: blankFF(extra), cKind: 'single', cols: ['#3a6ea5'], newTd: '', capIdx: 0, flashT: '' });
+    const F = s.ff || {};
+    const setF = (k, mapper) => (e) => { const v = e && e.target ? (e.target.type === 'checkbox' ? e.target.checked : e.target.value) : e; this.setState({ ff: { ...this.state.ff, [k]: v, ...(mapper ? mapper(v) : {}) } }); };
+    const CAT = [
+      { vendor: 'Prusament', name: 'PETG Prusa Orange', mat: 'PETG', hex: '#e46a1a', dens: '1.27', tN: '250', tB: '85', wt: '1000', empty: '201', price: '€27.99', url: 'https://www.prusa3d.com/' },
+      { vendor: 'Prusament', name: 'PETG Jet Black', mat: 'PETG', hex: '#111111', dens: '1.27', tN: '250', tB: '85', wt: '1000', empty: '201', price: '€27.99', url: 'https://www.prusa3d.com/' },
+      { vendor: 'Fiberlogy', name: 'PETG CF Black', mat: 'PETG', mods: ['CF'], hex: '#1b1b1b', dens: '1.30', tN: '250', tB: '80', wt: '500', empty: '180', price: '€39.00', url: '', abr: true },
+      { vendor: 'Polymaker', name: 'PolyLite PLA Teal', mat: 'PLA', hex: '#1f8a8a', dens: '1.24', tN: '210', tB: '60', wt: '1000', empty: '230', price: '€19.90', url: '' },
+      { vendor: 'Bambu Lab', name: 'PLA Silk+ Gold', mat: 'PLA', mods: ['Silk'], hex: '#d4af37', dens: '1.32', tN: '230', tB: '60', wt: '1000', empty: '250', price: '€24.99', url: '' },
+      { vendor: 'Generic', name: 'Silk Tri-colour Red/Gold/Blue', mat: 'PLA', mods: ['Silk'], hex: '#c0392b', multi: ['#c0392b', '#d4af37', '#2e5cb8'], dir: 'coaxial', dens: '1.24', tN: '215', tB: '60', wt: '1000', empty: '180', price: '€23.00', url: '' }
+    ];
+    const ql = (F.q || '').toLowerCase().split(/\s+/).filter(Boolean);
+    const vl = (F.vendor || '').toLowerCase();
+    const vExact = fVendors.find(v => v.toLowerCase() === vl);
+    const dupF = FL.find(f => !F.editKey && F.vendor && F.name && f.vendor.toLowerCase() === vl && f.name.toLowerCase() === F.name.toLowerCase());
+    const seg2 = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const filObj = () => ({ key: F.vendor + '|' + F.name, mods: (F.mods || []).slice(), vendor: F.vendor, name: F.name, mat: F.mat, art: F.art, cname: F.cname, dens: F.dens, tN: F.tN, tB: F.tB, abr: F.abr, wt: F.wt, empty: F.empty, price: F.price, url: F.url,
+      hex: s.cols[0], multi: s.cKind === 'single' ? null : s.cols.slice(), dir: s.cKind === 'single' ? null : s.cKind, td: s.cKind === 'single' ? s.newTd : '' });
+    const doSave = (thenSpool) => {
+      const f = filObj(); const prevS = { newFils: s.newFils, filEdits: s.filEdits, newVendors: s.newVendors };
+      const newV = !vExact; const upd = {};
+      if (F.editKey) upd.filEdits = { ...s.filEdits, [F.editKey]: { ...f, key: F.editKey } };
+      else { upd.newFils = [...s.newFils, f]; if (newV) upd.newVendors = [...s.newVendors, F.vendor]; }
+      if (thenSpool) Object.assign(upd, { mode: 'form', picked: { name: F.vendor + ' ' + F.name, vendor: F.vendor, mat: F.mat, hex: f.hex }, fq: F.vendor + ' ' + F.name, creatingF: false, combo: false, qty: 1 });
+      else Object.assign(upd, { mode: 'none', tab: 'filaments' });
+      this.setState(upd);
+      this.toast((F.editKey ? 'Updated ' : 'Added filament ') + '“' + F.vendor + ' ' + F.name + '”' + (!F.editKey && newV ? ' + vendor' : ''), () => this.setState(prevS));
+    };
+    const extraCount = [F.url, s.cKind === 'single' && s.newTd ? 'td' : ''].filter(Boolean).length;
+    const ff = { ...F, isNew: !F.editKey, kicker: F.editKey ? 'Edit filament' : 'New filament', title: F.editKey ? F.vendor + ' ' + F.name : (F.name ? (F.vendor ? F.vendor + ' ' : '') + F.name : 'New filament'),
+      noSrc: !F.src, hasSrc: !!F.src, src: F.src || '', q: F.q || '', setQ: setF('q'), clearSrc: () => startFil(),
+      hits: (ql.length ? CAT.filter(c => ql.every(w => (c.vendor + ' ' + c.name + ' ' + c.mat).toLowerCase().includes(w))) : []).slice(0, 4).map(c => ({ label: c.vendor + ' ' + c.name, sub: c.mat + (c.mods ? ' ' + c.mods.join(' ') : '') + ' · ' + c.tN + '/' + c.tB + ' °C' + (c.multi ? ' · ' + c.multi.length + ' colours' : ''), hex: swatchOf(c),
+        pick: () => this.setState({ ffOpen: null, ffDone: { start: 1, fil: 1, col: 1, prt: 1, ext: 1 }, ff: { ...this.state.ff, ...c, mods: (c.mods || []).slice(), multi: undefined, dir: undefined, abr: !!c.abr, src: 'SpoolmanDB · ' + c.vendor + ' ' + c.name }, cKind: c.multi ? c.dir : 'single', cols: c.multi ? c.multi.slice() : [c.hex], newTd: '' }) })),
+      setVendor: setF('vendor'), setName: setF('name'), setArt: setF('art'), setCname: setF('cname'), setDia: setF('dia'), setDens: setF('dens'), setTN: setF('tN'), setTB: setF('tB'), setWt: setF('wt'), setEmpty: setF('empty'), setPrice: setF('price'), setReorder: setF('reorder'), setUrl: setF('url'),
+      setTd: (e) => this.setState({ newTd: e.target.value }),
+      toggleAbr: () => this.setState({ ff: { ...this.state.ff, abr: !this.state.ff.abr } }),
+      setMat: setF('mat', (v) => { const d = MATDEF[v]; return d ? { tN: String(d[0]), tB: String(d[1]), dens: String(d[2]) } : {}; }),
+      mats: Object.keys(MATDEF).map(v => ({ v, on: v === F.mat })),
+      matHint: MATHINT[F.mat] || 'Temperatures and density fill from the material. Change them if this filament differs.',
+      vChips: fVendors.filter(v => !vl || v.toLowerCase().startsWith(vl) || v.toLowerCase() === vl).slice(0, 6).map(v => ({ label: v, ...seg2(v === vExact),
+        pick: () => this.setState({ ff: { ...this.state.ff, vendor: v, empty: this.state.ff.empty || String(VEMPTY[v] || '') } }) })),
+      vendorHint: !F.vendor ? 'Pick one, or type a new name.' : vExact ? '✓ Existing vendor' : 'New vendor “' + F.vendor + '” is created with the filament.', vendorFg: F.vendor && !vExact ? 'var(--fw-info)' : 'var(--fw-muted)',
+      emptyHint: vExact && VEMPTY[vExact] ? 'Empty spool weight comes from ' + vExact + ' (' + VEMPTY[vExact] + ' g). Change it if this spool type differs; the scale uses it for net weight.' : 'Empty spool weight is used by the scale to work out how much filament is left.',
+      dup: !!dupF, dupName: dupF ? dupF.vendor + ' ' + dupF.name : '', openDup: () => dupF && openFil(dupF),
+      extraCount, swatch: swatchOf({ hex: s.cols[0], multi: s.cKind === 'single' ? null : s.cols, dir: s.cKind }),
+      summary: F.editKey ? 'Changes apply to the filament, so every spool of it updates.' : (!F.vendor || !F.name ? 'Needs a vendor and a name.' : 'Creates filament “' + F.vendor + ' ' + F.name + '”' + (vExact ? '' : ' and vendor “' + F.vendor + '”') + ' in Spoolman. No spools yet.'),
+      saveOff: !F.vendor || !F.name, saveLabel: F.editKey ? 'Save changes' : F.ret ? 'Save and back to the spool' : 'Save filament', saveSpoolLabel: 'Save + add spool of it',
+      save: () => doSave(!!F.ret), saveSpool: () => doSave(true), showSaveSpool: !F.editKey && !F.ret };
+    const fmods = F.mods || [];
+    const abrHit = fmods.filter(m => ABRMOD[m]);
+    ff.matFull = (F.mat || '') + (fmods.length ? ' ' + fmods.join(' ') : '');
+    ff.abrWhy = abrHit.length ? 'auto: ' + abrHit.map(m => ABRMOD[m]).join(', ') : '';
+    ff.abrBorder = F.abr ? 'var(--fw-warning)' : 'var(--fw-border)';
+    ff.modGroups = MODG.map(([label, items]) => ({ label, items: items.map(m => { const on = fmods.includes(m); return { label: m + (ABRMOD[m] ? ' ⚠' : ''), ...seg2(on), pick: () => {
+      const cur = this.state.ff.mods || []; const next = on ? cur.filter(x => x !== m) : [...cur, m];
+      const anyAbr = next.some(x => ABRMOD[x]); const wasAuto = cur.some(x => ABRMOD[x]);
+      this.setState({ ff: { ...this.state.ff, mods: next, abr: anyAbr ? true : (wasAuto ? false : this.state.ff.abr) } }); } }; }) }));
+    const ORDER = (F.editKey ? [] : ['start']).concat(['fil', 'col', 'prt', 'ext']);
+    const TITLE = { start: 'Start from', fil: 'Filament', col: 'Colour', prt: 'Print settings', ext: 'Extras' };
+    const complete = { start: true, fil: !!(F.vendor && F.name && F.mat), col: s.cols.length > 0, prt: !!(F.dia && F.dens && F.tN && F.tB), ext: true };
+    const sums = {
+      start: F.src || 'Skipped · filled in by hand',
+      fil: [F.vendor || 'no vendor', F.name || 'no name', ff.matFull].join(' · ') + (F.abr ? ' · abrasive' : ''),
+      col: (s.cKind === 'single' ? 'Single ' : s.cKind === 'coaxial' ? 'Coextruded ' : 'Gradient ') + s.cols.join(' ') + (s.cKind === 'single' && s.newTd ? ' · TD ' + s.newTd : ''),
+      prt: F.dia + ' mm · ' + F.dens + ' g/cm³ · ' + F.tN + ' / ' + F.tB + ' °C',
+      ext: [F.price, F.url ? 'URL' : ''].filter(Boolean).join(' · ') || 'nothing set'
+    };
+    const fs = {};
+    ORDER.forEach((k, i) => { const open = s.ffOpen === k; const done = !!s.ffDone[k]; const ok = complete[k]; const nk = ORDER.slice(i + 1).find(x => !s.ffDone[x]) || null;
+      fs[k] = { open, closed: !open, sum: sums[k], chev: open ? '▴' : '▾', border: open ? 'var(--fw-info)' : 'var(--fw-border)',
+        mark: done ? (ok ? '✓' : '!') : String(i + 1), markFg: done ? (ok ? 'var(--fw-on-accent)' : 'var(--fw-warning)') : 'var(--fw-muted)', markBg: done && ok ? 'var(--fw-success)' : 'transparent', markBorder: done ? (ok ? 'var(--fw-success)' : 'var(--fw-warning)') : 'var(--fw-muted)',
+        toggle: () => this.setState({ ffOpen: open ? null : k, ffDone: open ? { ...this.state.ffDone, [k]: 1 } : this.state.ffDone }),
+        next: () => this.setState({ ffDone: { ...this.state.ffDone, [k]: 1 }, ffOpen: nk }),
+        nextOff: !ok, nextLabel: k === 'start' && !F.src ? 'Skip' : nk ? 'Next · ' + TITLE[nk] : 'Done' }; });
+    const priceNum = (p) => { const m = String(p || '').replace(',', '.').match(/[\d.]+/); return m ? parseFloat(m[0]) : null; };
+    const DEFT = { 'Prusament|PETG Galaxy Black': [2, 2], 'Bambu Lab|PLA Basic White': [4, 3], 'eSun|ABS+ Grey': [2, 2], 'Polymaker|PolyLite PLA Teal': [3, 2], 'Fiberlogy|PA12-CF': [1, 1], 'Polymaker|PolyTerra PLA Charcoal': [2, 1] };
+    const tgt = (k) => s.invT[k] || (DEFT[k] ? { t: DEFT[k][0], min: DEFT[k][1] } : null);
+    const tracked = FL.filter(f => tgt(f.key) && !s.untrackedSet[f.key]);
+    const stockOf = (f) => all.filter(x => x.vendor + '|' + x.name === f.key && x.g > 50).length;
+    const setT = (k, patch) => { const cur = tgt(k) || { t: 1, min: 1 }; const n = { ...cur, ...patch }; n.t = Math.max(0, n.t); n.min = Math.max(0, Math.min(n.min, n.t)); this.setState({ invT: { ...this.state.invT, [k]: n } }); };
+    const invRows = tracked.map(f => { const T = tgt(f.key); const have = stockOf(f); const need = have < T.min; const out = have === 0;
+      return { f, name: f.name, vendor: f.vendor, mat: f.mat + (f.mods && f.mods.length ? ' ' + f.mods.join(' ') : ''), size: (f.wt || 1000) >= 1000 ? (f.wt || 1000) / 1000 + ' kg' : f.wt + ' g', swatch: swatchOf(f), have, t: T.t, min: T.min, buy: need ? Math.max(1, T.t - have) : 0,
+        haveFg: out ? 'var(--fw-danger)' : need ? 'var(--fw-warning)' : 'var(--fw-text)', status: out ? 'OUT' : need ? 'BUY' : 'OK', stFg: out ? 'var(--fw-danger)' : need ? 'var(--fw-warning)' : 'var(--fw-success)', stBg: out ? 'var(--fw-danger-bg)' : need ? 'var(--fw-warning-bg)' : 'var(--fw-success-bg)',
+        tUp: () => setT(f.key, { t: T.t + 1 }), tDown: () => setT(f.key, { t: T.t - 1 }), mUp: () => setT(f.key, { min: T.min + 1, t: Math.max(T.t, T.min + 1) }), mDown: () => setT(f.key, { min: T.min - 1 }),
+        untrack: () => { this.setState({ untrackedSet: { ...this.state.untrackedSet, [f.key]: true } }); this.toast('Stopped tracking ' + f.name, () => { const u = { ...this.state.untrackedSet }; delete u[f.key]; this.setState({ untrackedSet: u }); }); } }; });
+    const shopRows = invRows.filter(r => r.buy > 0);
+    const totalCost = shopRows.reduce((a, r) => a + (priceNum(r.f.price) || 0) * r.buy, 0);
+    const inv = {
+      tiles: [{ k: 'Tracked filaments', v: tracked.length, fg: 'var(--fw-text)', border: 'var(--fw-border)' }, { k: 'Need restocking', v: shopRows.length, fg: shopRows.length ? 'var(--fw-warning)' : 'var(--fw-text)', border: shopRows.length ? 'var(--fw-warning)' : 'var(--fw-border)' }, { k: 'Est. restock cost', v: '€' + totalCost.toFixed(2), fg: 'var(--fw-text)', border: 'var(--fw-border)' }, { k: 'On hand · reserved', v: (all.reduce((a, x) => a + x.g, 0) / 1000).toFixed(1) + ' kg · ' + all.reduce((a, x) => a + x.res, 0) + ' g', fg: 'var(--fw-text)', border: 'var(--fw-border)' }],
+      shopCount: shopRows.length + (shopRows.length === 1 ? ' item' : ' items'), shopEmpty: shopRows.length === 0,
+      shop: shopRows.map(r => { const url = r.f.url || VURL[r.f.vendor] || ''; const pr = priceNum(r.f.price);
+        return { name: r.name, size: r.size, swatch: r.swatch, buy: r.buy, meta: r.vendor + ' · ' + r.mat + ' · have ' + r.have + ', target ' + r.t, cost: pr ? '€' + (pr * r.buy).toFixed(2) : '—', url, hasUrl: !!url, noUrl: !url,
+          bought: () => { const ids = []; for (let i = 0; i < r.buy; i++) ids.push(this.state.nextId + i); const prev = this.state.nextId;
+            this.setState({ nextId: this.state.nextId + r.buy, addedName: r.f.name, addedVendor: r.f.vendor, addedMat: r.f.mat, addedHex: r.f.hex });
+            this.toast('Added ' + ids.map(i => '#' + i).join(', ') + ' · ' + r.f.name + ' to Shelf B2', () => this.setState({ nextId: prev })); } }; }),
+      hasCost: shopRows.length > 0, total: '€' + totalCost.toFixed(2),
+      copy: () => this.toast('Shopping list copied (' + shopRows.length + ' lines)', null),
+      trackedCount: tracked.length, rows: invRows,
+      pickerOpen: s.invPicker, togglePicker: () => this.setState({ invPicker: !s.invPicker }),
+      untracked: FL.filter(f => !tracked.includes(f)).map(f => ({ label: f.vendor + ' ' + f.name, swatch: swatchOf(f), track: () => { const u = { ...this.state.untrackedSet }; delete u[f.key]; this.setState({ untrackedSet: u, invT: { ...this.state.invT, [f.key]: tgt(f.key) || { t: 1, min: 1 } } }); } })),
+      noUntracked: FL.every(f => tracked.includes(f)),
+      storeCount: all.filter(x => !x.where.startsWith('Loaded')).length,
+      storage: ['Shelf A1', 'Shelf B1', 'Shelf B2', 'Dry box 2'].map(loc => ({ loc, list: all.filter(x => x.where === loc).map(x => '#' + x.id + ' ' + x.name).join(' · ') || 'empty' }))
+    };
+    const vends = fVendors.map(v => ({ name: v, empty: VEMPTY[v] ? VEMPTY[v] + ' g' : 'not set', fils: FL.filter(f => f.vendor === v).length, spools: all.filter(x => x.vendor === v).length, url: (VURL[v] || '—').replace(/^https?:\/\//, ''),
+      rowBg: s.mode === 'vendor' && s.vf.edit === v ? 'var(--fw-info-bg)' : 'transparent', open: () => this.setState({ mode: 'vendor', vf: { edit: v, name: v, empty: VEMPTY[v] ? String(VEMPTY[v]) : '', url: VURL[v] || '' } }) }));
+    const VF = s.vf || {};
+    const VDB = [['Sunlu', 160, 'https://www.sunlu.com/'], ['Elegoo', 170, 'https://www.elegoo.com/'], ['Sovol', 180, ''], ['Extrudr', 250, 'https://www.extrudr.com/'], ['Spectrum', 260, '']];
+    const vq = (VF.name || '').toLowerCase();
+    const vDup = !VF.edit && fVendors.some(v => v.toLowerCase() === vq);
+    const saveVendor = (thenFil) => { const nm = VF.name.trim(); const rec = { empty: VF.empty, url: VF.url }; const prev = { vendRecs: s.vendRecs, newVendors: s.newVendors };
+      const upd = { vendRecs: { ...s.vendRecs, [nm]: rec } }; if (!VF.edit) upd.newVendors = [...s.newVendors, nm];
+      if (thenFil) Object.assign(upd, { mode: 'fil', ffOpen: 'fil', ffDone: { start: 1 }, ff: blankFF({ vendor: nm, empty: VF.empty }), cKind: 'single', cols: ['#3a6ea5'], newTd: '', capIdx: 0 }); else Object.assign(upd, { mode: 'none', tab: 'vendors' });
+      this.setState(upd); this.toast((VF.edit ? 'Updated vendor ' : 'Added vendor ') + nm, () => this.setState(prev)); };
+    const vf = { ...VF, isNew: !VF.edit, isEdit: !!VF.edit, kicker: VF.edit ? 'Edit vendor' : 'New vendor', title: VF.edit || VF.name || 'New vendor', dup: vDup,
+      setName: (e) => this.setState({ vf: { ...this.state.vf, name: e.target.value } }), setEmpty: (e) => this.setState({ vf: { ...this.state.vf, empty: e.target.value } }), setUrl: (e) => this.setState({ vf: { ...this.state.vf, url: e.target.value } }),
+      hits: VDB.filter(([n]) => vq.length > 1 && n.toLowerCase().startsWith(vq) && !fVendors.includes(n)).map(([n, e, u]) => ({ label: n + ' · ' + e + ' g', pick: () => this.setState({ vf: { ...this.state.vf, name: n, empty: String(e), url: u } }) })),
+      usage: VF.edit ? FL.filter(f => f.vendor === VF.edit).length + ' filaments and ' + all.filter(x => x.vendor === VF.edit).length + ' spools use this vendor. Changing the empty spool weight only affects new spools.' : '',
+      saveOff: !VF.name || !VF.name.trim() || vDup, saveLabel: VF.edit ? 'Save changes' : 'Save vendor', save: () => saveVendor(false), saveFil: () => saveVendor(true) };
+    vf.hasHits = vf.hits.length > 0;
+    const LOCS = ['Shelf A1', 'Shelf B1', 'Shelf B2', 'Dry box 2'];
+    const stList = all.filter(x => x.where === s.stLoc);
+    const stNext = stList.find(x => !s.stRows[x.id]);
+    const stDone = stList.filter(x => s.stRows[x.id]).length;
+    const setRow = (id, row) => this.setState({ stRows: { ...this.state.stRows, [id]: row } });
+    const st = { loc: s.stLoc, pos: stDone + ' of ' + stList.length, title: stNext ? s.stLoc : s.stLoc + ' done', active: !!stNext, finished: !stNext && stList.length > 0, doneCount: stList.filter(x => s.stRows[x.id] && s.stRows[x.id].g !== undefined).length,
+      locs: LOCS.map(v => ({ v, on: v === s.stLoc })), setLoc: (e) => this.setState({ stLoc: e.target.value }),
+      id: stNext ? stNext.id : '', name: stNext ? stNext.name : '', was: stNext ? stNext.g : '', swatch: stNext ? swatchOf(stNext) : 'transparent',
+      skip: () => setRow(stNext.id, { skip: true }), missing: () => { setRow(stNext.id, { missing: true }); this.toast('#' + stNext.id + ' flagged “not at ' + s.stLoc + '”', null); },
+      rows: stList.filter(x => s.stRows[x.id]).map(x => { const r = s.stRows[x.id]; return { id: x.id, name: x.name, canUndo: true,
+        text: r.missing ? 'not here · flagged' : r.skip ? 'skipped' : r.prev + ' → ' + r.g + ' g', fg: r.missing ? 'var(--fw-warning)' : r.skip ? 'var(--fw-muted)' : 'var(--fw-text)',
+        undo: () => { const rows = { ...this.state.stRows }; delete rows[x.id]; const g = { ...this.state.grams }; if (r.g !== undefined) delete g[x.id]; this.setState({ stRows: rows, grams: g }); } }; }) };
+    const capIdx = s.cols.length ? s.capIdx % s.cols.length : 0;
+    let scaleL = ['READY', 'no spool selected'], tdL = ['READY', s.recent[0] ? 'last ' + s.recent[0].hex : 'insert filament'];
+    if (s.mode === 'spool' && curRaw) scaleL = ['WEIGH #' + curRaw.id + ' ' + curRaw.name, s.flashS || ('net ' + net + ' g · stable')];
+    if (s.mode === 'stock') scaleL = stNext ? ['STOCK ' + s.stLoc + ' ' + (stDone + 1) + '/' + stList.length, 'Place #' + stNext.id + ' ' + stNext.name] : ['STOCK ' + s.stLoc, 'Done ✓'];
+    if ((s.mode === 'form' && s.creatingF) || s.mode === 'fil') tdL = [s.ff.editKey ? 'EDIT ' + (s.ff.name || '') : 'NEW FILAMENT', s.flashT ? s.flashT + ' · next: ' + (capIdx + 1) + ' of ' + s.cols.length : 'Insert colour ' + (capIdx + 1) + ' of ' + s.cols.length];
+    if (s.mode === 'spool' && curRaw && s.rm === 'wait') tdL = ['RE-MEASURE #' + curRaw.id, 'Insert filament…'];
+    if (s.mode === 'spool' && curRaw && s.rm && s.rm.hex) tdL = ['RE-MEASURE #' + curRaw.id, s.rm.hex + ' TD ' + s.rm.td + ' · confirm in app'];
+    if (s.mode === 'spool' && curRaw && !s.rm && s.flashT) tdL = ['#' + curRaw.id + ' ' + curRaw.name, s.flashT];
+    const screens = [{ name: 'SCALE · bench', link: '⇅ live', l1: scaleL[0], l2: scaleL[1] }, { name: 'TD1 · colour station', link: '⇅ live', l1: tdL[0], l2: tdL[1] }];
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      headline: all.length + ' spools · ' + totalKg + ' kg on hand · ' + resG + ' g reserved by projects and queue · ' + all.filter(x => x.g < 150).length + ' low',
+      tabs, isSpools: s.tab === 'spools', isOther: s.tab === 'locations', isInv: s.tab === 'inventory', isVend: s.tab === 'vendors', inv, vends, vf, mVend: s.mode === 'vendor', startVend: () => this.setState({ mode: 'vendor', vf: { name: '', empty: '', url: '' } }), otherText,
+      matFilters, spools, countLabel: shown.length + ' shown',
+      lowOn: s.low ? 'true' : 'false', lowBorder: s.low ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', lowBg: s.low ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', lowFg: s.low ? 'var(--fw-on-accent)' : 'var(--fw-text)',
+      toggleLow: () => this.setState({ low: !s.low }),
+      inspOpen: s.mode !== 'none' && (s.mode !== 'spool' || !!cur),
+      mSpool: s.mode === 'spool' && !!cur, mNew: s.mode === 'search' || s.mode === 'form' || s.mode === 'done',
+      nSearch: s.mode === 'search', nForm: s.mode === 'form', nDone: s.mode === 'done',
+      cur: cur || { facts: [] },
+      scaleState: s.tare ? 'tared · place spool' : 'stable', scaleGross: gross, scaleNet: net,
+      screens, mStock: s.mode === 'stock', st, mFil: s.mode === 'fil', ff, fs, tdScreen: tdL[0] + ' · ' + tdL[1], scaleScreen: scaleL[0] + ' · ' + scaleL[1], editFil: () => curRaw && openFil(baseF[curRaw.vendor + '|' + curRaw.name]), startFil: () => startFil(), isFils: s.tab === 'filaments', fils, filCount: fils.length + ' filaments', filHead: ['Filament', 'Material', 'Nozzle / bed', 'TD', 'Stock', 'Extras'],
+      startStock: () => this.setState({ mode: 'stock', stLoc: 'Shelf A1', stRows: {}, flashS: '' }),
+      hasRecent: s.recent.length > 0,
+      recent: s.recent.map((r, i) => ({ ...r, find: () => this.setState({ colourQ: r.hex, tab: 'spools', mat: 'all', low: false }),
+        make: () => this.setState({ mode: 'fil', ff: blankFF(), ffOpen: 'fil', ffDone: { start: 1, col: 1 }, cKind: 'single', cols: [r.hex], newTd: String(r.td), capIdx: 1, flashT: '' }),
+        drop: () => this.setState({ recent: this.state.recent.filter((_, j) => j !== i) }) })),
+      colourOn: !!s.colourQ, colourQ: s.colourQ || '', clearColour: () => this.setState({ colourQ: null }),
+      devCapture: () => this.capture(false),
+      devPlace: () => {
+        if (s.mode === 'stock' && stNext) { const g = Math.max(0, stNext.g - (12 + (stNext.id % 5) * 9)); this.setState({ grams: { ...s.grams, [stNext.id]: g }, stRows: { ...s.stRows, [stNext.id]: { prev: stNext.g, g } } }); return; }
+        if (s.mode === 'spool' && curRaw) { this.toast('Scale stable · ' + gross + ' g. Press Use to save.', null); return; }
+        this.toast('Scale stable, but no spool is selected. Scan or open a spool first.', null);
+      },
+      learnEmpty: () => this.toast('Saved ' + gross + ' g as ' + curRaw.vendor + ' empty spool weight. Used for new spools.', () => {}),
+      rmIdle: !s.rm, rmWait: s.rm === 'wait', rmGot: !!(s.rm && s.rm.hex),
+      rm: s.rm && s.rm.hex ? { ...s.rm, de: curRaw ? dist(curRaw.hex.toUpperCase(), s.rm.hex) : 0 } : { hex: '', td: '', de: '' },
+      remeasure: () => { this.setState({ rm: 'wait', flashT: '' }); this.toast('Sent “capture” to TD1 adapter', null); },
+      rmCancel: () => this.setState({ rm: null }),
+      rmApply: () => { const r = s.rm; const key = curRaw.vendor + curRaw.name; const prev = s.fil[key]; this.setState({ fil: { ...s.fil, [key]: { hex: r.hex.toLowerCase(), td: r.td } }, rm: null, flashT: 'Saved ✓' }); this.toast(curRaw.name + ' → ' + r.hex + ', TD ' + r.td, () => { const f = { ...this.state.fil }; if (prev) f[key] = prev; else delete f[key]; this.setState({ fil: f }); }); },
+      useScale: () => { const id = curRaw.id; const prev = curRaw.g; this.setState({ grams: { ...s.grams, [id]: net }, flashS: 'Saved ✓ ' + net + ' g' }); this.toast('#' + id + ' updated · ' + prev + ' g → ' + net + ' g', () => { const g = { ...this.state.grams }; delete g[id]; this.setState({ grams: g }); }); },
+      tare: () => this.setState({ tare: !s.tare }),
+      label: () => this.toast('Label sent to printer (62 mm tape)', null),
+      nfc: () => this.toast('Hold the tag to the reader…', null),
+      archive: () => { const id = curRaw.id; this.setState({ archived: { ...s.archived, [id]: true }, mode: 'none' }); this.toast('#' + id + ' archived', () => { const a = { ...this.state.archived }; delete a[id]; this.setState({ archived: a, sel: id, mode: 'spool' }); }); },
+      scan: () => { this.setState({ sel: 42, mode: 'spool', rm: null, flashS: '' }); this.toast('Scanned tag 04:A2:3F… → spool #42 · scale now shows it', null); },
+      closeInsp: () => this.setState({ mode: s.mode === 'fil' && s.ff.ret ? 'form' : 'none', rm: null, flashS: '', flashT: '' }),
+      startNew: () => this.setState({ mode: 'search', picked: null, fq: '', vq: '', creatingF: false, qty: 1, capIdx: 0, newTd: '', flashT: '' }),
+      newTitle: s.mode === 'done' ? 'Added' : s.picked ? s.picked.name : s.creatingF ? s.fq : 'Find the filament',
+      dbq: s.dbq, setDbq: (e) => this.setState({ dbq: e.target.value }), dbHits,
+      goManual: () => this.setState({ mode: 'form', picked: null, fq: '', combo: true }),
+      fq: s.fq, setFq: (e) => this.setState({ fq: e.target.value, combo: true, creatingF: false, picked: null }), openCombo: () => this.setState({ combo: true }),
+      comboOpen: s.combo, fOpts, canCreate,
+      createF: () => startFil({ name: s.fq, ret: 'spool' }),
+      creatingF: s.creatingF, vq: s.vq, setVq: (e) => this.setState({ vq: e.target.value }), vendorHint,
+      nf, qty: s.qty, qtyUp: () => this.setState({ qty: Math.min(20, s.qty + 1) }), qtyDown: () => this.setState({ qty: Math.max(1, s.qty - 1) }),
+      saveDisabled: !(s.picked || (s.creatingF && s.vq)),
+      saveLabel: 'Add ' + newCount + ' spool' + (newCount > 1 ? 's' : ''),
+      backSearch: () => this.setState({ mode: 'search' }),
+      saveNew: () => {
+        const name = s.picked ? s.picked.name.replace(/^(Prusament|Polymaker|Bambu Lab|eSun|Fiberlogy)\s/, '') : s.fq;
+        const ids = []; for (let i = 0; i < s.qty; i++) ids.push(s.nextId + i);
+        const prevNext = s.nextId;
+        this.setState({ nextId: s.nextId + s.qty, mode: 'done', addedName: name, addedVendor: s.picked ? s.picked.vendor : s.vq, addedMat: s.picked ? s.picked.mat : 'PLA', addedHex: s.picked ? s.picked.hex : '#3a6ea5',
+          done: 'Added ' + ids.map(i => '#' + i).join(', ') + (s.creatingF ? ' · created filament “' + s.fq + '”' + (vMatch ? '' : ' and vendor “' + s.vq + '”') : '') });
+        this.toast('Added ' + s.qty + ' spool' + (s.qty > 1 ? 's' : ''), () => this.setState({ nextId: prevNext, mode: 'none' }));
+      },
+      doneText: s.done,
+      nc: (() => {
+        const kinds = [['single', 'Single'], ['coaxial', 'Coextruded'], ['longitudinal', 'Gradient']];
+        const max = s.cKind === 'single' ? 1 : s.cKind === 'coaxial' ? 3 : 6;
+        const min = s.cKind === 'single' ? 1 : 2;
+        const cols = s.cols;
+        return {
+          kinds: kinds.map(([id, label]) => ({ label, ...seg(s.cKind === id), pick: () => {
+            let c = this.state.cols.slice();
+            const mx = id === 'single' ? 1 : id === 'coaxial' ? 3 : 6; const mn = id === 'single' ? 1 : 2;
+            if (c.length > mx) c = c.slice(0, mx);
+            while (c.length < mn) c.push(['#d4af37', '#c0c0c0', '#e8505b'][c.length - 1] || '#ffffff');
+            this.setState({ cKind: id, cols: c });
+          } })),
+          help: s.cKind === 'single' ? 'One colour, stored as color_hex.' : s.cKind === 'coaxial' ? 'Colours run side by side the whole length (dual/tri-colour silk). The print shows different colours from different angles. Stored as multi_color_hexes + direction “coaxial”.' : 'Colour changes along the spool (rainbow / gradient). The colour a print gets depends on where on the spool it is. Stored as multi_color_hexes + direction “longitudinal”.',
+          colours: cols.map((h, i) => ({ hex: h, n: i + 1, canRemove: cols.length > min, measure: () => { this.setState({ capIdx: i }); this.toast('Sent “capture” to TD1 adapter for colour ' + (i + 1), null); setTimeout(() => this.capture(true), 0); },
+            set: (e) => { const v = e.target.value.trim(); if (!/^#?[0-9a-fA-F]{6}$/.test(v)) return; const c = this.state.cols.slice(); c[i] = v[0] === '#' ? v : '#' + v; this.setState({ cols: c }); },
+            remove: () => this.setState({ cols: this.state.cols.filter((_, j) => j !== i) }) })),
+          canAdd: cols.length < max,
+          measure: () => { this.toast('Sent “capture” to TD1 adapter', null); this.capture(true); },
+          measureLabel: 'Measure colour ' + ((cols.length ? s.capIdx % cols.length : 0) + 1) + (cols.length > 1 ? ' of ' + cols.length : ''),
+          td: s.newTd, tdDisabled: s.cKind !== 'single',
+          tdHelp: s.cKind === 'single' ? 'TD fills from the TD1 too (saved as hue_td). Or press capture on the adapter — same result.' : 'Multi-colour: TD left empty (HueForge needs one colour per filament). Capture once per colour; the adapter screen tells you which one is next.',
+          add: () => this.setState({ cols: [...this.state.cols, '#ffffff'] }),
+          swatch: swatchOf({ hex: cols[0], multi: s.cKind === 'single' ? null : cols, dir: s.cKind }), pvAlign: s.cKind === 'longitudinal' ? 'stretch' : 'flex-start', pvW: s.cKind === 'longitudinal' ? 'auto' : '56px', pvH: s.cKind === 'longitudinal' ? '24px' : '56px', pvR: s.cKind === 'longitudinal' ? '2px' : '50%'
+        };
+      })(),
+      toasts: s.toasts.map(t => ({ text: t.text, canUndo: !!t.undo, undo: () => { if (t.undo) t.undo(); this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }); }, dismiss: () => this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
