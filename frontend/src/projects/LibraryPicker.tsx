@@ -111,10 +111,12 @@ export default function LibraryPicker({
                 className={`lp-card${on ? " lp-card--on" : ""}`}
                 onClick={() => {
                   if (isTaken) return;
-                  const m = new Map(sel);
-                  if (m.has(e.id)) m.delete(e.id);
-                  else m.set(e.id, e);
-                  setSel(m);
+                  setSel((cur) => {
+                    const m = new Map(cur);
+                    if (m.has(e.id)) m.delete(e.id);
+                    else m.set(e.id, e);
+                    return m;
+                  });
                 }}
               >
                 <span className="lp-card__img">

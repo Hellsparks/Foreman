@@ -126,26 +126,17 @@ export default function ProjectNew() {
       label: null,
       hex: g.hex,
       materials: groupMaterials(g),
-      plates: g.members.map((m) => `${m.file.replace(/\.(gcode|bgcode|3mf)$/i, "")} ${m.slot.label}${m.copies > 1 ? ` ×${m.copies}` : ""}`).join(", "),
+      plates: g.members.map((m) => `${m.file.replace(/(\.gcode)?\.(gcode|bgcode|3mf)$/i, "")} ${m.slot.label}${m.copies > 1 ? ` ×${m.copies}` : ""}`).join(", "),
       need: g.perSet * sets,
       keepColour: false,
       options: fileOptions[g.key] ?? [],
     }));
   }, [source, plan, groups, fileOptions, sets]);
 
-  // Default pick per slot: the best option of the sliced material.
-  useEffect(() => {
-    setPick((cur) => {
-      const next: Record<string, number | null> = {};
-      let changed = false;
-      for (const s of slots) {
-        const keep = cur[s.key] !== undefined && (cur[s.key] === null || s.options.some((o) => o.spool.id === cur[s.key]));
-        next[s.key] = keep ? cur[s.key] : s.options[0]?.spool.id ?? null;
-        if (next[s.key] !== cur[s.key]) changed = true;
-      }
-      return changed || Object.keys(cur).length !== slots.length ? next : cur;
-    });
-  }, [slots]);
+  // The spool per slot: the user's choice (null = decide later), else the best
+  // option of the sliced material (the server ranks them).
+  const pickOf = (key: string, options: SpoolOption[]): number | null =>
+    key in pick ? pick[key] : (options.find((o) => o.material_ok) ?? options[0])?.spool.id ?? null;
 
   const t = templates?.find((x) => x.id === tpl) ?? null;
   const baseName = (n: string) => n.replace(/\.(gcode|bgcode|3mf)$/i, "").replace(/\.gcode$/i, "").replace(/[_-]+/g, " ");
@@ -171,7 +162,7 @@ export default function ProjectNew() {
     let unset = 0;
     let warn = "";
     for (const s of slots) {
-      const o = s.options.find((x) => x.spool.id === pick[s.key]);
+      const o = s.options.find((x) => x.spool.id === pickOf(s.key, s.options));
       if (!o) {
         unset++;
         continue;
@@ -184,6 +175,7 @@ export default function ProjectNew() {
     if (short) return { tone: "bad", text: `✖ Not enough filament: short ${Math.round(short)} g. Pick another spool, or create anyway and swap later.` };
     if (warn) return { tone: "warn", text: `⚠ ${warn}` };
     return { tone: "ok", text: "✓ Every colour has enough free filament." };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slots, pick]);
 
   const create = async (queueAll: boolean, acceptSwaps = false) => {
@@ -206,7 +198,7 @@ export default function ProjectNew() {
           ? await projectsApi.create({
               ...common,
               template_id: tpl ?? 0,
-              spools: slots.map((s) => ({ key: s.key, spool_id: pick[s.key] ?? null })),
+              spools: slots.map((s) => ({ key: s.key, spool_id: pickOf(s.key, s.options) })),
             })
           : await projectsApi.fromFiles({
               ...common,
@@ -215,7 +207,7 @@ export default function ProjectNew() {
                 key: g.key,
                 label: null,
                 hex: g.hex,
-                spool_id: pick[g.key] ?? null,
+                spool_id: pickOf(g.key, slots.find((x) => x.key === g.key)?.options ?? []),
                 members: g.members.map((m) => ({ file_id: m.file_id, slot: m.slot.index })),
               })),
             });
@@ -432,7 +424,8 @@ export default function ProjectNew() {
             const hay = [`#${o.spool.id}`, o.spool.vendor, o.spool.material, o.spool.name, o.spool.color_hex, o.spool.location].filter(Boolean).join(" ").toLowerCase().replace(/#/g, "");
             return q.every((w) => hay.includes(w));
           });
-          const chosen = s.options.find((o) => o.spool.id === pick[s.key]);
+          const cur = pickOf(s.key, s.options);
+          const chosen = s.options.find((o) => o.spool.id === cur);
           const list = hits.slice(0, SHOW);
           if (chosen && !list.includes(chosen)) list.unshift(chosen);
           const mat = s.materials.join("/");
@@ -479,7 +472,7 @@ export default function ProjectNew() {
                 {list.map((o) => {
                   const f = fitText(o, s.need);
                   return (
-                    <button key={o.spool.id} type="button" role="radio" aria-checked={pick[s.key] === o.spool.id} className="prj-opt" onClick={() => setPick({ ...pick, [s.key]: o.spool.id })}>
+                    <button key={o.spool.id} type="button" role="radio" aria-checked={cur === o.spool.id} className="prj-opt" onClick={() => setPick({ ...pick, [s.key]: o.spool.id })}>
                       <Dot hex={o.spool.color_hex ?? o.spool.multi_color_hexes[0]} big />
                       <span className="prj-opt__body">
                         <b>{spoolLabel(o)}</b>
@@ -497,7 +490,7 @@ export default function ProjectNew() {
                     </button>
                   );
                 })}
-                <button type="button" role="radio" aria-checked={pick[s.key] == null} className="prj-opt" onClick={() => setPick({ ...pick, [s.key]: null })}>
+                <button type="button" role="radio" aria-checked={cur == null} className="prj-opt" onClick={() => setPick({ ...pick, [s.key]: null })}>
                   <Dot hex={null} big />
                   <span className="prj-opt__body">
                     <b>Decide later</b>
