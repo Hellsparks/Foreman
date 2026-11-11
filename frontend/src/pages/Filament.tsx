@@ -1,7 +1,8 @@
 /**
- * Filament page — Spools tab + spool inspector (task 4.1).
- * Reference: docs/ui-ref/Filament.dc.html lines 65–121 (list) and 222–260 (inspector).
- * Filaments / Inventory / Vendors / Locations come next session.
+ * Filament page — Spools, Filaments, Vendors (tasks 4.1, 4.2).
+ * Reference: docs/ui-ref/Filament.dc.html lines 65–147 (lists), 196–208 (vendors),
+ * 222–260 (spool inspector), 261–420 (filament + vendor forms), 443–554 (new spool).
+ * Inventory / Locations come later.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -19,9 +20,21 @@ import {
   whereLabel,
   type SpoolRow,
 } from "../api/spools";
-import SpoolSwatch from "../filament/SpoolSwatch";
+import SpoolSwatch, { ColourSwatch } from "../filament/SpoolSwatch";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
+import FilamentPanel from "../filament/FilamentForm";
+import NewSpoolPanel from "../filament/NewSpoolPanel";
+import VendorPanel from "../filament/VendorPanel";
+import {
+  COLOUR_KINDS,
+  filamentApi,
+  materialFull,
+  type FilamentRow,
+  type MaterialCatalogue,
+  type VendorRow,
+} from "../api/filaments";
 import "../filament/filament.css";
+import { ExternalLink } from "../ui";
 
 const TABS = [
   ["spools", "Spools"],
@@ -32,38 +45,68 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
-type Mode = "spool" | "load" | "edit";
+/** What the inspector shows. */
+type Panel =
+  | { kind: "spool"; id: number }
+  | { kind: "load"; id: number }
+  | { kind: "edit"; id: number }
+  | { kind: "new-spool"; filamentId: number | null }
+  | { kind: "filament"; id: number | null; vendor?: string }
+  | { kind: "vendor"; id: number | null };
 
 export default function Filament() {
   const { openInspector, closeInspector, inspectorOpen, inspectorBodyId } =
     useOutletContext<ShellContext>();
   const [tab, setTab] = useState<Tab>("spools");
   const [rows, setRows] = useState<SpoolRow[] | null>(null);
+  const [fils, setFils] = useState<FilamentRow[] | null>(null);
+  const [vendors, setVendors] = useState<VendorRow[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [catalogue, setCatalogue] = useState<MaterialCatalogue | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [fq, setFq] = useState("");
   const [mat, setMat] = useState("all");
   const [low, setLow] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [sel, setSel] = useState<number | null>(null);
-  const [mode, setMode] = useState<Mode>("spool");
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setRows(await spools.list(showArchived));
+      const [sp, fl, vd, lc] = await Promise.all([
+        spools.list(showArchived),
+        filamentApi.filaments(),
+        filamentApi.vendors(),
+        filamentApi.locations(),
+      ]);
+      setRows(sp);
+      setFils(fl);
+      setVendors(vd);
+      setLocations(lc);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }, [showArchived]);
   useEffect(() => void load(), [load]);
+  useEffect(() => {
+    filamentApi.catalogue().then(setCatalogue, (e) => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
   const onSpoolEvent = useCallback(() => void load(), [load]);
   useEventStream(onSpoolEvent, SPOOL_TOPICS);
   useEffect(() => () => closeInspector(), [closeInspector]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const [portal, setPortal] = useState<Element | null>(null);
   useEffect(() => setPortal(document.getElementById(inspectorBodyId)), [inspectorBodyId, inspectorOpen]);
 
   const all = rows ?? [];
+  const filaments = fils ?? [];
   const materials = useMemo(() => {
     const count = new Map<string, number>();
     for (const r of all) {
@@ -84,18 +127,25 @@ export default function Filament() {
       .toLowerCase();
     return q.toLowerCase().replace(/#(?=[0-9a-f]{6})/g, "").split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
   });
+  const filsShown = filaments.filter((f) => {
+    if (!fq.trim()) return true;
+    const hay = [f.vendor, f.name, f.material, ...f.modifiers, ...f.colours].filter(Boolean).join(" ").toLowerCase();
+    return fq.toLowerCase().replace(/#/g, "").split(/\s+/).filter(Boolean).every((w) => hay.includes(w));
+  });
 
   const kg = all.reduce((a, r) => a + (r.spool.remaining_weight ?? 0), 0) / 1000;
   const lowCount = all.filter((r) => r.spool.remaining_weight != null && r.spool.remaining_weight < LOW_GRAMS).length;
-  const cur = all.find((r) => r.spool.id === sel) ?? null;
+  const spoolId = panel && (panel.kind === "spool" || panel.kind === "load" || panel.kind === "edit") ? panel.id : null;
+  const cur = all.find((r) => r.spool.id === spoolId) ?? null;
+  const curFil = panel?.kind === "filament" && panel.id != null ? filaments.find((f) => f.id === panel.id) ?? null : null;
+  const curVendor = panel?.kind === "vendor" && panel.id != null ? vendors.find((v) => v.id === panel.id) ?? null : null;
 
-  const open = (id: number, m: Mode = "spool") => {
-    setSel(id);
-    setMode(m);
+  const show = (p: Panel) => {
+    setPanel(p);
     openInspector();
   };
   const close = () => {
-    setSel(null);
+    setPanel(null);
     closeInspector();
   };
 
@@ -107,7 +157,7 @@ export default function Filament() {
           <p className="fil-head__sub">
             {rows == null
               ? "Loading spools…"
-              : `${all.length} spool${all.length === 1 ? "" : "s"} · ${kg.toFixed(1)} kg on hand · ${lowCount} low`}
+              : `${all.length} spool${all.length === 1 ? "" : "s"} · ${kg.toFixed(1)} kg on hand · ${lowCount} low · ${filaments.length} filament${filaments.length === 1 ? "" : "s"} · ${vendors.length} vendor${vendors.length === 1 ? "" : "s"}`}
           </p>
         </div>
         <div role="tablist" aria-label="Filament sections" className="fil-tabs">
@@ -121,9 +171,27 @@ export default function Filament() {
 
       <main className="fil-main">
         {error && <p className="fil-note fil-note--bad" role="alert">{error}</p>}
-        {tab !== "spools" ? (
+        {toast && <p className="fil-note fil-note--ok" role="status">{toast}</p>}
+        {tab === "filaments" ? (
+          <FilamentsTab
+            rows={filsShown}
+            total={filaments.length}
+            q={fq}
+            setQ={setFq}
+            selected={panel?.kind === "filament" ? panel.id : null}
+            onOpen={(f) => show({ kind: "filament", id: f.id })}
+            onAdd={() => show({ kind: "filament", id: null })}
+          />
+        ) : tab === "vendors" ? (
+          <VendorsTab
+            rows={vendors}
+            selected={panel?.kind === "vendor" ? panel.id : null}
+            onOpen={(v) => show({ kind: "vendor", id: v.id })}
+            onAdd={() => show({ kind: "vendor", id: null })}
+          />
+        ) : tab !== "spools" ? (
           <p className="fil-placeholder">
-            {TABS.find((t) => t[0] === tab)?.[1]} comes next session (filament form, inventory, vendors, locations).
+            {TABS.find((t) => t[0] === tab)?.[1]} comes in a later session.
           </p>
         ) : (
           <>
@@ -136,6 +204,11 @@ export default function Filament() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
+              <button type="button" className="fil-btn fil-btn--primary fil-btn--add" onClick={() => show({ kind: "new-spool", filamentId: null })}>
+                Add spool
+              </button>
+            </div>
+            <div className="fil-filters">
               <div role="group" aria-label="Material" className="fil-segs">
                 {["all", ...materials].map((m) => (
                   <button key={m} type="button" className="fil-seg" aria-pressed={mat === m} onClick={() => setMat(m)}>
@@ -166,14 +239,14 @@ export default function Filament() {
                     const s = r.spool;
                     const isLow = s.remaining_weight != null && s.remaining_weight < LOW_GRAMS;
                     return (
-                      <tr key={s.id} aria-selected={sel === s.id} className="fil-tr" onClick={() => open(s.id)}>
+                      <tr key={s.id} aria-selected={spoolId === s.id} className="fil-tr" onClick={() => show({ kind: "spool", id: s.id })}>
                         <td>
                           <button
                             type="button"
                             className="fil-row-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              open(s.id);
+                              show({ kind: "spool", id: s.id });
                             }}
                           >
                             <SpoolSwatch spool={s} size={28} />
@@ -236,28 +309,272 @@ export default function Filament() {
 
       {portal &&
         inspectorOpen &&
-        cur &&
+        panel &&
         createPortal(
-          mode === "load" ? (
-            <LoadSpoolPanel spoolId={cur.spool.id} onClose={() => setMode("spool")} onLoaded={() => void load()} />
-          ) : mode === "edit" ? (
-            <EditSpoolPanel row={cur} onClose={() => setMode("spool")} onSaved={() => void load().then(() => setMode("spool"))} />
-          ) : (
+          panel.kind === "load" && cur ? (
+            <LoadSpoolPanel spoolId={cur.spool.id} onClose={() => show({ kind: "spool", id: cur.spool.id })} onLoaded={() => void load()} />
+          ) : panel.kind === "edit" && cur ? (
+            <EditSpoolPanel
+              row={cur}
+              onClose={() => show({ kind: "spool", id: cur.spool.id })}
+              onSaved={() => void load().then(() => show({ kind: "spool", id: cur.spool.id }))}
+            />
+          ) : panel.kind === "spool" && cur ? (
             <SpoolInspector
               row={cur}
               onClose={close}
-              onLoad={() => setMode("load")}
-              onEdit={() => setMode("edit")}
+              onLoad={() => show({ kind: "load", id: cur.spool.id })}
+              onEdit={() => show({ kind: "edit", id: cur.spool.id })}
+              onEditFilament={() => show({ kind: "filament", id: cur.spool.filament_id })}
+              onClone={async (n) => {
+                const made = await filamentApi.cloneSpool(cur.spool.id, n);
+                setToast(`Cloned #${cur.spool.id}: ${made.map((m) => `#${m.id}`).join(", ")}`);
+                await load();
+              }}
               onArchive={async (archived) => {
                 await spools.edit(cur.spool.id, { archived, location: null, lot_nr: null, comment: null, price: null });
                 if (archived && !showArchived) close();
                 await load();
               }}
             />
-          ),
+          ) : panel.kind === "new-spool" ? (
+            <NewSpoolPanel
+              key={`new-${panel.filamentId ?? "x"}`}
+              catalogue={catalogue}
+              vendors={vendors}
+              filaments={filaments}
+              locations={locations}
+              preset={filaments.find((f) => f.id === panel.filamentId) ?? null}
+              onClose={close}
+              onCreated={(c) => {
+                setToast(`Added ${c.spools.length} spool${c.spools.length === 1 ? "" : "s"} of ${[c.filament.vendor, c.filament.name].filter(Boolean).join(" ")}`);
+                void load();
+              }}
+              onLoad={(id) => {
+                setTab("spools");
+                void load().then(() => show({ kind: "load", id }));
+              }}
+            />
+          ) : panel.kind === "filament" && (panel.id == null || curFil) ? (
+            <FilamentPanel
+              key={`fil-${panel.id ?? "new"}`}
+              filament={curFil}
+              catalogue={catalogue}
+              vendors={vendors}
+              filaments={filaments}
+              presetVendor={panel.vendor}
+              onClose={close}
+              onOpenDuplicate={(f) => show({ kind: "filament", id: f.id })}
+              onSaved={(f, addSpool) => {
+                setToast(`Saved filament ${[f.vendor, f.name].filter(Boolean).join(" ")}`);
+                void load().then(() => (addSpool ? show({ kind: "new-spool", filamentId: f.id }) : show({ kind: "filament", id: f.id })));
+              }}
+            />
+          ) : panel.kind === "vendor" && (panel.id == null || curVendor) ? (
+            <VendorPanel
+              key={`vend-${panel.id ?? "new"}`}
+              vendor={curVendor}
+              vendors={vendors}
+              onClose={close}
+              onSaved={(v, addFilament) => {
+                setToast(`Saved vendor ${v.name}`);
+                void load().then(() =>
+                  addFilament ? show({ kind: "filament", id: null, vendor: v.name }) : show({ kind: "vendor", id: v.id }),
+                );
+              }}
+            />
+          ) : null,
           portal,
         )}
     </div>
+  );
+}
+
+// ── Filaments tab (reference lines 122–147) ──────────────────────────────────
+
+function FilamentsTab({
+  rows,
+  total,
+  q,
+  setQ,
+  selected,
+  onOpen,
+  onAdd,
+}: {
+  rows: FilamentRow[];
+  total: number;
+  q: string;
+  setQ: (q: string) => void;
+  selected: number | null;
+  onOpen: (f: FilamentRow) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <>
+      <div className="fil-filters">
+        <input
+          type="search"
+          className="fil-input"
+          aria-label="Search filaments"
+          placeholder="Name, vendor, material, colour…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <button type="button" className="fil-btn fil-btn--primary fil-btn--add" onClick={onAdd}>
+          Add filament
+        </button>
+      </div>
+      <div className="fil-count">
+        {rows.length === total ? `${total} filaments` : `${rows.length} of ${total} filaments`}
+      </div>
+      <div className="fil-table-wrap">
+        <table className="fil-table">
+          <thead>
+            <tr>
+              <th>Filament</th>
+              <th>Material</th>
+              <th>Nozzle / bed</th>
+              <th>TD</th>
+              <th>Stock</th>
+              <th>Extras</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((f) => (
+              <tr key={f.id} className="fil-tr" aria-selected={selected === f.id} onClick={() => onOpen(f)}>
+                <td>
+                  <button
+                    type="button"
+                    className="fil-row-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpen(f);
+                    }}
+                  >
+                    <ColourSwatch colours={f.colours} kind={f.colour_kind} size={28} />
+                    <span>
+                      <b>{f.name}</b>
+                      <br />
+                      <span className="fil-sub">{f.vendor ?? "No vendor"}</span>
+                    </span>
+                  </button>
+                </td>
+                <td>
+                  <span className="fil-mono">{materialFull(f.material ?? "—", f.modifiers)}</span>
+                  <br />
+                  <span className="fil-sub">
+                    {COLOUR_KINDS.find((k) => k[0] === f.colour_kind)?.[1]}
+                    {f.colours.length > 1 ? ` · ${f.colours.length} colours` : ""}
+                  </span>
+                </td>
+                <td className="fil-mono">
+                  {f.extruder_temp ?? "—"} / {f.bed_temp ?? "—"} °C
+                </td>
+                <td className="fil-mono">{f.hue_td ?? "—"}</td>
+                <td>
+                  {f.spool_count} spool{f.spool_count === 1 ? "" : "s"}
+                  {f.spool_count > 0 ? ` · ${Math.round(f.grams_left)} g` : ""}
+                </td>
+                <td className="fil-sub">
+                  <span className="fil-extras">
+                    {f.abrasive && <span className="fil-abrasive">⚠ abrasive</span>}
+                    {f.url && (
+                      <ExternalLink href={f.url} label={`Product page for ${f.name}`}>
+                        Link
+                      </ExternalLink>
+                    )}
+                    {f.price != null && <span>{f.price.toFixed(2)}</span>}
+                    {!f.abrasive && !f.url && f.price == null && "—"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ padding: 16 }} className="fil-placeholder">
+                  {total ? "No filament matches." : "No filaments yet. Add one, or add a spool and create its filament there."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Vendors tab (reference lines 196–208) ────────────────────────────────────
+
+function VendorsTab({
+  rows,
+  selected,
+  onOpen,
+  onAdd,
+}: {
+  rows: VendorRow[];
+  selected: number | null;
+  onOpen: (v: VendorRow) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <>
+      <div className="fil-filters">
+        <div className="fil-count" style={{ flex: 1 }}>
+          {rows.length} vendor{rows.length === 1 ? "" : "s"}
+        </div>
+        <button type="button" className="fil-btn fil-btn--primary fil-btn--add" onClick={onAdd}>
+          Add vendor
+        </button>
+      </div>
+      <div className="fil-table-wrap">
+        <table className="fil-table">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Empty spool</th>
+              <th>Filaments</th>
+              <th>Website</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((v) => (
+              <tr key={v.id} className="fil-tr" aria-selected={selected === v.id} onClick={() => onOpen(v)}>
+                <td>
+                  <button
+                    type="button"
+                    className="fil-row-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpen(v);
+                    }}
+                  >
+                    <span>
+                      <b>{v.name}</b>
+                      {v.comment && (
+                        <>
+                          <br />
+                          <span className="fil-sub">{v.comment}</span>
+                        </>
+                      )}
+                    </span>
+                  </button>
+                </td>
+                <td className="fil-mono">{v.empty_spool_weight != null ? `${v.empty_spool_weight} g` : "—"}</td>
+                <td>{v.filament_count}</td>
+                <td className="fil-sub">{v.website ? <ExternalLink href={v.website} label={`${v.name} website`} /> : "—"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ padding: 16 }} className="fil-placeholder">
+                  No vendors yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -268,18 +585,40 @@ function SpoolInspector({
   onClose,
   onLoad,
   onEdit,
+  onEditFilament,
+  onClone,
   onArchive,
 }: {
   row: SpoolRow;
   onClose: () => void;
   onLoad: () => void;
   onEdit: () => void;
+  onEditFilament: () => void;
+  onClone: (n: number) => Promise<void>;
   onArchive: (archived: boolean) => Promise<void>;
 }) {
   const s = row.spool;
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [archErr, setArchErr] = useState<string | null>(null);
-  useEffect(() => setConfirmArchive(false), [s.id]);
+  const [cloneN, setCloneN] = useState<number | null>(null);
+  const [cloneBusy, setCloneBusy] = useState(false);
+  useEffect(() => {
+    setConfirmArchive(false);
+    setCloneN(null);
+  }, [s.id]);
+  const clone = async () => {
+    if (cloneN == null) return;
+    setCloneBusy(true);
+    setArchErr(null);
+    try {
+      await onClone(cloneN);
+      setCloneN(null);
+    } catch (e) {
+      setArchErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCloneBusy(false);
+    }
+  };
   const archive = async () => {
     if (!s.archived && !confirmArchive) {
       setConfirmArchive(true);
@@ -339,8 +678,31 @@ function SpoolInspector({
           Load onto…
         </button>
         <button type="button" className="fil-btn" onClick={onEdit}>
-          Edit
+          Edit spool
         </button>
+        <button type="button" className="fil-btn" onClick={onEditFilament}>
+          Edit filament
+        </button>
+        <button type="button" className="fil-btn" aria-expanded={cloneN != null} onClick={() => setCloneN(cloneN == null ? 1 : null)}>
+          Clone…
+        </button>
+        {cloneN != null && (
+          <div className="spool-insp__clone" style={{ gridColumn: "1 / -1" }}>
+            <span className="fil-sub">Copies (same filament, weights, location, lot; full):</span>
+            <div className="ns-qty__ctl">
+              <button type="button" className="fil-btn fil-btn--small" aria-label="Fewer" disabled={cloneN <= 1} onClick={() => setCloneN(cloneN - 1)}>
+                −
+              </button>
+              <output className="ns-qty__n">{cloneN}</output>
+              <button type="button" className="fil-btn fil-btn--small" aria-label="More" disabled={cloneN >= 50} onClick={() => setCloneN(cloneN + 1)}>
+                +
+              </button>
+            </div>
+            <button type="button" className="fil-btn fil-btn--small" disabled={cloneBusy} onClick={() => void clone()}>
+              {cloneBusy ? "Cloning…" : `Clone ${cloneN}×`}
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className="fil-btn"
@@ -390,7 +752,7 @@ function SpoolInspector({
   );
 }
 
-// ── Edit (spool fields only; the filament form is next session) ───────────────
+// ── Edit (spool fields only; the filament has its own form) ──────────────────
 
 function EditSpoolPanel({ row, onClose, onSaved }: { row: SpoolRow; onClose: () => void; onSaved: () => void }) {
   const s = row.spool;
@@ -443,7 +805,7 @@ function EditSpoolPanel({ row, onClose, onSaved }: { row: SpoolRow; onClose: () 
         <span className="fil-field__label">Comment</span>
         <input className="fil-input" value={comment} onChange={(e) => setComment(e.target.value)} />
       </label>
-      <p className="fil-muted">Material, colour and vendor live on the filament; the filament form comes next session.</p>
+      <p className="fil-muted">Material, colour and vendor live on the filament: use Edit filament.</p>
       {error && <p className="fil-note fil-note--bad" role="alert">{error}</p>}
       <div style={{ flex: 1 }} />
       <div className="load-panel__foot">

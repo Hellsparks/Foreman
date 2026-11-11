@@ -4,6 +4,9 @@ mod auth;
 mod auth_api_tests;
 pub mod config;
 mod driver_manager;
+mod filaments;
+#[cfg(test)]
+mod filaments_tests;
 mod job_engine;
 mod net;
 mod scheduler;
@@ -622,9 +625,29 @@ fn build_router(app_state: AppState) -> Router {
             post(api::library::restore_many),
         )
         // Send (3.4): print-now + compat check
-        .route("/api/spools", get(api::spools::list))
+        .route(
+            "/api/spools",
+            get(api::spools::list).post(api::filaments::create_spools),
+        )
         .route("/api/spools/loaded", get(api::spools::loaded))
+        .route("/api/spools/locations", get(api::filaments::locations))
         .route("/api/spools/{id}", patch(api::spools::edit))
+        .route("/api/spools/{id}/clone", post(api::filaments::clone_spool))
+        // Filaments + vendors (4.2)
+        .route("/api/filament/catalogue", get(api::filaments::catalogue))
+        .route(
+            "/api/vendors",
+            get(api::filaments::list_vendors).post(api::filaments::create_vendor),
+        )
+        .route("/api/vendors/{id}", patch(api::filaments::update_vendor))
+        .route(
+            "/api/filaments",
+            get(api::filaments::list_filaments).post(api::filaments::create_filament),
+        )
+        .route(
+            "/api/filaments/{id}",
+            get(api::filaments::get_filament).patch(api::filaments::update_filament),
+        )
         .route("/api/printers/{id}/spools", get(api::spools::printer_slots))
         .route(
             "/api/printers/{id}/spools/candidates",

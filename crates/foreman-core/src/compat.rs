@@ -250,15 +250,12 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
         }
     }
 
-    // 3. Nozzle: abrasive materials (CF, GF) need a hardened nozzle.
-    let needs_hardened = file.tools.iter().any(|t| {
-        t.material
-            .as_deref()
-            .map(|m| {
-                let m = m.to_uppercase();
-                m.contains("CF") || m.contains("GF")
-            })
-            .unwrap_or(false)
+    // 3. Nozzle: abrasive filament needs a hardened nozzle. The loaded spool's
+    //    stored `abrasive` flag decides; the file's material string is only used
+    //    when no spool is known for that tool (it carries no flag).
+    let needs_hardened = file.tools.iter().any(|t| match snap.spool_for(t.index) {
+        Some(sp) => sp.abrasive,
+        None => crate::materials::is_abrasive_filament(t.material.as_deref(), None),
     });
     if needs_hardened && !p.hardened_nozzle {
         return CompatResult {
@@ -806,6 +803,25 @@ mod tests {
                 &idle_klipper(vec![klipper_slot(Some(pla_white(9, 800.0)))])
             ) > filament_score(&meta, &snap_after)
         );
+    }
+
+    #[test]
+    fn nozzle_check_reads_the_loaded_spools_abrasive_flag() {
+        // File says plain PLA, but the loaded spool is flagged abrasive (e.g. Glow).
+        let meta = make_meta();
+        let mut glow = pla_white(1, 800.0);
+        glow.abrasive = true;
+        let r = check(&meta, &idle_klipper(vec![klipper_slot(Some(glow))]));
+        assert_eq!(r.verdict, Verdict::Nozzle);
+        // File says PETG-CF, loaded spool's flag was unticked by the user: no block.
+        let mut meta = make_meta();
+        meta.tools[0].material = Some("PETG-CF".into());
+        let mut petg = pla_white(2, 800.0);
+        petg.material = Some("PETG".into());
+        petg.modifier = Some("CF".into());
+        petg.abrasive = false;
+        let r = check(&meta, &idle_klipper(vec![klipper_slot(Some(petg))]));
+        assert_ne!(r.verdict, Verdict::Nozzle, "{}", r.reason);
     }
 
     #[test]

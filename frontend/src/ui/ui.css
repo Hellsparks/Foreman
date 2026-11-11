@@ -302,3 +302,18 @@
   outline: 2px solid var(--fw-focus);
   outline-offset: 2px;
 }
+
+/* External link (opens a new tab; arrow-out icon) */
+.ext-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  color: var(--fw-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.ext-link:hover { color: var(--fw-text); }
+.ext-link:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+.ext-link svg { flex: none; }

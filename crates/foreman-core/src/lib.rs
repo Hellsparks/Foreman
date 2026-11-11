@@ -10,6 +10,7 @@ pub mod error;
 pub mod events;
 pub mod filament;
 pub mod library;
+pub mod materials;
 pub mod remote_fs;
 pub mod repo;
 pub mod secrets;
