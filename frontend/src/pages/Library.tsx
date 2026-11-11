@@ -1293,7 +1293,7 @@ export default function Library() {
                               Print now
                             </button>
                           )}
-                          {c.quick_fix && c.verdict !== "ready" && c.verdict !== "plate" && (
+                          {c.quick_fix && c.verdict !== "plate" && (
                             <span className="fw-send-fix">{c.quick_fix}</span>
                           )}
                           {c.verdict !== "too_big" && c.verdict !== "nozzle" && (

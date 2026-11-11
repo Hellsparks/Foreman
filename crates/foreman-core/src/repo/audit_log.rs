@@ -25,3 +25,23 @@ pub async fn insert(
     .map_err(|e| AppError::Database(e.to_string()))?;
     Ok(())
 }
+
+/// One `audit_log` row.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct AuditEntry {
+    pub printer_id: Option<i64>,
+    pub user: Option<String>,
+    pub command: String,
+    pub occurred_at: String,
+}
+
+/// Newest entries first.
+pub async fn recent(pool: &SqlitePool, limit: i64) -> Result<Vec<AuditEntry>, AppError> {
+    sqlx::query_as::<_, AuditEntry>(
+        "SELECT printer_id, user, command, occurred_at FROM audit_log ORDER BY id DESC LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Database(e.to_string()))
+}

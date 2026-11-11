@@ -424,6 +424,7 @@ pub async fn set_values(
 /// | swatch             | boolean |      |
 /// | orcaslicer_config  | text    |      |
 /// | material_modifier  | text    |      |
+/// | abrasive           | boolean |      |  (Foreman 4.1: filament guard)
 pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::error::Result<()> {
     use crate::models::ExtraFieldType;
 
@@ -463,6 +464,12 @@ pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::
             key: "material_modifier",
             name: "Material Modifier",
             field_type: ExtraFieldType::Text,
+            unit: None,
+        },
+        DefaultField {
+            key: "abrasive",
+            name: "Abrasive",
+            field_type: ExtraFieldType::Boolean,
             unit: None,
         },
     ];

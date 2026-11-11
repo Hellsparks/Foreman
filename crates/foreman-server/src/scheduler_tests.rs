@@ -65,6 +65,7 @@ impl SchedEnv for MockEnv {
                 status: m.status.get(&p.id).cloned(),
                 caps: m.caps.get(&p.id).cloned(),
                 printer: p,
+                loaded: vec![],
             })
             .collect()
     }

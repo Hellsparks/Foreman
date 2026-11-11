@@ -54,4 +54,12 @@ spoolman_connected: boolean | null,
 /**
  * Moonraker's active spool id (`server.spoolman.get_spool_id`).
  */
-spoolman_spool_id: number | null, };
+spoolman_spool_id: number | null, 
+/**
+ * Highest nozzle temperature, °C (Klipper `extruder.max_temp`; Bambu by model).
+ */
+max_nozzle_temp: number | null, 
+/**
+ * Enclosed build chamber: Some(false) for known open-frame printers, None = unknown.
+ */
+enclosed: boolean | null, };

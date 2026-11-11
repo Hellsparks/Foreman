@@ -45,6 +45,12 @@ pub struct PrinterCapabilities {
     #[serde(default)]
     #[ts(type = "number | null")]
     pub spoolman_spool_id: Option<i64>,
+    /// Highest nozzle temperature, °C (Klipper `extruder.max_temp`; Bambu by model).
+    #[serde(default)]
+    pub max_nozzle_temp: Option<f64>,
+    /// Enclosed build chamber: Some(false) for known open-frame printers, None = unknown.
+    #[serde(default)]
+    pub enclosed: Option<bool>,
 }
 
 /// A webcam discovered via the firmware API.
@@ -147,6 +153,15 @@ pub trait PrinterDriver: Send + Sync + 'static {
 
     /// Get the current status snapshot.
     async fn current_status(&self) -> Result<PrinterStatus, AppError>;
+
+    /// Set (or clear with `None`) the spool loaded in `tool`.
+    /// Klipper: Moonraker's active spool. Drivers that can't do it return NotImplemented.
+    async fn set_active_spool(&self, tool: u32, spool_id: Option<i64>) -> Result<(), AppError> {
+        let _ = (tool, spool_id);
+        Err(AppError::NotImplemented(
+            "this printer can't change its loaded spool from Foreman".into(),
+        ))
+    }
 
     /// G-code storage as a Library location (`None` = not browsable from the Library).
     fn storage(&self) -> Option<std::sync::Arc<dyn crate::storage::PrinterStorage>> {

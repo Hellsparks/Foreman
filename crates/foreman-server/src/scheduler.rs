@@ -85,13 +85,7 @@ impl SchedEnv for LiveEnv {
         let printers = repo::printer::list(&self.pool).await.unwrap_or_default();
         let mut snaps = Vec::with_capacity(printers.len());
         for p in printers {
-            let caps = self.drivers.get_capabilities(p.id).await;
-            let status = self.drivers.get_status(p.id).await;
-            snaps.push(PrinterSnapshot {
-                printer: p,
-                caps,
-                status,
-            });
+            snaps.push(crate::spools::snapshot(&self.drivers, self.spoolman.get(), p).await);
         }
         snaps
     }

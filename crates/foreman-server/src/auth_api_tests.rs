@@ -21,7 +21,7 @@ use crate::{
 };
 
 const CODE: &str = "ABCD-EFGH";
-const PW: &str = "a long password";
+pub(crate) const PW: &str = "a long password";
 
 pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
     let db = ForemanDb::connect(&dir.path().join("foreman.db"))
@@ -51,6 +51,7 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
         driver_manager.clone(),
         Arc::clone(&tx),
     );
+    let spoolman = Arc::new(std::sync::OnceLock::new());
     let scheduler = crate::scheduler::Scheduler::new(
         db.pool.clone(),
         Arc::clone(&tx),
@@ -58,10 +59,11 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
             pool: db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
-            spoolman: Arc::new(std::sync::OnceLock::new()),
+            spoolman: Arc::clone(&spoolman),
         }),
     );
     let state = AppState {
+        spoolman,
         scheduler,
         driver_manager,
         bus_tx: tx,

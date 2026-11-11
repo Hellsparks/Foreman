@@ -88,6 +88,24 @@ fn bed_size_from_model(model: &str) -> Option<(f64, f64)> {
     }
 }
 
+/// Is the model's build chamber enclosed? (A1 / A1 Mini / P1P are open-frame.)
+fn enclosed_from_model(model: &str) -> Option<bool> {
+    match model {
+        "X1 Carbon" | "X1E" | "P1S" => Some(true),
+        "A1" | "A1 Mini" | "P1P" => Some(false),
+        _ => None,
+    }
+}
+
+/// Highest nozzle temperature by model, °C.
+fn max_nozzle_temp_from_model(model: &str) -> Option<f64> {
+    match model {
+        "X1E" => Some(320.0),
+        "X1 Carbon" | "P1P" | "P1S" | "A1" | "A1 Mini" => Some(300.0),
+        _ => None,
+    }
+}
+
 /// `print_error` Bambu reports when the user cancels a print (0x0300400C,
 /// "printing was cancelled").
 const BAMBU_CANCELLED: u64 = 0x0300_400C;
@@ -773,6 +791,8 @@ impl BambuDriver {
             c.printer_model = model.map(|s| s.to_owned());
             if let Some(m) = model {
                 c.bed_size = bed_size_from_model(m);
+                c.enclosed = enclosed_from_model(m);
+                c.max_nozzle_temp = max_nozzle_temp_from_model(m);
             }
             c.extruder_count = 1;
         }
