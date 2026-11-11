@@ -225,6 +225,40 @@ async function req<T>(
   return res.json() as Promise<T>;
 }
 
+/** POST JSON, get a file back (zip / STL / JSON download) with its suggested name. */
+async function postBlob(path: string, body: unknown): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = `POST ${path} → ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j && typeof j.error === "string") msg = j.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const m = /filename="([^"]+)"/.exec(cd);
+  return { blob: await res.blob(), filename: m ? m[1] : null };
+}
+
+/** Hands a blob to the browser as a download. */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** Quick roots on a Klipper host (absolute paths). */
 export interface SshRoots {
   home: string;
@@ -447,4 +481,4 @@ export interface NetworkSettings {
 
 export type { ApiKey };
 
-export { ApiError, req as request };
+export { ApiError, postBlob, req as request };

@@ -1,6 +1,9 @@
-/** Tools (W10, W11). Reference: docs/ui-ref/Tools.dc.html. Calibration is live (5.4); the rest comes later. */
-import { useState } from "react";
+/** Tools (W10, W11). Reference: docs/ui-ref/Tools.dc.html. Calibration (5.4), Swatches + Export (5.5); Import comes later. */
+import { useCallback, useEffect, useState } from "react";
+import { exportsApi, type ExportRow } from "../api/exports";
 import Calibration from "../calibration/Calibration";
+import Exports from "../exports/Exports";
+import Swatches from "../exports/Swatches";
 import "./Tools.css";
 
 type Tab = "cal" | "swatch" | "import" | "export";
@@ -13,6 +16,21 @@ const TABS: [Tab, string][] = [
 
 export default function Tools() {
   const [tab, setTab] = useState<Tab>("cal");
+  const [rows, setRows] = useState<ExportRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const needRows = tab === "swatch" || tab === "export";
+  useEffect(() => {
+    if (!needRows) return;
+    exportsApi.rows().then(
+      (r) => {
+        setRows(r);
+        setError(null);
+      },
+      (e) => setError(e instanceof Error ? e.message : String(e)),
+    );
+  }, [needRows]);
+  const onError = useCallback((e: string | null) => setError(e), []);
+
   return (
     <div className="tl">
       <header className="tl-head">
@@ -25,7 +43,22 @@ export default function Tools() {
           ))}
         </div>
       </header>
-      {tab === "cal" ? <Calibration /> : <p className="tl-muted">Coming in a later session.</p>}
+      {needRows && error && (
+        <p className="tl-error" role="alert">
+          {error}
+        </p>
+      )}
+      {tab === "cal" ? (
+        <Calibration />
+      ) : tab === "import" ? (
+        <p className="tl-muted">Coming in a later session.</p>
+      ) : rows === null ? (
+        <p className="tl-muted">Loading filaments…</p>
+      ) : tab === "swatch" ? (
+        <Swatches rows={rows} onError={onError} />
+      ) : (
+        <Exports rows={rows} onError={onError} />
+      )}
     </div>
   );
 }
