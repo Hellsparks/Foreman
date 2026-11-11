@@ -47,11 +47,17 @@ pub struct Printer {
     /// User-defined labels.
     pub tags: Vec<String>,
     pub hardened_nozzle: bool,
+    /// Slicer printer-profile names that map to this printer (e.g. `["Voron V0 0.4mm"]`).
+    pub slicer_profiles: Vec<String>,
     pub sort_order: i64,
     /// Consecutive health-check failures before switching to next path.
     pub fail_after_checks: i64,
     /// Seconds a higher-priority path must be healthy before returning to it.
     pub return_after_secs: i64,
+    /// Whether the print bed is clear and ready for the next job.
+    pub plate_clear: bool,
+    /// Whether the scheduler should auto-start queue items on this printer.
+    pub auto_start_from_queue: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -82,6 +88,8 @@ pub struct CreatePrinter {
     pub tags: Vec<String>,
     #[serde(default)]
     pub hardened_nozzle: bool,
+    #[serde(default)]
+    pub slicer_profiles: Vec<String>,
     pub sort_order: Option<i64>,
     #[serde(default)]
     pub fail_after_checks: Option<i64>,
@@ -102,9 +110,12 @@ pub struct UpdatePrinter {
     pub access_code: Option<String>,
     pub tags: Option<Vec<String>>,
     pub hardened_nozzle: Option<bool>,
+    pub slicer_profiles: Option<Vec<String>>,
     pub sort_order: Option<i64>,
     pub fail_after_checks: Option<i64>,
     pub return_after_secs: Option<i64>,
+    pub plate_clear: Option<bool>,
+    pub auto_start_from_queue: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------

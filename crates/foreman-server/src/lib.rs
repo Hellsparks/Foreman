@@ -569,6 +569,9 @@ fn build_router(app_state: AppState) -> Router {
             "/api/library/restore-many",
             post(api::library::restore_many),
         )
+        // Send (3.4): print-now + compat check
+        .route("/api/send/check/{file_id}", get(api::send::check_file))
+        .route("/api/send", post(api::send::send_file))
         // Locations (printer G-code storage) + transfers
         .route("/api/locations", get(api::storage::locations))
         .route("/api/printers/{id}/storage", get(api::storage::list))

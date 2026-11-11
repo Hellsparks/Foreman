@@ -422,3 +422,36 @@
 .fw-browser-foot [role="status"] { display: flex; align-items: center; gap: var(--fw-space-2); }
 
 .fw-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ── Send panel ─────────────────────────────────────────────────────────── */
+
+.fw-send-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-2);
+  border-top: 1px solid var(--fw-border);
+  padding-top: var(--fw-space-3);
+}
+.fw-send-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-1);
+}
+.fw-send-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: var(--fw-space-2);
+  align-items: center;
+  font: var(--fw-type-label) var(--fw-mono);
+}
+.fw-send-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fw-send-reason { color: var(--fw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fw-send-fix { color: var(--fw-muted); font-style: italic; }
+.fw-send-plate {
+  display: flex;
+  align-items: center;
+  gap: var(--fw-space-2);
+  font: var(--fw-type-label) var(--fw-mono);
+  color: var(--fw-warning);
+  padding: var(--fw-space-1) 0;
+}

@@ -1,0 +1,255 @@
+//! Send API (task 3.4): print a Library file on a printer.
+//!
+//! Modes:
+//! - `print_now`: start the print immediately (upload to printer + start).
+//! - `queue`: add to the printer's queue (returns 501 — session 24).
+//! - `fleet_queue`: add to the fleet queue (returns 501 — session 24).
+//!
+//! `GET /api/send/check/{file_id}` returns per-printer compatibility results.
+
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
+use foreman_core::{
+    compat::{self, CompatResult, PrinterSnapshot, Verdict},
+    domain::FileMeta,
+    error::AppError,
+    repo,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use tracing::info;
+use ts_rs::TS;
+
+use crate::state::AppState;
+
+// ---------------------------------------------------------------------------
+// DTOs
+// ---------------------------------------------------------------------------
+
+/// Request body for `POST /api/send`.
+#[derive(Debug, Deserialize)]
+pub struct SendRequest {
+    /// Library entry id of the file to print.
+    pub file_id: i64,
+    /// Target printer id (required for `print_now` and `queue`).
+    pub printer_id: Option<i64>,
+    /// `print_now` | `queue` | `fleet_queue`.
+    pub mode: String,
+    /// For `print_now`: the user confirms the plate is clear.
+    #[serde(default)]
+    pub plate_confirm: bool,
+}
+
+/// Successful `print_now` response.
+#[derive(Debug, Serialize, TS)]
+#[ts(export)]
+pub struct SendResult {
+    pub ok: bool,
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+/// `GET /api/send/check/{file_id}` — compatibility check for every printer.
+pub async fn check_file(
+    State(state): State<AppState>,
+    Path(file_id): Path<i64>,
+) -> Result<Json<Vec<CompatResult>>, (StatusCode, Json<serde_json::Value>)> {
+    let meta = get_file_meta(&state, file_id).await.map_err(api_err)?;
+
+    let snapshots = build_snapshots(&state).await;
+    let results = compat::check_all(&meta, &snapshots);
+    Ok(Json(results))
+}
+
+/// `POST /api/send` — send a file to a printer.
+pub async fn send_file(
+    State(state): State<AppState>,
+    Json(req): Json<SendRequest>,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    match req.mode.as_str() {
+        "print_now" => print_now(state, req).await,
+        "queue" => Err((
+            StatusCode::NOT_IMPLEMENTED,
+            Json(json!({ "error": "queue mode is not yet implemented (coming in session 24)" })),
+        )),
+        "fleet_queue" => Err((
+            StatusCode::NOT_IMPLEMENTED,
+            Json(
+                json!({ "error": "fleet_queue mode is not yet implemented (coming in session 24)" }),
+            ),
+        )),
+        other => Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("unknown mode: {other}") })),
+        )),
+    }
+}
+
+/// Print now: upload the file to the printer's storage and start printing.
+async fn print_now(
+    state: AppState,
+    req: SendRequest,
+) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let printer_id = req.printer_id.ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "printer_id required for print_now" })),
+        )
+    })?;
+
+    // 1. Fetch file details.
+    let meta = get_file_meta(&state, req.file_id).await.map_err(api_err)?;
+
+    // 2. Run compatibility check.
+    let snap = build_snapshot_for(&state, printer_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "printer not found" })),
+            )
+        })?;
+    let compat_result = compat::check(&meta, &snap);
+
+    // Allow Ready, or Plate if the user confirmed.
+    match &compat_result.verdict {
+        Verdict::Ready => {}
+        Verdict::Plate if req.plate_confirm => {
+            // User says plate is clear — mark it.
+            let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, true).await;
+        }
+        other => {
+            return Err((
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": format!("printer not ready: {}", compat_result.reason),
+                    "verdict": other,
+                    "reason": compat_result.reason,
+                })),
+            ));
+        }
+    }
+
+    // 3. Read the file from the Library.
+    let entry = state.library.get(req.file_id).await.map_err(api_err)?;
+    let abs_path = state
+        .library
+        .file_path(req.file_id)
+        .await
+        .map_err(api_err)?;
+
+    // 4. Get the printer's storage and upload the file.
+    let (_name, storage) = state
+        .driver_manager
+        .storage(printer_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": "printer has no accessible storage" })),
+            )
+        })?;
+
+    let dest_name = entry.name.clone();
+    let progress = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    storage
+        .upload(&dest_name, &abs_path, progress)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": format!("upload failed: {e}") })),
+            )
+        })?;
+
+    // 5. Start the print.
+    let driver = state
+        .driver_manager
+        .get_driver(printer_id)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({ "error": "no driver for printer" })),
+            )
+        })?;
+    driver.start_print(&dest_name).await.map_err(|e| {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({ "error": format!("start_print failed: {e}") })),
+        )
+    })?;
+
+    info!(printer_id, file = %dest_name, "print_now: print started");
+
+    // 6. Mark plate as not clear (a print is starting).
+    let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, false).await;
+
+    Ok((
+        StatusCode::OK,
+        Json(SendResult {
+            ok: true,
+            message: format!("Printing {} on printer {}", dest_name, printer_id),
+        }),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Get the full parsed metadata for a library file.
+async fn get_file_meta(state: &AppState, file_id: i64) -> Result<FileMeta, AppError> {
+    let details = state.library.details(file_id).await?;
+    details.meta.ok_or_else(|| {
+        AppError::InvalidInput("file has no parsed metadata (not a printable file?)".into())
+    })
+}
+
+/// Build a compatibility snapshot for a single printer.
+async fn build_snapshot_for(state: &AppState, printer_id: i64) -> Option<PrinterSnapshot> {
+    let printer = repo::printer::get(&state.foreman_db.pool, printer_id)
+        .await
+        .ok()?;
+    let caps = state.driver_manager.get_capabilities(printer_id).await;
+    let status = state.driver_manager.get_status(printer_id).await;
+    Some(PrinterSnapshot {
+        printer,
+        caps,
+        status,
+    })
+}
+
+/// Build compatibility snapshots for all printers.
+async fn build_snapshots(state: &AppState) -> Vec<PrinterSnapshot> {
+    let printers = repo::printer::list(&state.foreman_db.pool)
+        .await
+        .unwrap_or_default();
+    let mut snaps = Vec::with_capacity(printers.len());
+    for p in printers {
+        let caps = state.driver_manager.get_capabilities(p.id).await;
+        let status = state.driver_manager.get_status(p.id).await;
+        snaps.push(PrinterSnapshot {
+            printer: p,
+            caps,
+            status,
+        });
+    }
+    snaps
+}
+
+fn api_err(e: AppError) -> (StatusCode, Json<serde_json::Value>) {
+    let status = match &e {
+        AppError::NotFound(_) => StatusCode::NOT_FOUND,
+        AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    (status, Json(json!({ "error": e.to_string() })))
+}

@@ -60,6 +60,10 @@ const MIGRATIONS: &[&str] = &[
        layer_count INTEGER, bed_width REAL, bed_depth REAL, filament_settings_id TEXT, \
        suggested_spool_id INTEGER, tools_json TEXT NOT NULL DEFAULT '[]', \
        plates_json TEXT NOT NULL DEFAULT '[]', thumb_file TEXT, parsed_at TEXT NOT NULL)",
+    // 0008: slicer profiles per printer + plate-clear + auto-start (3.3 + 3.4).
+    "ALTER TABLE printer ADD COLUMN slicer_profiles TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE printer ADD COLUMN plate_clear INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE printer ADD COLUMN auto_start_from_queue INTEGER NOT NULL DEFAULT 1",
 ];
 
 /// Foreman-native database handle.

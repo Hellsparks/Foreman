@@ -262,6 +262,7 @@ mod tests {
                 access_code: None,
                 tags: vec![],
                 hardened_nozzle: false,
+                slicer_profiles: vec![],
                 sort_order: None,
                 fail_after_checks: None,
                 return_after_secs: None,

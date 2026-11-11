@@ -1,12 +1,14 @@
-/** Library browser API: Library store, printer G-code storage, transfers (task 3.2). */
+/** Library browser API: Library store, printer G-code storage, transfers (task 3.2), send (task 3.4). */
 import { request } from "./client";
 import { apiUrl, authHeaders } from "./conn";
+import type { CompatResult } from "./types/CompatResult";
 import type { LibraryEntry } from "./types/LibraryEntry";
 import type { LibraryFileDetails } from "./types/LibraryFileDetails";
+import type { SendResult } from "./types/SendResult";
 import type { StorageEntry } from "./types/StorageEntry";
 import type { TransferInfo } from "./types/TransferInfo";
 
-export type { LibraryEntry, LibraryFileDetails, StorageEntry, TransferInfo };
+export type { CompatResult, LibraryEntry, LibraryFileDetails, SendResult, StorageEntry, TransferInfo };
 
 export type LocRef =
   | { kind: "library"; path: string }
@@ -114,4 +116,12 @@ export const transfers = {
     if (res.status === 409 || res.ok) return json as StartOutcome;
     throw new Error((json && typeof json.error === "string" && json.error) || `transfer → ${res.status}`);
   },
+};
+
+export const send = {
+  /** Compatibility check: returns per-printer verdicts for a library file. */
+  check: (fileId: number) => request<CompatResult[]>("GET", `/api/send/check/${fileId}`),
+  /** Send a file to a printer (print_now, queue, fleet_queue). */
+  send: (body: { file_id: number; printer_id?: number; mode: string; plate_confirm?: boolean }) =>
+    request<SendResult>("POST", "/api/send", body),
 };

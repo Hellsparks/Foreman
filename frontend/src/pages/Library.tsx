@@ -7,8 +7,10 @@ import { useSignedUrl } from "../hooks/useSignedUrl";
 import { signedUrl } from "../api/conn";
 import {
   lib,
+  send,
   storage,
   transfers,
+  type CompatResult,
   type ConflictInfo,
   type LibraryEntry,
   type LibraryFileDetails,
@@ -306,9 +308,15 @@ export default function Library() {
   const isTrash = where.kind === "trash";
   const selLibId = sel && !sel.isDir && !isTrash ? sel.libId : undefined;
 
+  const [compat, setCompat] = useState<CompatResult[]>([]);
+  const [sendBusy, setSendBusy] = useState(false);
+  const [plateConfirm, setPlateConfirm] = useState(false);
+
   useEffect(() => {
     setDetails(null);
+    setCompat([]);
     setDelArm(false);
+    setPlateConfirm(false);
     if (sel) setRname(sel.name);
   }, [sel?.key]);
 
@@ -316,10 +324,31 @@ export default function Library() {
     if (selLibId == null) return;
     let live = true;
     lib.details(selLibId).then((d) => live && setDetails(d)).catch(() => {});
+    send.check(selLibId).then((r) => live && setCompat(r)).catch(() => {});
     return () => {
       live = false;
     };
   }, [selLibId]);
+
+  const selIsPrintable = sel && !sel.isDir && sel.kind !== "STL" && sel.kind !== "folder";
+
+  const doPrintNow = async (printerId: number) => {
+    if (!sel?.libId || sendBusy) return;
+    setSendBusy(true);
+    try {
+      const r = await send.send({
+        file_id: sel.libId,
+        printer_id: printerId,
+        mode: "print_now",
+        plate_confirm: plateConfirm,
+      });
+      setNotice(r.message);
+    } catch (e) {
+      setNotice(errText(e));
+    } finally {
+      setSendBusy(false);
+    }
+  };
 
   // ── navigation ───────────────────────────────────────────────────────────
 
@@ -1092,16 +1121,11 @@ export default function Library() {
                   </button>
                 ) : (
                   <>
-                    {!sel.isDir &&
-                      (sel.kind === "STL" ? (
-                        <button type="button" className="fb-button" disabled title="STL files must be sliced first">
-                          Slice first to print
-                        </button>
-                      ) : (
-                        <button type="button" className="fb-button fb-primary" disabled title="Send arrives next session">
-                          Send (next session)
-                        </button>
-                      ))}
+                    {!sel.isDir && sel.kind === "STL" && (
+                      <button type="button" className="fb-button" disabled title="STL files must be sliced first">
+                        Slice first to print
+                      </button>
+                    )}
                     <button type="button" className="fb-button" onClick={() => clipItems([sel], "copy")}>
                       Copy
                     </button>
@@ -1137,6 +1161,61 @@ export default function Library() {
                   </>
                 )}
               </div>
+              {selIsPrintable && compat.length > 0 && (
+                <div className="fw-send-panel">
+                  <span className="fw-inspector-eyebrow">SEND TO PRINTER</span>
+                  <div className="fw-send-list">
+                    {compat.map((c) => {
+                      const verdictColor =
+                        c.verdict === "ready"
+                          ? "var(--fw-success)"
+                          : c.verdict === "plate"
+                            ? "var(--fw-warning)"
+                            : c.verdict === "busy" || c.verdict === "offline"
+                              ? "var(--fw-muted)"
+                              : "var(--fw-danger)";
+                      return (
+                        <div key={Number(c.printer_id)} className="fw-send-row">
+                          <span style={{ color: verdictColor }}>●</span>
+                          <span className="fw-send-name">{c.printer_name}</span>
+                          <span className="fw-send-reason">{c.reason}</span>
+                          {(c.verdict === "ready" || c.verdict === "plate") && (
+                            <button
+                              type="button"
+                              className="fb-button fb-primary fb-small"
+                              disabled={sendBusy || (c.verdict === "plate" && !plateConfirm)}
+                              onClick={() => void doPrintNow(Number(c.printer_id))}
+                            >
+                              Print now
+                            </button>
+                          )}
+                          {c.quick_fix && c.verdict !== "ready" && c.verdict !== "plate" && (
+                            <span className="fw-send-fix">{c.quick_fix}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {compat.some((c) => c.verdict === "plate") && (
+                    <label className="fw-send-plate">
+                      <input
+                        type="checkbox"
+                        checked={plateConfirm}
+                        onChange={(e) => setPlateConfirm(e.target.checked)}
+                      />
+                      Plate is clear — I removed the last print
+                    </label>
+                  )}
+                  <div className="fw-browser-actions">
+                    <button type="button" className="fb-button" disabled title="Queue — coming next session">
+                      Queue
+                    </button>
+                    <button type="button" className="fb-button" disabled title="Fleet queue — coming next session">
+                      Fleet queue
+                    </button>
+                  </div>
+                </div>
+              )}
               {!isTrash && (
                 <div className="fw-browser-form" style={{ padding: 0, border: 0 }}>
                   <label>
