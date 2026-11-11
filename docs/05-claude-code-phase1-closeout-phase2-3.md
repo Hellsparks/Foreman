@@ -240,7 +240,7 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 - [x] `usage_reporter = moonraker | foreman` per printer: deduct exactly once (Moonraker `[spoolman]` reports itself). *(session 25; `auto` default)*
 - [x] Outcome rating (good / failed + reason) from Attention or job history. *(session 25)*
 - [x] Job history + basic stats endpoints (filters: printer, material, spool, outcome). *(session 25, + History and Stats tabs)*
-- [ ] Real short print on HellV0 to close Phase 3 (owner).
+- [x] Real print on HellV0 to close Phase 3 (owner, session 25: one cancel + two simulated jobs; see log).
 
 **Phase 3 done =** upload from OrcaSlicer → Library → Send → prints on a mock printer → job recorded, filament deducted once, Attention asks to clear the plate, next fleet-queue job starts after "Plate cleared".
 
@@ -289,6 +289,13 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 - **HellV0 today:** its `[spoolman]` points at `http://localhost:32000` and reports `spoolman_connected: false`, so `auto` resolves to **Foreman** for it (read-only check of `/server/spoolman/status`).
 - **Attention:** `attention_item.job_id` links the "clear the plate" item to its job; the Fleet strip shows **✓ Good / ✖ Failed** (+ reason chips: adhesion, spaghetti, layer shift, clog, warping, other) next to **Plate cleared**. Title says finished / cancelled / stopped with an error.
 - **API:** `GET /api/jobs` (printer_id, from, to, material, spool_id, outcome = good|failed|cancelled|unrated|running, q, limit, offset), `GET/PATCH/DELETE /api/jobs/{id}`, `GET /api/jobs/stats?from&to` (default 7 days): hours, jobs, good/failed/cancelled/unrated, success rate = 1 − failed ÷ (jobs − cancelled − running), grams, per printer (hours, jobs, failure rate, utilization % of the period), by material, by spool. Plain SQL with SQLite `json_each`; no new deps. Job changes broadcast the `job` topic.
+- **Real printer (HellV0, owner present; Foreman never sent a start command itself):**
+  - Job #1 `Cylinder_PLA_4m31s.gcode`, Print now, cancelled by the owner after 76 s in heat-up → `cancelled`, 0 mm extruded → 0 g, spool unchanged, plate item "print cancelled". Moonraker history agrees (cancelled, filament_used 0).
+  - The owner pointed HellV0's `[spoolman]` at Foreman (`http://10.0.0.10:7912`); ufw on the dev PC dropped it (timeout) until `sudo ufw allow from 10.0.0.0/24 to any port 7912 proto tcp`. Spool #1 (Clas Ohlson PLA Grey, 500 g left) created in the built-in Spoolman and set active in Mainsail.
+  - **Bug found live and fixed:** `DriverManager` cached capabilities 2 s after connect, so the job engine still saw `spoolman_connected=false` after Moonraker linked → it would have picked Foreman *and* Moonraker would report (double deduction). `get_capabilities` now reads the spoolman fields live from the driver (regression test).
+  - Jobs #2 and #3: a simulated file (Orca metadata kept; body = `M109 S200`, `G1 E30`, no homing) → both `complete`, `usage_reporter=moonraker`, `deduct_state=skipped`, Foreman deducted 0; spool #1 rose by +0.089 g per run (Moonraker), matching 30 mm of PLA. Job #3 was started by "Start next now" from a printer-queue item (the owner had added the file 6 times; leftovers removed). Plate item raised after each end and cleared by the owner; job #3 rated Good via `PATCH /api/jobs/3`.
+  - Stats after: 3 jobs, 1 good / 1 cancelled / 1 unrated, success 100 %, 0.18 g PLA on spool #1 (2 jobs; a 0 g job no longer counts toward a spool/material — fixed).
+  - Not exercised on hardware: Foreman-side deduction of a non-zero amount (HellV0 now reports via Moonraker); covered by the mock and live-spoolman-rs tests.
 - **UI:** Jobs → History (search, outcome segment incl. "Not rated", printer, material, spool, date range; thumbnail, file, printer, finished, time, grams + spool, outcome; inspector with facts, outcome + reason, delete record) and Stats (7 d / 30 d / 90 d / 1 y; KPIs; utilization; filament by material and by spool). Not built from the reference: material cost (needs spool prices) and "Reprint → Send panel" (links to the Library).
 
 ### Session 24 — 2026-11-11 (3.5 queues + scheduler + Jobs queue board)
