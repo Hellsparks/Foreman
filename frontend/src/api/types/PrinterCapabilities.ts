@@ -44,4 +44,14 @@ camera_type: string | null,
 /**
  * Printer model string derived from serial prefix (Bambu).
  */
-printer_model: string | null, };
+printer_model: string | null, 
+/**
+ * Moonraker's `[spoolman]` link: Some(true) when Moonraker reports it is
+ * connected to a Spoolman server (it then reports filament use itself).
+ * None when the component is not configured or unknown.
+ */
+spoolman_connected: boolean | null, 
+/**
+ * Moonraker's active spool id (`server.spoolman.get_spool_id`).
+ */
+spoolman_spool_id: number | null, };

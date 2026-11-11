@@ -263,6 +263,7 @@ impl TestCachedStatus {
             fans: Some(self.fans.clone()),
             ams_trays: self.ams_trays.clone(),
             hms_codes: self.hms_codes.clone(),
+            ..Default::default()
         }
     }
 }

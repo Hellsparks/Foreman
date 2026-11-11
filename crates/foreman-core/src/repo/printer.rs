@@ -7,7 +7,7 @@ use chrono::Utc;
 use sqlx::{FromRow, SqlitePool};
 
 use crate::{
-    domain::{CreatePrinter, FirmwareKind, Printer, UpdatePrinter},
+    domain::{CreatePrinter, FirmwareKind, Printer, UpdatePrinter, UsageReporter},
     error::AppError,
 };
 
@@ -33,6 +33,7 @@ struct PrinterRow {
     return_after_secs: i64,
     plate_clear: i64,
     auto_start_from_queue: i64,
+    usage_reporter: String,
     created_at: String,
     updated_at: String,
 }
@@ -93,6 +94,7 @@ impl PrinterRow {
             return_after_secs: self.return_after_secs,
             plate_clear: self.plate_clear != 0,
             auto_start_from_queue: self.auto_start_from_queue != 0,
+            usage_reporter: UsageReporter::parse(&self.usage_reporter),
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         })
@@ -107,14 +109,14 @@ const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     created_at, updated_at \
+     usage_reporter, created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     created_at, updated_at \
+     usage_reporter, created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.
@@ -200,6 +202,10 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     let auto_start: i64 = req
         .auto_start_from_queue
         .unwrap_or(current.auto_start_from_queue) as i64;
+    let usage_reporter = req
+        .usage_reporter
+        .unwrap_or(current.usage_reporter)
+        .as_str();
     let now = Utc::now().to_rfc3339();
 
     sqlx::query(
@@ -207,7 +213,7 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
          SET name=?, firmware=?, primary_url=?, api_key=?, serial_number=?, \
              access_code=?, tags=?, hardened_nozzle=?, slicer_profiles=?, \
              sort_order=?, fail_after_checks=?, return_after_secs=?, \
-             plate_clear=?, auto_start_from_queue=?, updated_at=? \
+             plate_clear=?, auto_start_from_queue=?, usage_reporter=?, updated_at=? \
          WHERE id=?",
     )
     .bind(&name)
@@ -224,6 +230,7 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     .bind(return_after_secs)
     .bind(plate_clear)
     .bind(auto_start)
+    .bind(usage_reporter)
     .bind(&now)
     .bind(id)
     .execute(pool)
@@ -377,6 +384,7 @@ mod tests {
                 return_after_secs: None,
                 plate_clear: None,
                 auto_start_from_queue: None,
+                usage_reporter: None,
             },
         )
         .await

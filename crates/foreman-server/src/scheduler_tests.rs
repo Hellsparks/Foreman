@@ -11,6 +11,7 @@ use foreman_core::{
     compat::PrinterSnapshot,
     db::ForemanDb,
     domain::{FileMeta, QueueSource, QueueStatus, ToolUsage},
+    driver::PrinterCapabilities,
     error::AppError,
     events::{AmsTray, PrinterState, PrinterStatus, ServerEvent},
     repo,
@@ -30,6 +31,8 @@ struct Mock {
     uploads: Vec<(i64, i64)>,
     starts: Vec<(i64, String)>,
     fail_upload: bool,
+    caps: HashMap<i64, PrinterCapabilities>,
+    deductions: Vec<(i64, f64)>,
 }
 
 struct MockEnv {
@@ -60,7 +63,7 @@ impl SchedEnv for MockEnv {
             .into_iter()
             .map(|p| PrinterSnapshot {
                 status: m.status.get(&p.id).cloned(),
-                caps: None,
+                caps: m.caps.get(&p.id).cloned(),
                 printer: p,
             })
             .collect()
@@ -85,6 +88,10 @@ impl SchedEnv for MockEnv {
     }
     async fn start(&self, printer_id: i64, name: &str) -> Result<(), AppError> {
         self.lock().starts.push((printer_id, name.to_owned()));
+        Ok(())
+    }
+    async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
+        self.lock().deductions.push((spool_id, grams));
         Ok(())
     }
 }
@@ -508,4 +515,423 @@ async fn incompatible_fleet_item_is_skipped_not_blocking() {
     assert_eq!(r.tick().await, 1);
     assert_eq!(r.status_of(pla).await, QueueStatus::Waiting);
     assert_eq!(r.lane_of(petg).await, Some(2));
+}
+
+// ---------------------------------------------------------------------------
+// Job engine (3.6)
+// ---------------------------------------------------------------------------
+
+mod jobs {
+    use super::*;
+    use crate::job_engine;
+    use foreman_core::{
+        domain::{Job, JobEnd, JobOutcome, UpdatePrinter, UsageReporter},
+        events::PrintEnd,
+    };
+
+    /// A PLA file: 12.5 g / 4000 mm on tool 0, preset names spool #7.
+    fn spool_file() -> FileMeta {
+        FileMeta {
+            format: "gcode".into(),
+            parse_status: "ok".into(),
+            tools: vec![ToolUsage {
+                index: 0,
+                material: Some("PLA".into()),
+                colour: Some("#FFFFFF".into()),
+                grams: Some(12.5),
+                mm: Some(4000.0),
+                spool_id: Some(7),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
+
+    fn st(state: PrinterState, end: Option<PrintEnd>) -> PrinterStatus {
+        PrinterStatus {
+            state,
+            print_end: end,
+            filename: Some("file10.gcode".into()),
+            ..Default::default()
+        }
+    }
+
+    impl Rig {
+        async fn push(&self, pid: i64, s: PrinterStatus) -> bool {
+            self.env.lock().status.insert(pid, s.clone());
+            self.sched.on_status(pid, &s).await
+        }
+        async fn jobs(&self) -> Vec<Job> {
+            repo::job::list(
+                &self.pool,
+                &repo::job::JobFilter {
+                    limit: 100,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("jobs")
+            .0
+        }
+        fn deductions(&self) -> Vec<(i64, f64)> {
+            self.env.lock().deductions.clone()
+        }
+        /// Queue spool_file on Alpha and dispatch it (Bravo offline).
+        async fn start_one(&self) -> i64 {
+            self.file(10, spool_file());
+            self.env.set_state(2, PrinterState::Offline);
+            let id = self.add(10, Some(1)).await;
+            assert_eq!(self.tick().await, 1);
+            id
+        }
+    }
+
+    #[tokio::test]
+    async fn mock_print_start_to_finish_writes_job_deducts_once_raises_plate_item() {
+        let r = rig(None).await;
+        let item = r.start_one().await;
+        // The job opens when Foreman sends the start command.
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 1);
+        let j = &jobs[0];
+        assert_eq!(j.end, JobEnd::Running);
+        assert_eq!(
+            (j.printer_id, j.file_id, j.queue_item_id),
+            (Some(1), Some(10), Some(item))
+        );
+        assert_eq!(j.file_name, "file10.gcode");
+        assert_eq!(j.grams_planned, Some(12.5));
+        assert_eq!(j.usage_reporter, "foreman");
+        assert_eq!(j.tools[0].spool_id, Some(7));
+
+        // Printer reports printing: still one job.
+        r.push(1, st(PrinterState::Printing, None)).await;
+        assert_eq!(r.jobs().await.len(), 1);
+
+        // Klipper "complete".
+        assert!(
+            r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+                .await
+        );
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Complete);
+        assert_eq!(j.outcome, None, "a clean finish waits for a rating");
+        assert!(j.ended_at.is_some() && j.duration_secs.is_some());
+        assert_eq!(j.grams_used, Some(12.5));
+        assert_eq!(j.grams_deducted, 12.5);
+        assert_eq!(r.deductions(), vec![(7, 12.5)]);
+        assert_eq!(r.status_of(item).await, QueueStatus::Done);
+
+        // Plate gate + Attention linked to the job.
+        assert!(!r.plate(1).await);
+        let att = repo::attention::get_active_by_printer_kind(&r.pool, 1, PLATE_ATTENTION)
+            .await
+            .expect("q")
+            .expect("plate item");
+        assert_eq!(att.job_id, Some(j.id));
+        assert!(att.title.contains("print finished"), "{}", att.title);
+
+        // Repeats never deduct again: the same end event, and a direct retry.
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        job_engine::deduct_once(&r.pool, r.env.as_ref(), j.id, "foreman", j.tools.clone())
+            .await
+            .expect("retry");
+        assert_eq!(r.deductions().len(), 1);
+        assert_eq!(r.jobs().await.len(), 1);
+
+        // Rating from the Attention item.
+        let rated = repo::job::set_outcome(&r.pool, j.id, JobOutcome::Good, None)
+            .await
+            .expect("rate");
+        assert_eq!(rated.outcome, Some(JobOutcome::Good));
+    }
+
+    #[tokio::test]
+    async fn job_events_are_broadcast() {
+        let mut r = rig(None).await;
+        r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        let mut kinds = Vec::new();
+        while let Ok(ev) = r.rx.try_recv() {
+            if let ServerEvent::Job { payload, .. } = ev {
+                kinds.push(payload["kind"].as_str().unwrap_or("").to_owned());
+            }
+        }
+        assert_eq!(kinds, ["started", "ended"]);
+    }
+
+    #[tokio::test]
+    async fn cancel_is_not_a_clean_finish() {
+        let r = rig(None).await;
+        let item = r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        // Klipper "cancelled" at 40 %: 1600 of 4000 mm extruded.
+        let mut s = st(PrinterState::Idle, Some(PrintEnd::Cancelled));
+        s.filament_used_mm = Some(1600.0);
+        s.progress = Some(0.9); // mm wins over progress when both are known
+        r.push(1, s).await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Cancelled);
+        assert_eq!(j.outcome, Some(JobOutcome::Cancelled));
+        assert_eq!(j.grams_used, Some(5.0));
+        assert_eq!(r.deductions(), vec![(7, 5.0)]);
+        assert_eq!(r.status_of(item).await, QueueStatus::Cancelled);
+        let att = repo::attention::get_active_by_printer_kind(&r.pool, 1, PLATE_ATTENTION)
+            .await
+            .expect("q")
+            .expect("plate item");
+        assert!(att.title.contains("cancelled"), "{}", att.title);
+    }
+
+    #[tokio::test]
+    async fn error_is_failed_with_the_printer_message() {
+        let r = rig(None).await;
+        let item = r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        let mut s = st(PrinterState::Error, Some(PrintEnd::Error));
+        s.print_message = Some("Heater extruder not heating at expected rate".into());
+        s.progress = Some(0.2);
+        r.push(1, s).await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Error);
+        assert_eq!(j.outcome, Some(JobOutcome::Failed));
+        assert_eq!(
+            j.error.as_deref(),
+            Some("Heater extruder not heating at expected rate")
+        );
+        assert_eq!(j.grams_used, Some(2.5));
+        assert_eq!(r.deductions(), vec![(7, 2.5)]);
+        assert_eq!(r.status_of(item).await, QueueStatus::Failed);
+    }
+
+    #[tokio::test]
+    async fn bambu_style_failed_without_hms_is_idle_but_still_an_error_end() {
+        // Bambu FAILED with no HMS codes maps to Idle; print_end says Error.
+        let r = rig(None).await;
+        r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Error)))
+            .await;
+        assert_eq!(r.jobs().await[0].outcome, Some(JobOutcome::Failed));
+    }
+
+    #[tokio::test]
+    async fn restart_mid_print_deducts_once() {
+        let r = rig(None).await;
+        r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+
+        // Server restarts while printing: a fresh scheduler on the same DB.
+        let (tx, _) = broadcast::channel(64);
+        let s2 = Scheduler::new(r.pool.clone(), Arc::new(tx), r.env.clone());
+        let printing = st(PrinterState::Printing, None);
+        s2.on_status(1, &printing).await;
+        assert_eq!(r.jobs().await.len(), 1, "re-attaches, no second job");
+        s2.on_status(1, &st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.deductions(), vec![(7, 12.5)]);
+
+        // Another restart after the end: the stale "complete" state is not a new end.
+        let (tx, _) = broadcast::channel(64);
+        let s3 = Scheduler::new(r.pool.clone(), Arc::new(tx), r.env.clone());
+        s3.on_status(1, &st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.deductions().len(), 1);
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].end, JobEnd::Complete);
+    }
+
+    #[tokio::test]
+    async fn print_that_ended_while_foreman_was_down_is_closed_once() {
+        let r = rig(None).await;
+        r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        // Down; the print finishes; Foreman starts and first sees "complete".
+        let (tx, _) = broadcast::channel(64);
+        let s2 = Scheduler::new(r.pool.clone(), Arc::new(tx), r.env.clone());
+        s2.on_status(1, &st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Complete);
+        assert_eq!(r.deductions(), vec![(7, 12.5)]);
+        assert!(
+            repo::attention::get_active_by_printer_kind(&r.pool, 1, PLATE_ATTENTION)
+                .await
+                .expect("q")
+                .is_some()
+        );
+        // Back from offline later: no second end.
+        s2.on_status(1, &st(PrinterState::Offline, None)).await;
+        s2.on_status(1, &st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.deductions().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn moonraker_reporter_printers_are_not_deducted_by_foreman() {
+        let r = rig(None).await;
+        // Alpha's Moonraker has a working [spoolman] link, active spool #42.
+        r.env.lock().caps.insert(
+            1,
+            PrinterCapabilities {
+                spoolman_connected: Some(true),
+                spoolman_spool_id: Some(42),
+                ..Default::default()
+            },
+        );
+        let mut f = spool_file();
+        f.tools[0].spool_id = None;
+        r.file(10, f);
+        r.env.set_state(2, PrinterState::Offline);
+        r.add(10, Some(1)).await;
+        assert_eq!(r.tick().await, 1);
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.usage_reporter, "moonraker");
+        assert_eq!(j.grams_used, Some(12.5), "use is still recorded for stats");
+        assert_eq!(j.grams_deducted, 0.0);
+        assert_eq!(
+            j.tools[0].spool_id,
+            Some(42),
+            "Moonraker's active spool is recorded"
+        );
+        assert!(r.deductions().is_empty());
+        assert_eq!(
+            repo::job::deduct_state(&r.pool, j.id).await.expect("state"),
+            "skipped"
+        );
+
+        // Forcing usage_reporter = foreman on the same printer makes Foreman deduct.
+        repo::printer::update(
+            &r.pool,
+            1,
+            UpdatePrinter {
+                name: None,
+                firmware: None,
+                primary_url: None,
+                api_key: None,
+                serial_number: None,
+                access_code: None,
+                tags: None,
+                hardened_nozzle: None,
+                slicer_profiles: None,
+                sort_order: None,
+                fail_after_checks: None,
+                return_after_secs: None,
+                plate_clear: Some(true),
+                auto_start_from_queue: None,
+                usage_reporter: Some(UsageReporter::Foreman),
+            },
+        )
+        .await
+        .expect("update");
+        r.add(10, Some(1)).await;
+        assert_eq!(r.tick().await, 1);
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.deductions(), vec![(42, 12.5)]);
+    }
+
+    #[tokio::test]
+    async fn moonraker_without_a_spoolman_link_is_deducted_by_foreman() {
+        let r = rig(None).await;
+        r.env.lock().caps.insert(
+            1,
+            PrinterCapabilities {
+                spoolman_connected: Some(false),
+                ..Default::default()
+            },
+        );
+        r.start_one().await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.jobs().await[0].usage_reporter, "foreman");
+        assert_eq!(r.deductions(), vec![(7, 12.5)]);
+    }
+
+    #[tokio::test]
+    async fn print_started_on_the_printer_is_recorded_without_deduction() {
+        let r = rig(None).await;
+        r.env.set_state(2, PrinterState::Offline);
+        let mut s = st(PrinterState::Printing, None);
+        s.filename = Some("from_mainsail.gcode".into());
+        r.push(1, s).await;
+        let j = &r.jobs().await[0];
+        assert_eq!(
+            (j.file_id, j.file_name.as_str()),
+            (None, "from_mainsail.gcode")
+        );
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        assert_eq!(r.jobs().await[0].end, JobEnd::Complete);
+        assert!(
+            r.deductions().is_empty(),
+            "no plan, no spool: nothing to deduct"
+        );
+        assert!(!r.plate(1).await);
+    }
+}
+
+/// The live deduction path: spoolman-rs `use_weight` on a real SQLite Spoolman DB.
+#[tokio::test]
+async fn live_spoolman_deduction_updates_the_spool_and_broadcasts() {
+    use spoolman_rs::{
+        config::{DbType, SpoolmanConfig},
+        db::{filament, spool, Db},
+        models::{CreateFilamentRequest, CreateSpoolRequest},
+        state::AppState,
+    };
+    let dir = tempfile::TempDir::new().expect("tmp");
+    let cfg = SpoolmanConfig {
+        db_type: DbType::Sqlite,
+        db_host: None,
+        db_port: None,
+        db_name: None,
+        db_username: None,
+        db_password: None,
+        data_dir: dir.path().to_path_buf(),
+        logs_dir: dir.path().to_path_buf(),
+        backups_dir: dir.path().join("backups"),
+        host: "127.0.0.1".into(),
+        port: 0,
+        base_path: String::new(),
+        automatic_backup: false,
+    };
+    let db = Db::connect(&cfg).await.expect("spoolman db");
+    let f: CreateFilamentRequest = serde_json::from_value(
+        serde_json::json!({"density": 1.24, "diameter": 1.75, "material": "PLA"}),
+    )
+    .expect("filament req");
+    let f = filament::create(&db.pool, &db.engine, &f)
+        .await
+        .expect("filament");
+    let s: CreateSpoolRequest =
+        serde_json::from_value(serde_json::json!({"filament_id": f.id, "initial_weight": 1000.0}))
+            .expect("spool req");
+    let s = spool::create(&db.pool, &db.engine, &s)
+        .await
+        .expect("spool");
+    let sm = AppState::new(db, cfg);
+    let mut events = sm.event_tx.subscribe();
+
+    crate::scheduler::spoolman_deduct(&sm, s.id, 12.5)
+        .await
+        .expect("deduct");
+    let after = spool::find_by_id(&sm.db.pool, s.id).await.expect("spool");
+    assert_eq!(after.used_weight, 12.5);
+    assert!(
+        events.try_recv().is_ok(),
+        "spool update broadcast to Spoolman clients"
+    );
+    assert!(crate::scheduler::spoolman_deduct(&sm, 9999, 1.0)
+        .await
+        .is_err());
 }

@@ -325,6 +325,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
   const [paths, setPaths] = useState<LocalPathS[]>([]);
   const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
   const [returnAfter, setReturnAfter] = useState(printer.return_after_secs ?? 60);
+  const [reporter, setReporter] = useState(printer.usage_reporter ?? "auto");
   const [authValue, setAuthValue] = useState(
     printer.firmware === "bambu" ? (printer.access_code ?? "") : (printer.api_key ?? "")
   );
@@ -399,6 +400,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
       await api.updatePrinter(printer.id, {
         fail_after_checks: failAfter,
         return_after_secs: returnAfter,
+        usage_reporter: reporter,
         ...(printer.firmware === "bambu"
           ? { access_code: authValue }
           : { api_key: authValue }),
@@ -623,6 +625,24 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             {RETURN_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: "bold" }}>Filament use reported by</span>
+          <select
+            value={reporter}
+            onChange={(e) => setReporter(e.target.value as "auto" | "moonraker" | "foreman")}
+            style={{
+              minHeight: 32,
+              border: "1px solid var(--fw-muted)",
+              background: "var(--fw-raised)",
+              padding: "0 8px",
+              borderRadius: 2,
+            }}
+          >
+            <option value="auto">Auto (Moonraker if linked to Spoolman)</option>
+            <option value="moonraker">Moonraker [spoolman]</option>
+            <option value="foreman">Foreman (from the file)</option>
           </select>
         </label>
       </div>

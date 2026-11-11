@@ -58,6 +58,7 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
             pool: db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
+            spoolman: Arc::new(std::sync::OnceLock::new()),
         }),
     );
     let state = AppState {
@@ -634,12 +635,29 @@ async fn octoprint_upload_with_api_key_lands_in_slicer_inbox() {
         "Slicer inbox/LED carrier.gcode"
     );
     assert!(h.get(header::LOCATION).is_some());
+    // "Allow print from slicer" is off by default: print=true only stores the file.
     let (s, _, _) = raw(&app, send("true")).await;
-    assert_eq!(
-        s,
-        StatusCode::CREATED,
-        "print flag accepted (Send not built yet)"
-    );
+    assert_eq!(s, StatusCode::CREATED);
+    let board = foreman_core::repo::queue::list_board(&state.foreman_db.pool)
+        .await
+        .expect("board");
+    assert!(board.is_empty(), "nothing queued while the gate is off");
+    // Turned on, the slicer's "upload and print" joins the fleet queue.
+    foreman_core::repo::setting::set(
+        &state.foreman_db.pool,
+        crate::api::library::SETTING_ALLOW_SLICER_PRINT,
+        "true",
+    )
+    .await
+    .expect("setting");
+    let (s, _, _) = raw(&app, send("true")).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let board = foreman_core::repo::queue::list_board(&state.foreman_db.pool)
+        .await
+        .expect("board");
+    assert_eq!(board.len(), 1);
+    assert_eq!(board[0].printer_id, None);
+    assert_eq!(board[0].source, foreman_core::domain::QueueSource::Slicer);
 
     // Without a key the upload is refused.
     let (ct, body) = multipart(&[], ("x.gcode", b"G28\n"));
@@ -662,7 +680,7 @@ async fn octoprint_upload_with_api_key_lands_in_slicer_inbox() {
     .await;
     assert_eq!(s, StatusCode::OK);
     let entries = list["entries"].as_array().expect("entries");
-    assert_eq!(entries.len(), 2, "second upload kept as a copy");
+    assert_eq!(entries.len(), 3, "later uploads kept as copies");
     let id = entries[0]["id"].as_i64().expect("id");
     let thumb_url = entries[0]["thumb_url"]
         .as_str()
@@ -789,4 +807,116 @@ async fn library_rest_basics() {
     assert_eq!(s, StatusCode::OK);
     let (_, _, v) = call(&app, "GET", "/api/settings/library", &auth, None).await;
     assert_eq!(v["trash_days"], 7);
+    assert_eq!(v["allow_slicer_print"], false, "off by default");
+    let (s, _, v) = call(
+        &app,
+        "PUT",
+        "/api/settings/library",
+        &auth,
+        Some(json!({ "allow_slicer_print": true })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["allow_slicer_print"], true);
+    assert_eq!(v["trash_days"], 7, "partial update keeps trash_days");
+}
+
+#[tokio::test]
+async fn jobs_history_and_stats_rest() {
+    use foreman_core::{
+        domain::{JobEnd, JobTool},
+        repo::job::{self, JobClose, NewJob},
+    };
+    let dir = tempfile::TempDir::new().expect("dir");
+    let (app, state) = app(&dir, true).await;
+    let bearer = format!("Bearer {}", bearer_login(&app).await);
+    let auth = [("authorization", bearer.as_str())];
+    let pool = &state.foreman_db.pool;
+    sqlx::query(
+        "INSERT INTO printer (id, name, firmware, tags, created_at, updated_at) \
+         VALUES (1, 'HellV0', 'moonraker', '[]', 'x', 'x')",
+    )
+    .execute(pool)
+    .await
+    .expect("printer");
+    let tool = JobTool {
+        material: Some("ASA".into()),
+        grams_planned: Some(4.2),
+        grams_used: Some(4.2),
+        spool_id: Some(3),
+        ..Default::default()
+    };
+    let j = job::open(
+        pool,
+        &NewJob {
+            printer_id: 1,
+            printer_name: "HellV0".into(),
+            file_name: "cube.gcode".into(),
+            usage_reporter: "foreman".into(),
+            tools: vec![tool.clone()],
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("open");
+    job::close(
+        pool,
+        j.id,
+        &JobClose {
+            end: JobEnd::Complete,
+            duration_secs: Some(1800),
+            error: None,
+            outcome: None,
+            tools: vec![tool],
+        },
+    )
+    .await
+    .expect("close");
+
+    let (s, _, v) = call(
+        &app,
+        "GET",
+        "/api/jobs?outcome=unrated&material=asa",
+        &auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["total"], 1);
+    assert_eq!(v["jobs"][0]["file_name"], "cube.gcode");
+    assert_eq!(v["jobs"][0]["end"], "complete");
+    let (s, _, _) = call(&app, "GET", "/api/jobs?outcome=nope", &auth, None).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _, _) = call(&app, "GET", "/api/jobs?from=yesterday", &auth, None).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    let path = format!("/api/jobs/{}", j.id);
+    let (s, _, v) = call(
+        &app,
+        "PATCH",
+        &path,
+        &auth,
+        Some(json!({ "outcome": "failed", "fail_reason": "adhesion" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["outcome"], "failed");
+    assert_eq!(v["fail_reason"], "adhesion");
+
+    let (s, _, v) = call(&app, "GET", "/api/jobs/stats", &auth, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["jobs"], 1);
+    assert_eq!(v["failed"], 1);
+    assert_eq!(v["hours"], 0.5);
+    assert_eq!(v["by_material"][0]["key"], "ASA");
+    assert_eq!(v["by_spool"][0]["spool_id"], 3);
+    assert_eq!(v["printers"][0]["failure_rate"], 1.0);
+
+    let (s, _, _) = call(&app, "DELETE", &path, &auth, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _, _) = call(&app, "GET", &path, &auth, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // Unauthenticated is refused.
+    let (s, _, _) = call(&app, "GET", "/api/jobs", &[], None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
 }

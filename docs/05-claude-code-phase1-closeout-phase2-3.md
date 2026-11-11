@@ -236,10 +236,11 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 - [x] Scheduler reacts to events (idle, plate cleared, job added). Auto-start only after **plate cleared** confirmation.
 
 ### 3.6 Job engine (W7)
-- [ ] Detect start/end/cancel/error per driver → job record → filament deduction → Attention item.
-- [ ] `usage_reporter = moonraker | foreman` per printer: deduct exactly once (Moonraker `[spoolman]` reports itself).
-- [ ] Outcome rating (good / failed + reason) from Attention or job history.
-- [ ] Job history + basic stats endpoints (filters: printer, material, spool, outcome).
+- [x] Detect start/end/cancel/error per driver → job record → filament deduction → Attention item. *(session 25)*
+- [x] `usage_reporter = moonraker | foreman` per printer: deduct exactly once (Moonraker `[spoolman]` reports itself). *(session 25; `auto` default)*
+- [x] Outcome rating (good / failed + reason) from Attention or job history. *(session 25)*
+- [x] Job history + basic stats endpoints (filters: printer, material, spool, outcome). *(session 25, + History and Stats tabs)*
+- [ ] Real short print on HellV0 to close Phase 3 (owner).
 
 **Phase 3 done =** upload from OrcaSlicer → Library → Send → prints on a mock printer → job recorded, filament deducted once, Attention asks to clear the plate, next fleet-queue job starts after "Plate cleared".
 
@@ -276,6 +277,19 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 25 — 2026-11-11 (3.6 job engine + History + Stats)
+
+- **Step 0, slicer gate:** there was **no** "Allow print from slicer" setting; session 24 made `print=true` always add the file to the fleet queue. Restored as `library.allow_slicer_print` (default **off**), in `GET/PUT /api/settings/library` and as a checkbox under Settings → Security (next to API keys). Off: the file only lands in the Slicer inbox. Test covers off → nothing queued, on → fleet item with source `slicer`.
+- **End states.** `PrinterStatus` gained `print_end` (`complete | cancelled | error`), `print_message` and `filament_used_mm`. Klipper: `print_stats.state` complete / cancelled / error (kept until the next print or `standby`), `message`, `filament_used`. Moonraker status updates that change state or end now bypass the 2/s throttle, so no start/end is lost. Bambu: `FINISH` = complete; `FAILED` with `print_error` 0x0300400C = cancelled (also when the code arrives after the state), any other `FAILED` = error with the code as the message. The session 24 bug (Klipper cancel marked the queue item *done*) is fixed: cancel → queue item `cancelled`, job outcome `cancelled`.
+- **Job table** (`0010_jobs.sql`): opened when Foreman sends the start (queue dispatch or Print now, with the Library file and per-tool plan) or when a printer starts a print by itself (file name only, no plan). Closed once (`WHERE end_state='running'`). Duration is wall clock start → end. `outcome`: NULL until rated for a clean finish; cancel → `cancelled`; error → `failed` with the printer's message. A printer still printing after a restart, or back from offline, re-attaches to its running job; a print that ended while Foreman was down is closed on the first status Foreman sees. A job Foreman started that never runs (idle 120 s, never seen printing) is closed as an error.
+- **Deduction once:** `deduct_state none → pending` is a conditional update; only the winner deducts, then `done` (or `skipped` for Moonraker reporters). A crash between pending and done never deducts again (under-count preferred over double). Used grams = planned for a full print; for cancel/error, planned × (filament_used_mm ÷ planned mm), else × progress. Deduction goes through spoolman-rs `use_weight` on the built-in Spoolman DB and broadcasts the spool update to its websocket clients.
+- **Reporter:** per printer `usage_reporter = auto | moonraker | foreman` (Settings → printer). `auto` = Moonraker when `server.spoolman.status` says `spoolman_connected: true` (also tracked via `notify_spoolman_status_changed` / `notify_active_spool_set`), else Foreman. The reporter is fixed on the job when it opens.
+- **Which spool:** there is no "Load spool" flow yet (W8), so Foreman deducts from the spool the file names: per-tool `spool_id` from a `… (#ID) - Spoolman` preset, else the file's `suggested_spool_id` for single-tool files. Moonraker's active spool is recorded on the job when it has one. A tool with no spool records its grams but deducts nothing.
+- **HellV0 today:** its `[spoolman]` points at `http://localhost:32000` and reports `spoolman_connected: false`, so `auto` resolves to **Foreman** for it (read-only check of `/server/spoolman/status`).
+- **Attention:** `attention_item.job_id` links the "clear the plate" item to its job; the Fleet strip shows **✓ Good / ✖ Failed** (+ reason chips: adhesion, spaghetti, layer shift, clog, warping, other) next to **Plate cleared**. Title says finished / cancelled / stopped with an error.
+- **API:** `GET /api/jobs` (printer_id, from, to, material, spool_id, outcome = good|failed|cancelled|unrated|running, q, limit, offset), `GET/PATCH/DELETE /api/jobs/{id}`, `GET /api/jobs/stats?from&to` (default 7 days): hours, jobs, good/failed/cancelled/unrated, success rate = 1 − failed ÷ (jobs − cancelled − running), grams, per printer (hours, jobs, failure rate, utilization % of the period), by material, by spool. Plain SQL with SQLite `json_each`; no new deps. Job changes broadcast the `job` topic.
+- **UI:** Jobs → History (search, outcome segment incl. "Not rated", printer, material, spool, date range; thumbnail, file, printer, finished, time, grams + spool, outcome; inspector with facts, outcome + reason, delete record) and Stats (7 d / 30 d / 90 d / 1 y; KPIs; utilization; filament by material and by spool). Not built from the reference: material cost (needs spool prices) and "Reprint → Send panel" (links to the Library).
 
 ### Session 24 — 2026-11-11 (3.5 queues + scheduler + Jobs queue board)
 

@@ -1129,6 +1129,7 @@ mod tests {
             fans: None,
             ams_trays: vec![],
             hms_codes: vec![],
+            ..Default::default()
         }
     }
 

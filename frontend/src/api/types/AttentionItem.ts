@@ -7,4 +7,8 @@ export type AttentionItem = { id: bigint, printer_id: bigint | null,
 /**
  * Kind tag: "offline" | "error" (auto-raised) + future manual kinds.
  */
-kind: string, title: string, body: string | null, created_at: string, };
+kind: string, title: string, body: string | null, 
+/**
+ * The job a "print finished" item is about (rate it Good / Failed).
+ */
+job_id: number | null, created_at: string, };

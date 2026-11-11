@@ -58,6 +58,8 @@ pub struct Printer {
     pub plate_clear: bool,
     /// Whether the scheduler should auto-start queue items on this printer.
     pub auto_start_from_queue: bool,
+    /// Who reports filament use to Spoolman (3.6).
+    pub usage_reporter: UsageReporter,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -116,6 +118,9 @@ pub struct UpdatePrinter {
     pub return_after_secs: Option<i64>,
     pub plate_clear: Option<bool>,
     pub auto_start_from_queue: Option<bool>,
+    #[serde(default)]
+    #[ts(optional)]
+    pub usage_reporter: Option<UsageReporter>,
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +308,9 @@ pub struct AttentionItem {
     pub kind: String,
     pub title: String,
     pub body: Option<String>,
+    /// The job a "print finished" item is about (rate it Good / Failed).
+    #[ts(type = "number | null")]
+    pub job_id: Option<i64>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -510,4 +518,235 @@ pub struct QueueItem {
     /// Why it failed (upload / start error, missing file).
     pub error: Option<String>,
     pub updated_at: String,
+}
+
+// ---------------------------------------------------------------------------
+// Jobs (task 3.6)
+// ---------------------------------------------------------------------------
+
+/// Who reports a printer's filament use to Spoolman.
+/// `auto` = Moonraker when its `[spoolman]` link is connected, else Foreman.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageReporter {
+    #[default]
+    Auto,
+    Moonraker,
+    Foreman,
+}
+
+impl UsageReporter {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Moonraker => "moonraker",
+            Self::Foreman => "foreman",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "moonraker" => Self::Moonraker,
+            "foreman" => Self::Foreman,
+            _ => Self::Auto,
+        }
+    }
+}
+
+/// How a job ended, as the printer reported it. `running` while it prints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum JobEnd {
+    Running,
+    Complete,
+    Cancelled,
+    Error,
+}
+
+impl JobEnd {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Running => "running",
+            Self::Complete => "complete",
+            Self::Cancelled => "cancelled",
+            Self::Error => "error",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "complete" => Self::Complete,
+            "cancelled" => Self::Cancelled,
+            "error" => Self::Error,
+            _ => Self::Running,
+        }
+    }
+}
+
+/// The user's verdict on a job. A clean finish starts unrated (`None` on the job)
+/// until someone rates it from Attention or History; a cancel starts `cancelled`
+/// and an error starts `failed`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum JobOutcome {
+    Good,
+    Failed,
+    Cancelled,
+}
+
+impl JobOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Good => "good",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "good" => Some(Self::Good),
+            "failed" => Some(Self::Failed),
+            "cancelled" => Some(Self::Cancelled),
+            _ => None,
+        }
+    }
+}
+
+/// Filament for one tool of a job: planned (from the file) and deducted.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct JobTool {
+    pub index: u32,
+    pub material: Option<String>,
+    pub colour: Option<String>,
+    /// Grams the file needs for a full print.
+    pub grams_planned: Option<f64>,
+    /// Grams this print used: planned for a full print, planned × progress for a
+    /// cancelled / failed one. Set when the job ends.
+    pub grams_used: Option<f64>,
+    /// Grams Foreman took off the spool (0 when Moonraker reports, or no spool).
+    pub grams_deducted: f64,
+    #[ts(type = "number | null")]
+    pub spool_id: Option<i64>,
+}
+
+/// One print: started, ended, what it used and how it went.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Job {
+    #[ts(type = "number")]
+    pub id: i64,
+    #[ts(type = "number | null")]
+    pub printer_id: Option<i64>,
+    /// Printer name when the job ran (kept if the printer is deleted).
+    pub printer_name: String,
+    /// Library file, when Foreman sent it.
+    #[ts(type = "number | null")]
+    pub file_id: Option<i64>,
+    pub file_name: String,
+    #[ts(type = "number | null")]
+    pub queue_item_id: Option<i64>,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    /// Seconds from start to end (printer-reported print time when known).
+    #[ts(type = "number | null")]
+    pub duration_secs: Option<i64>,
+    pub end: JobEnd,
+    pub outcome: Option<JobOutcome>,
+    /// adhesion | spaghetti | layer shift | clog | warping | other.
+    pub fail_reason: Option<String>,
+    pub error: Option<String>,
+    /// Who reported filament use for this job: `moonraker` or `foreman`.
+    pub usage_reporter: String,
+    pub grams_planned: Option<f64>,
+    /// Sum of the tools' `grams_used`.
+    pub grams_used: Option<f64>,
+    /// Grams Foreman took off spools (0 when Moonraker reports usage itself).
+    pub grams_deducted: f64,
+    /// Main material (first tool).
+    pub material: Option<String>,
+    pub tools: Vec<JobTool>,
+    /// `/api/library/files/{id}/thumb` when the file has one.
+    pub thumb_url: Option<String>,
+}
+
+/// `PATCH /api/jobs/{id}`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct JobOutcomeUpdate {
+    pub outcome: JobOutcome,
+    #[serde(default)]
+    pub fail_reason: Option<String>,
+}
+
+/// `GET /api/jobs` result.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct JobList {
+    pub jobs: Vec<Job>,
+    #[ts(type = "number")]
+    pub total: i64,
+}
+
+/// Per printer, over the stats period.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PrinterStats {
+    #[ts(type = "number | null")]
+    pub printer_id: Option<i64>,
+    pub name: String,
+    pub hours: f64,
+    #[ts(type = "number")]
+    pub jobs: i64,
+    #[ts(type = "number")]
+    pub good: i64,
+    #[ts(type = "number")]
+    pub failed: i64,
+    #[ts(type = "number")]
+    pub cancelled: i64,
+    /// failed / (jobs − cancelled − still running); 0 when none.
+    pub failure_rate: f64,
+    /// Share of the period spent printing, 0–100.
+    pub utilization_pct: f64,
+}
+
+/// Grams by material or by spool.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct UsageStat {
+    pub key: String,
+    #[ts(type = "number | null")]
+    pub spool_id: Option<i64>,
+    pub grams: f64,
+    #[ts(type = "number")]
+    pub jobs: i64,
+}
+
+/// `GET /api/jobs/stats`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct JobStats {
+    pub from: String,
+    pub to: String,
+    pub hours: f64,
+    #[ts(type = "number")]
+    pub jobs: i64,
+    #[ts(type = "number")]
+    pub good: i64,
+    #[ts(type = "number")]
+    pub failed: i64,
+    #[ts(type = "number")]
+    pub cancelled: i64,
+    #[ts(type = "number")]
+    pub unrated: i64,
+    /// 1 − failed / (jobs − cancelled − running); null when there are none.
+    pub success_rate: Option<f64>,
+    pub grams: f64,
+    pub printers: Vec<PrinterStats>,
+    pub by_material: Vec<UsageStat>,
+    pub by_spool: Vec<UsageStat>,
 }

@@ -31,7 +31,8 @@ use crate::driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterF
 use crate::drivers::moonraker_files::MoonrakerFiles;
 use crate::error::AppError;
 use crate::events::{
-    ConnectionEvent, ConnectionEventKind, PrinterState, PrinterStatus, ServerEvent, TempReading,
+    ConnectionEvent, ConnectionEventKind, PrintEnd, PrinterState, PrinterStatus, ServerEvent,
+    TempReading,
 };
 use crate::storage::PrinterStorage;
 
@@ -105,6 +106,9 @@ struct CachedStatus {
     filename: Option<String>,
     print_duration: f64,
     display_message: Option<String>,
+    print_end: Option<PrintEnd>,
+    print_message: Option<String>,
+    filament_used_mm: Option<f64>,
 }
 
 impl CachedStatus {
@@ -129,6 +133,9 @@ impl CachedStatus {
             fans: None,
             ams_trays: Vec::new(),
             hms_codes: Vec::new(),
+            print_end: self.print_end,
+            print_message: self.print_message.clone(),
+            filament_used_mm: self.filament_used_mm,
         }
     }
 
@@ -174,6 +181,24 @@ impl CachedStatus {
                                 "complete" | "cancelled" | "standby" => PrinterState::Idle,
                                 _ => PrinterState::Idle,
                             };
+                            // Klipper keeps complete/cancelled/error until the next
+                            // print or SDCARD_RESET_FILE (→ standby).
+                            self.print_end = match s {
+                                "complete" => Some(PrintEnd::Complete),
+                                "cancelled" => Some(PrintEnd::Cancelled),
+                                "error" => Some(PrintEnd::Error),
+                                _ => None,
+                            };
+                        }
+                        if let Some(m) = val.get("message").and_then(|v| v.as_str()) {
+                            self.print_message = if m.is_empty() {
+                                None
+                            } else {
+                                Some(m.to_owned())
+                            };
+                        }
+                        if let Some(f) = val.get("filament_used").and_then(|v| v.as_f64()) {
+                            self.filament_used_mm = Some(f);
                         }
                         if let Some(d) = val.get("print_duration").and_then(|v| v.as_f64()) {
                             self.print_duration = d;
@@ -470,8 +495,12 @@ impl MoonrakerDriver {
 
         // 5) macros
         let macros_id = rpc_id;
-        // rpc_id += 1; // not used after this
+        rpc_id += 1;
         ws_send_rpc(&mut ws_tx, macros_id, "printer.objects.list", None).await?;
+
+        // 6) [spoolman] link (errors "method not found" when not configured).
+        let spoolman_id = rpc_id;
+        ws_send_rpc(&mut ws_tx, spoolman_id, "server.spoolman.status", None).await?;
 
         // Throttle: max 2 status events per second.
         let min_interval = Duration::from_millis(500);
@@ -514,12 +543,15 @@ impl MoonrakerDriver {
                                 if let Some(params) = &resp.params {
                                     if let Some(objects) = params.first() {
                                         let mut s = status.write().await;
+                                        let before = (s.state.clone(), s.print_end);
                                         s.merge_update(objects);
+                                        let state_changed = before != (s.state.clone(), s.print_end);
                                         drop(s);
 
-                                        // Throttled publish.
+                                        // Throttled publish; state changes always go out
+                                        // (the job engine needs every start/end).
                                         let now = Instant::now();
-                                        if now.duration_since(last_publish) >= min_interval {
+                                        if state_changed || now.duration_since(last_publish) >= min_interval {
                                             last_publish = now;
                                             let ps = status.read().await.to_printer_status();
                                             let _ = bus_tx.send(ServerEvent::PrinterStatus {
@@ -538,6 +570,21 @@ impl MoonrakerDriver {
                                     printer_id,
                                     status: ps,
                                 });
+                            } else if method == "notify_spoolman_status_changed" {
+                                let connected = resp.params.as_ref()
+                                    .and_then(|p| p.first())
+                                    .and_then(|o| o.get("spoolman_connected"))
+                                    .and_then(|v| v.as_bool());
+                                let mut caps = capabilities.write().await;
+                                caps.get_or_insert_with(PrinterCapabilities::default).spoolman_connected = connected;
+                                debug!(printer_id, ?connected, "moonraker: spoolman status changed");
+                            } else if method == "notify_active_spool_set" {
+                                let spool = resp.params.as_ref()
+                                    .and_then(|p| p.first())
+                                    .and_then(|o| o.get("spool_id"))
+                                    .and_then(|v| v.as_i64());
+                                let mut caps = capabilities.write().await;
+                                caps.get_or_insert_with(PrinterCapabilities::default).spoolman_spool_id = spool;
                             } else if method == "notify_klippy_ready" {
                                 // Klippy came back — re-subscribe.
                                 let mut s = status.write().await;
@@ -552,6 +599,12 @@ impl MoonrakerDriver {
                     let id = resp.id.unwrap_or(0);
 
                     if let Some(err) = resp.error {
+                        if id == spoolman_id {
+                            debug!(printer_id, msg = %err.message, "moonraker: no [spoolman] component");
+                            let mut caps = capabilities.write().await;
+                            caps.get_or_insert_with(PrinterCapabilities::default).spoolman_connected = None;
+                            continue;
+                        }
                         warn!(printer_id, id, code = err.code, msg = %err.message, "moonraker rpc error");
                         continue;
                     }
@@ -596,6 +649,14 @@ impl MoonrakerDriver {
                     } else if id == macros_id {
                         // Parse macro names from printer.objects.list.
                         Self::parse_macros(&result, capabilities).await;
+                    } else if id == spoolman_id {
+                        let connected = result.get("spoolman_connected").and_then(|v| v.as_bool());
+                        let spool = result.get("spool_id").and_then(|v| v.as_i64());
+                        let mut caps = capabilities.write().await;
+                        let c = caps.get_or_insert_with(PrinterCapabilities::default);
+                        c.spoolman_connected = connected;
+                        c.spoolman_spool_id = spool;
+                        info!(printer_id, ?connected, ?spool, "moonraker: [spoolman] link");
                     }
                 }
 
@@ -905,6 +966,28 @@ impl PrinterDriver for MoonrakerDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn print_stats_end_states_are_told_apart() {
+        let mut c = CachedStatus::default();
+        c.merge_update(&json!({"print_stats": {"state": "printing", "filename": "a.gcode"}}));
+        assert_eq!(c.state, PrinterState::Printing);
+        assert_eq!(c.print_end, None);
+        c.merge_update(&json!({"print_stats": {"state": "cancelled", "filament_used": 812.5}}));
+        assert_eq!(c.state, PrinterState::Idle);
+        assert_eq!(c.print_end, Some(PrintEnd::Cancelled));
+        assert_eq!(c.to_printer_status().filament_used_mm, Some(812.5));
+        c.merge_update(&json!({"print_stats": {"state": "complete"}}));
+        assert_eq!(c.print_end, Some(PrintEnd::Complete));
+        c.merge_update(&json!({"print_stats": {"state": "error", "message": "Move out of range"}}));
+        assert_eq!(c.state, PrinterState::Error);
+        let st = c.to_printer_status();
+        assert_eq!(st.print_end, Some(PrintEnd::Error));
+        assert_eq!(st.print_message.as_deref(), Some("Move out of range"));
+        c.merge_update(&json!({"print_stats": {"state": "standby", "message": ""}}));
+        assert_eq!(c.print_end, None);
+        assert_eq!(c.print_message, None);
+    }
 
     #[tokio::test]
     async fn relative_webcam_urls_use_frontend_origin() {

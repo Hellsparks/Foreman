@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { queue } from "../api/queue";
+import { FAIL_REASONS, jobs, type JobOutcome } from "../api/jobs";
 import { useEventStream } from "../hooks/useEventStream";
 import type { PrinterWithStatus, AttentionItem } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
@@ -156,6 +157,9 @@ export default function Fleet() {
   const [loading, setLoading] = useState(true);
   const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
   const [attnOpen, setAttnOpen] = useState(true);
+  /** Per attention item: the rating given here, and whether the reason picker is open. */
+  const [rated, setRated] = useState<Record<number, { outcome: JobOutcome; reason?: string }>>({});
+  const [reasonFor, setReasonFor] = useState<number | null>(null);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
@@ -289,6 +293,17 @@ export default function Fleet() {
     }
   };
 
+  const rateJob = async (item: AttentionItem, outcome: JobOutcome, reason?: string) => {
+    if (item.job_id == null) return;
+    try {
+      await jobs.rate(item.job_id, outcome, reason ?? null);
+      setRated((prev) => ({ ...prev, [item.id]: { outcome, reason } }));
+      setReasonFor(outcome === "failed" && !reason ? item.id : null);
+    } catch (e) {
+      console.error("Failed to rate job:", e);
+    }
+  };
+
   const dismissAttention = async (id: number) => {
     try {
       await api.dismissAttention(id);
@@ -374,6 +389,44 @@ export default function Fleet() {
                       <div className="fleet__attn-title">{item.title}</div>
                       {item.body && (
                         <div className="fleet__attn-body">{item.body}</div>
+                      )}
+                      {item.kind === "print_finished" && item.job_id != null && (
+                        <div className="fleet__attn-rate" role="group" aria-label="How did it go?">
+                          {rated[item.id] ? (
+                            <span className="fleet__attn-rated">
+                              Rated {rated[item.id].outcome === "good" ? "✓ Good" : `✖ Failed${rated[item.id].reason ? ` · ${rated[item.id].reason}` : ""}`}
+                            </span>
+                          ) : (
+                            <span className="fleet__attn-rated">How did it go?</span>
+                          )}
+                          <button
+                            type="button"
+                            className="fleet__attn-chip"
+                            aria-pressed={rated[item.id]?.outcome === "good"}
+                            onClick={() => void rateJob(item, "good")}
+                          >
+                            ✓ Good
+                          </button>
+                          <button
+                            type="button"
+                            className="fleet__attn-chip"
+                            aria-pressed={rated[item.id]?.outcome === "failed"}
+                            onClick={() => void rateJob(item, "failed")}
+                          >
+                            ✖ Failed
+                          </button>
+                          {reasonFor === item.id &&
+                            FAIL_REASONS.map((r) => (
+                              <button
+                                key={r}
+                                type="button"
+                                className="fleet__attn-chip fleet__attn-chip--reason"
+                                onClick={() => void rateJob(item, "failed", r)}
+                              >
+                                {r}
+                              </button>
+                            ))}
+                        </div>
                       )}
                     </div>
                     <div className="fleet__attn-actions">

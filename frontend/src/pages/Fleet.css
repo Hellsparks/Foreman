@@ -175,6 +175,22 @@
 .fleet__attn-btn--primary:hover { background: var(--fw-accent); }
 .fleet__attn-btn:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
 
+.fleet__attn-rate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.fleet__attn-rated { font-size: 12px; color: var(--fw-muted); margin-right: 4px; }
+.fleet__attn-chip {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--fw-muted);
+  background: var(--fw-raised);
+  color: var(--fw-text);
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.fleet__attn-chip[aria-pressed="true"] { background: var(--fw-accent-hover); border-color: var(--fw-accent-hover); color: var(--fw-on-accent); }
+.fleet__attn-chip--reason { border-style: dashed; }
+.fleet__attn-chip:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+
 /* ── Printer grid ────────────────────────────────────────────────────────── */
 
 .fleet__grid {

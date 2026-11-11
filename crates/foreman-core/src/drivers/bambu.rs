@@ -32,8 +32,8 @@ use tracing::{debug, error, info, warn};
 use crate::driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile};
 use crate::error::AppError;
 use crate::events::{
-    AmsTray, ConnectionEvent, ConnectionEventKind, FanSpeeds, HmsCode, PrinterState, PrinterStatus,
-    ServerEvent, TempReading,
+    AmsTray, ConnectionEvent, ConnectionEventKind, FanSpeeds, HmsCode, PrintEnd, PrinterState,
+    PrinterStatus, ServerEvent, TempReading,
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +88,10 @@ fn bed_size_from_model(model: &str) -> Option<(f64, f64)> {
     }
 }
 
+/// `print_error` Bambu reports when the user cancels a print (0x0300400C,
+/// "printing was cancelled").
+const BAMBU_CANCELLED: u64 = 0x0300_400C;
+
 // ---------------------------------------------------------------------------
 // Fan speed normalisation
 // ---------------------------------------------------------------------------
@@ -123,6 +127,9 @@ struct CachedStatus {
     fans: FanSpeeds,
     ams_trays: Vec<AmsTray>,
     hms_codes: Vec<HmsCode>,
+    print_end: Option<PrintEnd>,
+    /// Last non-zero `print_error` code.
+    print_error: Option<u64>,
     // Capabilities extracted from reports.
     nozzle_diameter: Option<f64>,
     has_camera: Option<bool>,
@@ -154,6 +161,9 @@ impl CachedStatus {
             fans: Some(self.fans.clone()),
             ams_trays: self.ams_trays.clone(),
             hms_codes: self.hms_codes.clone(),
+            print_end: self.print_end,
+            print_message: self.print_error.map(|c| format!("print_error {c:#010X}")),
+            filament_used_mm: None,
         }
     }
 
@@ -171,6 +181,10 @@ impl CachedStatus {
                 .collect();
         }
 
+        if let Some(code) = print.get("print_error").and_then(|v| v.as_u64()) {
+            self.print_error = (code != 0).then_some(code);
+        }
+
         // State.  "FAILED" is the stale gcode_state after a print failure;
         // it does NOT mean the printer is currently faulted.  Only treat it
         // as Error when there are active HMS codes.
@@ -183,6 +197,19 @@ impl CachedStatus {
                 "FAILED" => PrinterState::Error,
                 _ => self.state.clone(),
             };
+            self.print_end = match s {
+                "FINISH" => Some(PrintEnd::Complete),
+                // A user cancel ends as FAILED with print_error 0x0300400C.
+                "FAILED" if self.print_error == Some(BAMBU_CANCELLED) => Some(PrintEnd::Cancelled),
+                "FAILED" => Some(PrintEnd::Error),
+                "RUNNING" | "PREPARE" | "PAUSE" => None,
+                _ => self.print_end,
+            };
+        } else if self.print_end == Some(PrintEnd::Error)
+            && self.print_error == Some(BAMBU_CANCELLED)
+        {
+            // print_error can arrive after the FAILED state.
+            self.print_end = Some(PrintEnd::Cancelled);
         }
 
         // Temperatures.
@@ -962,5 +989,46 @@ impl PrinterDriver for BambuDriver {
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
         Ok(self.status.read().await.to_printer_status())
+    }
+}
+
+#[cfg(test)]
+mod end_state_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn finish_failed_and_cancel_are_told_apart() {
+        let mut c = CachedStatus::default();
+        c.merge_report(&json!({"gcode_state": "RUNNING", "print_error": 0}));
+        assert_eq!(c.state, PrinterState::Printing);
+        assert_eq!(c.print_end, None);
+        c.merge_report(&json!({"gcode_state": "FINISH"}));
+        assert_eq!(
+            (c.state.clone(), c.print_end),
+            (PrinterState::Idle, Some(PrintEnd::Complete))
+        );
+
+        // User cancel: FAILED + print_error 0x0300400C, no HMS → idle, cancelled.
+        c.merge_report(&json!({"gcode_state": "RUNNING", "print_error": 0}));
+        c.merge_report(&json!({"gcode_state": "FAILED", "print_error": 50348044u64}));
+        assert_eq!(
+            (c.state.clone(), c.print_end),
+            (PrinterState::Idle, Some(PrintEnd::Cancelled))
+        );
+
+        // Cancel code arriving after the FAILED state still counts as a cancel.
+        c.merge_report(&json!({"gcode_state": "RUNNING", "print_error": 0}));
+        c.merge_report(&json!({"gcode_state": "FAILED"}));
+        assert_eq!(c.print_end, Some(PrintEnd::Error));
+        c.merge_report(&json!({"print_error": 50348044u64}));
+        assert_eq!(c.print_end, Some(PrintEnd::Cancelled));
+
+        // Any other failure is an error with the code as the message.
+        c.merge_report(&json!({"gcode_state": "RUNNING", "print_error": 0}));
+        c.merge_report(&json!({"gcode_state": "FAILED", "print_error": 117473795u64}));
+        let st = c.to_printer_status();
+        assert_eq!(st.print_end, Some(PrintEnd::Error));
+        assert_eq!(st.print_message.as_deref(), Some("print_error 0x07008203"));
     }
 }
