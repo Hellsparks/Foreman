@@ -841,6 +841,15 @@ impl DriverManager {
         }
     }
 
+    /// Get a reference to a printer's driver (for direct operations like start_print).
+    pub async fn get_driver(&self, printer_id: i64) -> Option<Arc<dyn PrinterDriver>> {
+        self.drivers
+            .read()
+            .await
+            .get(&printer_id)
+            .map(|h| Arc::clone(&h.driver))
+    }
+
     /// Get the last-known status for a printer.
     pub async fn get_status(&self, printer_id: i64) -> Option<PrinterStatus> {
         self.status_cache.read().await.get(&printer_id).cloned()

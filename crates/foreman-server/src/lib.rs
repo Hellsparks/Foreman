@@ -91,6 +91,8 @@ pub async fn serve_with(
         host = %cfg.host,
         data_dir = %cfg.data_dir.display(),
         db_url = cfg.db_url.as_deref().unwrap_or("(none)"),
+        commit = api::health::GIT_COMMIT,
+        built_at = %api::health::built_at(),
         "foreman-server starting"
     );
 
@@ -450,6 +452,32 @@ pub async fn reset_admin_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Lifetime of a `dev-token` session.
+const DEV_TOKEN_TTL_SECS: i64 = 30 * 60;
+
+/// `foreman-server dev-token`: mint a short-lived admin session for local testing and
+/// print only the bearer token to stdout. Use this instead of editing the database.
+pub async fn dev_token_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
+    let db = ForemanDb::connect(&cfg.data_dir.join("foreman.db")).await?;
+    if foreman_core::auth::admin_username(&db.pool)
+        .await?
+        .is_none()
+    {
+        anyhow::bail!(
+            "no admin account yet: finish setup first (an unclaimed server only answers health/info/setup)"
+        );
+    }
+    let (token, expires_at) =
+        foreman_core::auth::create_session(&db.pool, DEV_TOKEN_TTL_SECS, None, Some("dev-token"))
+            .await?;
+    eprintln!(
+        "dev-token: admin session valid for {} min (expires at unix {expires_at}); send as `Authorization: Bearer <token>`",
+        DEV_TOKEN_TTL_SECS / 60
+    );
+    println!("{token}");
+    Ok(())
+}
+
 /// The Spoolman-compatible API on its own port (default 7912).
 async fn spawn_spoolman(cfg: &config::ServerConfig) {
     if !cfg.spoolman_enabled {
@@ -569,6 +597,9 @@ fn build_router(app_state: AppState) -> Router {
             "/api/library/restore-many",
             post(api::library::restore_many),
         )
+        // Send (3.4): print-now + compat check
+        .route("/api/send/check/{file_id}", get(api::send::check_file))
+        .route("/api/send", post(api::send::send_file))
         // Locations (printer G-code storage) + transfers
         .route("/api/locations", get(api::storage::locations))
         .route("/api/printers/{id}/storage", get(api::storage::list))

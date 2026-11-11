@@ -27,9 +27,12 @@ struct PrinterRow {
     tls_fingerprint: Option<String>,
     tags: String,
     hardened_nozzle: i64,
+    slicer_profiles: String,
     sort_order: i64,
     fail_after_checks: i64,
     return_after_secs: i64,
+    plate_clear: i64,
+    auto_start_from_queue: i64,
     created_at: String,
     updated_at: String,
 }
@@ -84,9 +87,12 @@ impl PrinterRow {
             tls_fingerprint: self.tls_fingerprint,
             tags: parse_tags(&self.tags),
             hardened_nozzle: self.hardened_nozzle != 0,
+            slicer_profiles: parse_tags(&self.slicer_profiles),
             sort_order: self.sort_order,
             fail_after_checks: self.fail_after_checks,
             return_after_secs: self.return_after_secs,
+            plate_clear: self.plate_clear != 0,
+            auto_start_from_queue: self.auto_start_from_queue != 0,
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         })
@@ -99,14 +105,16 @@ impl PrinterRow {
 
 const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tls_fingerprint, tags, hardened_nozzle, sort_order, fail_after_checks, \
-     return_after_secs, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
+     fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
+     created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
-     tls_fingerprint, tags, hardened_nozzle, sort_order, fail_after_checks, \
-     return_after_secs, created_at, updated_at \
+     tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
+     fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
+     created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.
@@ -137,6 +145,7 @@ pub async fn create(pool: &SqlitePool, req: CreatePrinter) -> Result<Printer, Ap
     let firmware = firmware_str(&req.firmware).to_owned();
     let tags = tags_json(&req.tags);
     let hardened: i64 = req.hardened_nozzle as i64;
+    let slicer_profiles = tags_json(&req.slicer_profiles);
     let sort_order = req.sort_order.unwrap_or(0);
     let fail_after_checks = req.fail_after_checks.unwrap_or(3);
     let return_after_secs = req.return_after_secs.unwrap_or(60);
@@ -144,9 +153,10 @@ pub async fn create(pool: &SqlitePool, req: CreatePrinter) -> Result<Printer, Ap
     let id = sqlx::query(
         "INSERT INTO printer \
          (name, firmware, primary_url, api_key, serial_number, access_code, \
-          tags, hardened_nozzle, sort_order, fail_after_checks, return_after_secs, \
+          tags, hardened_nozzle, slicer_profiles, sort_order, \
+          fail_after_checks, return_after_secs, \
           created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&req.name)
     .bind(&firmware)
@@ -156,6 +166,7 @@ pub async fn create(pool: &SqlitePool, req: CreatePrinter) -> Result<Printer, Ap
     .bind(&req.access_code)
     .bind(&tags)
     .bind(hardened)
+    .bind(&slicer_profiles)
     .bind(sort_order)
     .bind(fail_after_checks)
     .bind(return_after_secs)
@@ -181,16 +192,22 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     let access_code = req.access_code.or(current.access_code);
     let tags = tags_json(&req.tags.unwrap_or(current.tags));
     let hardened: i64 = req.hardened_nozzle.unwrap_or(current.hardened_nozzle) as i64;
+    let slicer_profiles = tags_json(&req.slicer_profiles.unwrap_or(current.slicer_profiles));
     let sort_order = req.sort_order.unwrap_or(current.sort_order);
     let fail_after_checks = req.fail_after_checks.unwrap_or(current.fail_after_checks);
     let return_after_secs = req.return_after_secs.unwrap_or(current.return_after_secs);
+    let plate_clear: i64 = req.plate_clear.unwrap_or(current.plate_clear) as i64;
+    let auto_start: i64 = req
+        .auto_start_from_queue
+        .unwrap_or(current.auto_start_from_queue) as i64;
     let now = Utc::now().to_rfc3339();
 
     sqlx::query(
         "UPDATE printer \
          SET name=?, firmware=?, primary_url=?, api_key=?, serial_number=?, \
-             access_code=?, tags=?, hardened_nozzle=?, sort_order=?, \
-             fail_after_checks=?, return_after_secs=?, updated_at=? \
+             access_code=?, tags=?, hardened_nozzle=?, slicer_profiles=?, \
+             sort_order=?, fail_after_checks=?, return_after_secs=?, \
+             plate_clear=?, auto_start_from_queue=?, updated_at=? \
          WHERE id=?",
     )
     .bind(&name)
@@ -201,9 +218,12 @@ pub async fn update(pool: &SqlitePool, id: i64, req: UpdatePrinter) -> Result<Pr
     .bind(&access_code)
     .bind(&tags)
     .bind(hardened)
+    .bind(&slicer_profiles)
     .bind(sort_order)
     .bind(fail_after_checks)
     .bind(return_after_secs)
+    .bind(plate_clear)
+    .bind(auto_start)
     .bind(&now)
     .bind(id)
     .execute(pool)
@@ -234,6 +254,20 @@ pub async fn update_tls_fingerprint(
 pub async fn clear_tls_fingerprint(pool: &SqlitePool, id: i64) -> Result<(), AppError> {
     let now = Utc::now().to_rfc3339();
     sqlx::query("UPDATE printer SET tls_fingerprint=NULL, updated_at=? WHERE id=?")
+        .bind(&now)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Set the plate_clear flag on a printer (used by attention actions and the scheduler).
+pub async fn set_plate_clear(pool: &SqlitePool, id: i64, clear: bool) -> Result<(), AppError> {
+    let now = Utc::now().to_rfc3339();
+    let val: i64 = clear as i64;
+    sqlx::query("UPDATE printer SET plate_clear=?, updated_at=? WHERE id=?")
+        .bind(val)
         .bind(&now)
         .bind(id)
         .execute(pool)
@@ -286,6 +320,7 @@ mod tests {
             access_code: None,
             tags: vec!["klipper".to_owned()],
             hardened_nozzle: false,
+            slicer_profiles: vec![],
             sort_order: Some(0),
             fail_after_checks: None,
             return_after_secs: None,
@@ -336,9 +371,12 @@ mod tests {
                 serial_number: None,
                 access_code: None,
                 hardened_nozzle: None,
+                slicer_profiles: None,
                 sort_order: None,
                 fail_after_checks: None,
                 return_after_secs: None,
+                plate_clear: None,
+                auto_start_from_queue: None,
             },
         )
         .await

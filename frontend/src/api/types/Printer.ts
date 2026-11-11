@@ -24,7 +24,11 @@ tls_fingerprint: string | null,
 /**
  * User-defined labels.
  */
-tags: Array<string>, hardened_nozzle: boolean, sort_order: bigint, 
+tags: Array<string>, hardened_nozzle: boolean, 
+/**
+ * Slicer printer-profile names that map to this printer (e.g. `["Voron V0 0.4mm"]`).
+ */
+slicer_profiles: Array<string>, sort_order: bigint, 
 /**
  * Consecutive health-check failures before switching to next path.
  */
@@ -32,4 +36,12 @@ fail_after_checks: bigint,
 /**
  * Seconds a higher-priority path must be healthy before returning to it.
  */
-return_after_secs: bigint, created_at: string, updated_at: string, };
+return_after_secs: bigint, 
+/**
+ * Whether the print bed is clear and ready for the next job.
+ */
+plate_clear: boolean, 
+/**
+ * Whether the scheduler should auto-start queue items on this printer.
+ */
+auto_start_from_queue: boolean, created_at: string, updated_at: string, };

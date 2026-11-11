@@ -258,6 +258,7 @@ export default function Fleet() {
         access_code: data.accessCode || null,
         tags: [],
         hardened_nozzle: false,
+        slicer_profiles: [],
         sort_order: null,
         fail_after_checks: null,
         return_after_secs: null,

@@ -1,13 +1,15 @@
 # Foreman rewrite — 01 Workflows & backend map
 
 Source audited: `Hellsparks/Foreman-overview` (README still says "Marathon"), `Hellsparks/Fieldwork-designtemplate`, `Donkie/Spoolman` master (pyproject 0.27.1, 2026-11-02).
-Rule: **if it isn't frontend, it's Rust.** Frontend = Vite + React + TS, styled only from Fieldwork `tokens.css` / `DESIGN.md`.
+Rule: **if it isn't frontend, it's Rust.** (One exception: the C++ glue in `foreman-bambu-helper`, D11.) Frontend = Vite + React + TS, styled only from Fieldwork `tokens.css` / `DESIGN.md`.
 
 ---
 
 ## 0. Architecture decisions
 
 **Status 2026-11-08:** D1, D3, D4, D6, D8, D9 confirmed by owner. v1 firmware: Klipper/Moonraker, OctoPrint, Duet, Bambu (built last). Bambu driver: two auth modes — Developer Mode (unsigned MQTT/FTPS) and signed mode for normal-firmware printers (RSA-signed MQTT using a user-supplied cert/key, loaded from config, not committed to the repo). Auth default: single admin + API keys (not yet explicitly confirmed).
+
+**Status 2026-11-10:** D11 added by owner — Bambu Cloud the Orca way, several Bambu accounts at once. Printers stay cloud-bound (Bambu Handy and remote access keep working); Bambu's own plugin signs commands. Bambu Cloud needs an x86_64 server; ARM servers show a warning and keep LAN/Developer Mode only. The user-supplied cert/key signed mode above stays a later option, not the default.
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
@@ -21,6 +23,7 @@ Rule: **if it isn't frontend, it's Rust.** Frontend = Vite + React + TS, styled 
 | D8 | Swatch STL generator | **Port to Rust** (`foreman-swatch` crate), see §5 | Job is tiny: fixed plate + 2 lines of debossed text. Python/CadQuery (~500 MB) is overkill. |
 | D9 | Docker self-management (install Spoolman, GHCR self-update, socket mount) | **Remove.** Spoolman is built in; updates handled by desktop updater / server package. Research update mechanism at that phase | Docker-socket-in-container is a big attack surface and no longer needed. |
 | D10 | Marathon data | One-shot **importer** for existing `marathon.db` (migrations 001–041) + uploads dir. New schema starts clean | Lets you move without losing history/projects/maintenance. |
+| D11 | Bambu Cloud | ✅ **DECIDED 2026-11-10:** do what OrcaSlicer does — load Bambu's prebuilt `bambu_networking` plugin (downloaded from Bambu, pinned ABI series; a custom path such as Open Bamboo Networking is allowed). One `foreman-bambu-helper` process per Bambu account (the plugin keeps one login per process), talking JSON lines over stdio to the server. Only the helper has C++ (one glue file). **x86_64 only** (Bambu publishes the plugin for x86_64): on ARM the feature is off with a warning. | Keeps printers in cloud mode with Handy working, gets signing from Bambu's own plugin, and lets several people's Bambu accounts sit next to the Klipper printers in one Foreman. Orca itself can only hold one Bambu account. |
 
 ---
 
@@ -35,9 +38,10 @@ Each workflow lists: trigger · steps · backend pieces · what changes vs today
 - **Changes:** Spoolman install step gone (built-in). Add discovery (mDNS for Moonraker, SSDP/LAN for Bambu — verify at build). Wizard resumable.
 
 ### W2 — Add / configure a printer
-- **Steps:** pick firmware (Klipper/Moonraker, Bambu LAN, OctoPrint, Duet) → connection test → capabilities auto-read where possible (bed size, nozzle, extruder count, MMU/AMS, webcams, macros) → manual: abrasive-capable, tool slots, temp presets, sort order, group/tags.
+- **Steps:** pick firmware (Klipper/Moonraker, Bambu LAN, Bambu Cloud account, OctoPrint, Duet) → connection test → capabilities auto-read where possible (bed size, nozzle, extruder count, MMU/AMS, webcams, macros) → manual: abrasive-capable, tool slots, temp presets, sort order, group/tags.
 - **Backend:** `PrinterDriver` trait, capability probe per driver, presets, webcam registry.
 - **Changes:** capability *probe* instead of hand-entry; printer **groups/tags** (needed for fleet queue W5).
+- **Bambu Cloud (D11):** Settings → Bambu accounts → sign in (one or more accounts) → import that account's printers. Each imported printer belongs to one account. On an ARM server this section shows the x86_64 warning instead.
 
 ### W3 — Monitor the fleet
 - **Steps:** dashboard grid/list → per-printer state, temps, progress, ETA, active spool(s), webcam → drill into printer.
@@ -123,6 +127,7 @@ crates/
   spoolman-rs/       Spoolman-compatible API + WS, multi-DB, alembic-aware (D3–D5)
   foreman-server/    axum: REST, /ws/events, static frontend, OctoPrint-compat, MCP, Spoolman mount
   foreman-desktop/   Tauri 2 shell: embedded server or remote, tray, notifications, dialogs
+  foreman-bambu-helper/  one process per Bambu account: loads Bambu's network plugin via one C++ glue file (D11)
 frontend/            Vite + React + TS, Fieldwork tokens, API types generated from Rust
 ```
 

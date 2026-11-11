@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useNavigate } from "react-router-dom";
 import type { ConnectionState } from "../hooks/useEventStream";
 import { useRoute } from "../desktop/route";
 
@@ -61,6 +62,7 @@ interface TopBarProps {
 export default function TopBar({ connectionState: _connectionState, attentionCount }: TopBarProps) {
   const win = IS_TAURI ? getCurrentWindow() : null;
   const route = useRoute();
+  const navigate = useNavigate();
 
   return (
     <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
@@ -115,11 +117,12 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
         onDoubleClick={win ? () => win.toggleMaximize() : undefined}
       />
 
-      {/* Send — primary */}
+      {/* Send — primary: navigate to Library */}
       <button
         type="button"
         className="topbar__btn topbar__btn--primary"
-        aria-label="Upload a file to send to a printer"
+        aria-label="Send a file to a printer"
+        onClick={() => navigate("/library")}
       >
         <svg
           width="18"
