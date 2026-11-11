@@ -37,14 +37,14 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 /// A Moonraker-like driver: one active spool, a `[spoolman]` link.
-struct MockKlipper {
+pub(crate) struct MockKlipper {
     link: Option<bool>,
-    active: Mutex<Option<i64>>,
+    pub(crate) active: Mutex<Option<i64>>,
     sets: Mutex<Vec<Option<i64>>>,
 }
 
 impl MockKlipper {
-    fn new(link: Option<bool>) -> Arc<Self> {
+    pub(crate) fn new(link: Option<bool>) -> Arc<Self> {
         Arc::new(Self {
             link,
             active: Mutex::new(None),
@@ -140,14 +140,14 @@ fn bambu_caps() -> PrinterCapabilities {
     }
 }
 
-fn idle() -> PrinterStatus {
+pub(crate) fn idle() -> PrinterStatus {
     PrinterStatus {
         state: PrinterState::Idle,
         ..Default::default()
     }
 }
 
-struct NoMeta(Option<FileMeta>);
+pub(crate) struct NoMeta(pub(crate) Option<FileMeta>);
 
 #[async_trait]
 impl MetaSource for NoMeta {
@@ -182,7 +182,12 @@ async fn spoolman(dir: &tempfile::TempDir) -> spools::Spoolman {
 }
 
 /// Add a filament + spool; returns the spool id.
-async fn add_spool(sm: &spools::Spoolman, material: &str, color: &str, remaining: f64) -> i64 {
+pub(crate) async fn add_spool(
+    sm: &spools::Spoolman,
+    material: &str,
+    color: &str,
+    remaining: f64,
+) -> i64 {
     let f: CreateFilamentRequest = serde_json::from_value(json!({
         "density": 1.24, "diameter": 1.75, "material": material,
         "name": format!("{material} Test"), "color_hex": color,
@@ -201,7 +206,7 @@ async fn add_spool(sm: &spools::Spoolman, material: &str, color: &str, remaining
         .id
 }
 
-async fn add_printer(state: &AppState, name: &str, firmware: FirmwareKind) -> i64 {
+pub(crate) async fn add_printer(state: &AppState, name: &str, firmware: FirmwareKind) -> i64 {
     repo::printer::create(
         &state.foreman_db.pool,
         CreatePrinter {

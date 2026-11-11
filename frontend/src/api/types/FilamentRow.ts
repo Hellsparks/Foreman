@@ -16,4 +16,8 @@ spool_weight: number | null,
 /**
  * Non-archived spools of it.
  */
-spool_count: number, grams_left: number, };
+spool_count: number, grams_left: number, 
+/**
+ * Net filament weight of a full spool, g.
+ */
+weight: number | null, };

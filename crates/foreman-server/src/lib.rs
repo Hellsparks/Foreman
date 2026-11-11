@@ -7,6 +7,9 @@ mod driver_manager;
 mod filaments;
 #[cfg(test)]
 mod filaments_tests;
+mod inventory;
+#[cfg(test)]
+mod inventory_tests;
 mod job_engine;
 mod net;
 mod scheduler;
@@ -647,6 +650,17 @@ fn build_router(app_state: AppState) -> Router {
         .route(
             "/api/filaments/{id}",
             get(api::filaments::get_filament).patch(api::filaments::update_filament),
+        )
+        // Inventory + locations (4.3)
+        .route("/api/inventory", get(api::inventory::get))
+        .route(
+            "/api/inventory/{filament_id}",
+            put(api::inventory::track).delete(api::inventory::untrack),
+        )
+        .route("/api/spool-locations", get(api::inventory::locations))
+        .route(
+            "/api/spool-locations/{name}",
+            patch(api::inventory::rename_location),
         )
         .route("/api/printers/{id}/spools", get(api::spools::printer_slots))
         .route(
