@@ -474,3 +474,56 @@
   color: var(--fw-warning);
   padding: var(--fw-space-1) 0;
 }
+
+/* Phone (below 760 px): locations become a strip above the list; selecting a
+   file replaces the list with its inspector (Send lives there). */
+@media (max-width: 759px) {
+  .lib-page {
+    margin: calc(-1 * var(--fw-space-4)) calc(-1 * var(--fw-space-4)) calc(-1 * var(--fw-space-6));
+    height: calc(100% + var(--fw-space-4) + var(--fw-space-6));
+  }
+
+  .fw-browser-body,
+  .fw-browser-body[data-inspector="true"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .fw-browser-locations {
+    display: flex;
+    gap: var(--fw-space-1);
+    padding: var(--fw-space-2);
+    border-right: 0;
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .fw-browser-locations > span {
+    display: none;
+  }
+
+  .fw-browser-locations button,
+  .fw-loc-row {
+    flex: none;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .fw-browser-body[data-inspector="true"] > .fw-browser-locations,
+  .fw-browser-body[data-inspector="true"] > :nth-child(2) {
+    display: none;
+  }
+
+  .fw-browser-body[data-inspector="true"] > .fw-file-inspector {
+    grid-row: 1 / -1;
+    min-width: 0;
+    overflow-y: auto;
+    border-left: 0;
+  }
+
+  .fw-browser-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}

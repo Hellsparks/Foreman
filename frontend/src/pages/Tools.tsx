@@ -34,7 +34,7 @@ export default function Tools() {
   return (
     <div className="tl">
       <header className="tl-head">
-        <h1 className="tl-title">Tools</h1>
+        <h1 className="tl-title phone-dup-title">Tools</h1>
         <div role="tablist" aria-label="Tools" className="tl-tabs">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} className="tl-tab" onClick={() => setTab(id)}>

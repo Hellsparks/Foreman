@@ -164,3 +164,13 @@ textarea.prj-input { min-height: 72px; padding: var(--fw-space-2) var(--fw-space
   .np-file .prj-thumb { display: none; }
   .np-map__row { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Phone (below 760 px): one column; plate rows wrap instead of overflowing. */
+@media (max-width: 759px) {
+  .pd-grid { grid-template-columns: minmax(0, 1fr); }
+  .pd-plate { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fw-space-2) 10px; }
+  .pd-plate > :nth-child(3) { flex: 1 1 160px; min-width: 0; }
+  .pd-plate__status { flex-basis: 100%; }
+  .pd-plate__slots { margin-top: var(--fw-space-1); }
+  .pd-slotchip { max-width: 100%; overflow-wrap: anywhere; }
+}

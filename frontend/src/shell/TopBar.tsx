@@ -1,7 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { ConnectionState } from "../hooks/useEventStream";
 import { useRoute } from "../desktop/route";
+import { usePhone } from "../hooks/useMediaQuery";
 
 /** True only when running inside the Tauri shell. */
 export const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -54,6 +56,17 @@ export function WindowControls() {
   );
 }
 
+const PAGE_TITLES: [string, string][] = [
+  ["/fleet", "Fleet"], ["/printer", "Printer"], ["/jobs", "Jobs"], ["/library", "Library"],
+  ["/projects", "Projects"], ["/filament", "Filament"], ["/service", "Service"],
+  ["/tools", "Tools"], ["/settings", "Settings"],
+];
+
+/** Phone header title: the section the route belongs to. */
+function pageTitle(pathname: string): string {
+  return PAGE_TITLES.find(([p]) => pathname === p || pathname.startsWith(p + "/"))?.[1] ?? "Foreman";
+}
+
 interface TopBarProps {
   connectionState: ConnectionState;
   attentionCount: number;
@@ -63,10 +76,22 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
   const win = IS_TAURI ? getCurrentWindow() : null;
   const route = useRoute();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const phone = usePhone();
+  // Phone only: the search field is a button until tapped (see Shell.css).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   return (
-    <header className="topbar" role="banner" onDragStart={(e) => e.preventDefault()}>
+    <header
+      className="topbar"
+      role="banner"
+      data-search-open={searchOpen}
+      onDragStart={(e) => e.preventDefault()}
+    >
       <div id={TOPBAR_SLOT_ID} className="topbar__page" />
+      {/* Phone: page title (hidden when the page puts its own header in the slot). */}
+      <p className="topbar__title" aria-hidden="true">{pageTitle(pathname)}</p>
 
       {route?.via && (
         <span className="topbar__via" title={`${route.serverName} via ${route.address}`}>
@@ -92,17 +117,38 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
         <input
           type="search"
           className="topbar__search-input"
-          placeholder="Search printers, files, spools… or type a command"
+          placeholder={phone ? "Search printers, files, spools…" : "Search printers, files, spools… or type a command"}
           aria-keyshortcuts="Control+k"
+          ref={searchRef}
+          onBlur={() => setSearchOpen(false)}
         />
         <kbd className="topbar__kbd">Ctrl K</kbd>
       </label>
+
+      {/* Phone: search icon that expands the field to full width. */}
+      <button
+        type="button"
+        className="topbar__search-toggle"
+        aria-label="Search"
+        aria-expanded={searchOpen}
+        onClick={() => {
+          setSearchOpen(true);
+          // The field is display:none until the state applies.
+          requestAnimationFrame(() => searchRef.current?.focus());
+        }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M20 20l-4-4" />
+        </svg>
+      </button>
 
       {/* Spacer — drag region when inside Tauri.
           data-tauri-drag-region works on Windows/X11; on Wayland we need
           startDragging() called directly from the mousedown event so the
           compositor receives the correct input serial. */}
       <div
+        className="topbar__spacer"
         data-tauri-drag-region
         style={{ flex: 1, cursor: IS_TAURI ? "grab" : undefined }}
         onMouseDown={

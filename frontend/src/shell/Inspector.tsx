@@ -13,7 +13,7 @@ interface InspectorProps {
  * Non-modal right-side Inspector panel.
  *
  * Per doc 02/03: selected record opens here; main view stays usable.
- * On phone (≤430px) this expands to full page — handled via CSS.
+ * Below 760 px it becomes a bottom panel — handled via CSS.
  *
  * When `title` is omitted the shell header is suppressed and the page is
  * expected to render its own header inside the body (via React portal).

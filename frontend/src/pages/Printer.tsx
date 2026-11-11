@@ -13,6 +13,7 @@ import PrinterSpoolsTab from "../filament/PrinterSpoolsTab";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import { useSignedUrl } from "../hooks/useSignedUrl";
+import { usePhone } from "../hooks/useMediaQuery";
 import "./Printer.css";
 
 // ---------------------------------------------------------------------------
@@ -133,6 +134,22 @@ export default function Printer() {
   useEffect(() => {
     setVisited((v) => (v.has(activeTab) ? v : new Set(v).add(activeTab)));
   }, [activeTab]);
+
+  const phone = usePhone();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  // The list is position:fixed (so it never widens the header); place it under the button.
+  const menuPos = (): CSSProperties => {
+    const r = menuBtnRef.current?.getBoundingClientRect();
+    return r ? { top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) } : {};
+  };
+  // Phone: the tab row scrolls sideways; keep the active tab in view.
+  useEffect(() => {
+    if (!phone) return;
+    const el = tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    el?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [phone, activeTab, printer]);
 
   const [topbarSlot, setTopbarSlot] = useState<HTMLElement | null>(null);
   useEffect(() => setTopbarSlot(document.getElementById(TOPBAR_SLOT_ID)), []);
@@ -303,7 +320,7 @@ export default function Printer() {
             <h1 className="printer-title__name">{printer.name}</h1>
             {fwTag && <span className="printer-header__fw">{fwTag}</span>}
             {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
-              <span style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}>
+              <span className="printer-header__via" style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}>
                 via {printer.active_path_name}
               </span>
             )}
@@ -312,7 +329,7 @@ export default function Printer() {
           topbarSlot,
         )}
       <header className="printer-header">
-        <div className="printer-tabs" role="tablist" aria-label="Printer sections">
+        <div className="printer-tabs" role="tablist" aria-label="Printer sections" ref={tabsRef}>
           {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
             <button
               key={t}
@@ -326,6 +343,68 @@ export default function Printer() {
           ))}
         </div>
         <div className="printer-header__spacer" />
+        {phone ? (
+          (isPrinting || printer.primary_url) && (
+            <div className="printer-menu">
+              <button
+                type="button"
+                className="printer-menu__btn"
+                ref={menuBtnRef}
+                aria-label="More actions"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+                onKeyDown={(e) => e.key === "Escape" && setMenuOpen(false)}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="printer-menu__scrim" onClick={() => setMenuOpen(false)} />
+                  <div className="printer-menu__list" role="menu" aria-label="Printer actions" style={menuPos()}>
+                    {isPrinting && (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="printer-menu__item"
+                          onClick={() => { setMenuOpen(false); cmd(state === "paused" ? "resume" : "pause"); }}
+                        >
+                          {state === "paused" ? "Resume" : "Pause"}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="printer-menu__item printer-menu__item--danger"
+                          onClick={() => { setMenuOpen(false); setCancelOpen(true); }}
+                        >
+                          Cancel print...
+                        </button>
+                      </>
+                    )}
+                    {printer.primary_url && (
+                      <a
+                        role="menuitem"
+                        className="printer-menu__item"
+                        href={ensureProtocol(printer.primary_url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Native UI
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" aria-hidden="true">
+                          <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        ) : (
         <div className="printer-header__actions">
             {isPrinting && (
               <>
@@ -361,6 +440,7 @@ export default function Printer() {
               </a>
             )}
         </div>
+        )}
       </header>
 
       {/* ── Tab content ────────────────────────────────────────── */}
@@ -1110,9 +1190,8 @@ function PrinterConfigTab({
             return (
               <div
                 key={pathIdx}
+                className="printer-config__path"
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "26px minmax(90px, 0.8fr) minmax(0, 1.6fr) 100px auto",
                   alignItems: "center",
                   gap: "var(--fw-space-2)",
                   padding: "6px var(--fw-space-2)",

@@ -38,7 +38,7 @@ export default function Settings() {
     <div>
       <div className="page-header">
         <p className="page-header__eyebrow">Settings</p>
-        <h1 className="page-header__title">Settings</h1>
+        <h1 className="page-header__title phone-dup-title">Settings</h1>
       </div>
 
       {/* Appearance ─────────────────────────────────────────────────────── */}

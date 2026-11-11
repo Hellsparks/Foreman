@@ -164,7 +164,7 @@ export default function Filament() {
     <div className="fil-page">
       <header className="fil-head">
         <div>
-          <h1 className="fil-head__title">Filament</h1>
+          <h1 className="fil-head__title phone-dup-title">Filament</h1>
           <p className="fil-head__sub">
             {rows == null
               ? "Loading spools…"
