@@ -309,12 +309,16 @@ export default function Library() {
   const selLibId = sel && !sel.isDir && !isTrash ? sel.libId : undefined;
 
   const [compat, setCompat] = useState<CompatResult[]>([]);
+  const [compatErr, setCompatErr] = useState<string | null>(null);
+  const [compatLoading, setCompatLoading] = useState(false);
   const [sendBusy, setSendBusy] = useState(false);
   const [plateConfirm, setPlateConfirm] = useState(false);
 
   useEffect(() => {
     setDetails(null);
     setCompat([]);
+    setCompatErr(null);
+    setCompatLoading(false);
     setDelArm(false);
     setPlateConfirm(false);
     if (sel) setRname(sel.name);
@@ -324,7 +328,23 @@ export default function Library() {
     if (selLibId == null) return;
     let live = true;
     lib.details(selLibId).then((d) => live && setDetails(d)).catch(() => {});
-    send.check(selLibId).then((r) => live && setCompat(r)).catch(() => {});
+    setCompatLoading(true);
+    setCompatErr(null);
+    send
+      .check(selLibId)
+      .then((r) => {
+        if (live) {
+          setCompat(r);
+          setCompatLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (live) {
+          setCompat([]);
+          setCompatErr(errText(e));
+          setCompatLoading(false);
+        }
+      });
     return () => {
       live = false;
     };
@@ -1161,9 +1181,14 @@ export default function Library() {
                   </>
                 )}
               </div>
-              {selIsPrintable && compat.length > 0 && (
+              {selIsPrintable && (
                 <div className="fw-send-panel">
                   <span className="fw-inspector-eyebrow">SEND TO PRINTER</span>
+                  {compatLoading && <span className="fw-send-loading">Checking printers…</span>}
+                  {compatErr && <span className="fw-send-err">{compatErr}</span>}
+                  {!compatLoading && !compatErr && compat.length === 0 && (
+                    <span className="fw-send-empty">No printers configured</span>
+                  )}
                   <div className="fw-send-list">
                     {compat.map((c) => {
                       const verdictColor =

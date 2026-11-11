@@ -447,6 +447,13 @@
 .fw-send-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fw-send-reason { color: var(--fw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fw-send-fix { color: var(--fw-muted); font-style: italic; }
+.fw-send-loading,
+.fw-send-err,
+.fw-send-empty {
+  font: var(--fw-type-label) var(--fw-mono);
+  color: var(--fw-muted);
+}
+.fw-send-err { color: var(--fw-danger); }
 .fw-send-plate {
   display: flex;
   align-items: center;
