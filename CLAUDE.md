@@ -97,3 +97,13 @@ Contract sources in authority order:
 6. `vendor/spoolman-upstream/tests_integration/` — integration test oracle
 
 If brief disagrees with upstream source, **upstream wins**. Log the correction in doc 04.
+
+---
+
+## Running things yourself
+
+- You start, restart and stop the dev server yourself. Never ask the owner to do it.
+- Before any test that needs the server: kill whatever is on the port, rebuild, start the new binary in the background with output to a log file, wait until `/api/health` answers, then test. Same for the frontend dev server.
+- After changing Rust code, always restart the server before testing. A stale binary has wasted two sessions already.
+- The server logs its commit/build time at startup; check it matches the code you just built.
+- Only ask the owner to do something physical: touch a printer, clear a plate, press Print now on real hardware, or plug something in.
