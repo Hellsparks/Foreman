@@ -107,3 +107,8 @@ If brief disagrees with upstream source, **upstream wins**. Log the correction i
 - After changing Rust code, always restart the server before testing. A stale binary has wasted two sessions already.
 - The server logs its commit/build time at startup; check it matches the code you just built.
 - Only ask the owner to do something physical: touch a printer, clear a plate, press Print now on real hardware, or plug something in.
+- Don't narrate what you're about to do and then stop. Carry the task through to the end, then report.
+- Never ask a question the owner can't answer physically. Starting servers, rebuilding, choosing a branch name, picking a crate — decide it yourself and say what you chose.
+- Never use `tail -N` on test or build output; it hides results. Use `grep -E "test result|FAILED|panicked|^error"`.
+- When reporting, give evidence: the command's real output, not a description of it.
+- If stuck after 3 attempts, stop and paste the actual error. Don't retry past that.
