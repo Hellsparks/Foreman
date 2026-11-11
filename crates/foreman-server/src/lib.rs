@@ -11,6 +11,9 @@ mod inventory;
 #[cfg(test)]
 mod inventory_tests;
 mod job_engine;
+mod maintenance;
+#[cfg(test)]
+mod maintenance_tests;
 mod net;
 mod projects;
 #[cfg(test)]
@@ -248,6 +251,20 @@ pub async fn serve_with(
         }),
     );
     scheduler.spawn();
+
+    // Maintenance: re-check every task at startup and hourly (calendar intervals
+    // come due without a print; job counters are re-checked when each job ends).
+    {
+        let pool = foreman_db.pool.clone();
+        let tx = Arc::clone(&tx);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
+            loop {
+                interval.tick().await;
+                maintenance::evaluate_all(&pool, &tx).await;
+            }
+        });
+    }
 
     let app_state = AppState {
         foreman_db,
@@ -735,6 +752,40 @@ fn build_router(app_state: AppState) -> Router {
             post(api::queue::plate_cleared),
         )
         // Jobs (3.6): history + stats
+        .route("/api/maintenance", get(api::maintenance::overview))
+        .route(
+            "/api/maintenance/settings",
+            put(api::maintenance::put_settings),
+        )
+        .route(
+            "/api/maintenance/templates",
+            get(api::maintenance::templates),
+        )
+        .route(
+            "/api/maintenance/from-templates",
+            post(api::maintenance::from_templates),
+        )
+        .route(
+            "/api/maintenance/tasks",
+            post(api::maintenance::create_task),
+        )
+        .route(
+            "/api/maintenance/tasks/{id}",
+            put(api::maintenance::update_task).delete(api::maintenance::delete_task),
+        )
+        .route(
+            "/api/maintenance/tasks/{id}/done",
+            post(api::maintenance::mark_done),
+        )
+        .route(
+            "/api/maintenance/tasks/{id}/snooze",
+            post(api::maintenance::snooze),
+        )
+        .route("/api/maintenance/history", get(api::maintenance::history))
+        .route(
+            "/api/maintenance/history/{id}",
+            delete(api::maintenance::undo_done),
+        )
         .route("/api/jobs", get(api::jobs::list))
         .route("/api/jobs/stats", get(api::jobs::stats))
         .route(

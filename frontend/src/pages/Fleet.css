@@ -599,3 +599,24 @@ select.fleet__form-input { appearance: none; cursor: pointer; }
   .fleet__form-row { flex-direction: column; }
   .fleet__form-field--short { max-width: none; }
 }
+
+/* Add printer: service tasks offered at creation (5.3) */
+.fleet__form-tasks {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--fw-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.fleet__form-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.fleet__form-task-every {
+  color: var(--fw-muted);
+}

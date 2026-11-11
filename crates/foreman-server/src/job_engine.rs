@@ -309,6 +309,10 @@ pub async fn job_ended(
         "job ended"
     );
     deduct_once(pool, env, job.id, &job.usage_reporter, tools).await?;
+    // Maintenance counters accrue from the job just closed.
+    if let Err(e) = crate::maintenance::evaluate_printer(pool, bus, printer_id).await {
+        warn!(printer_id, "maintenance evaluate: {e}");
+    }
     emit(bus, printer_id, "ended", job.id);
     Ok(Some(repo::job::get(pool, job.id).await?))
 }

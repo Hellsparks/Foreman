@@ -128,6 +128,13 @@ pub async fn rate(
         printer_id: job.printer_id,
         payload: json!({ "kind": "updated", "job_id": id }),
     });
+    if let Some(pid) = job.printer_id {
+        if let Err(e) =
+            crate::maintenance::evaluate_printer(&state.foreman_db.pool, &state.bus_tx, pid).await
+        {
+            tracing::warn!(printer_id = pid, "maintenance evaluate: {e}");
+        }
+    }
     Ok(Json(job))
 }
 
@@ -151,6 +158,13 @@ pub async fn delete(
         printer_id: job.printer_id,
         payload: json!({ "kind": "deleted", "job_id": id }),
     });
+    if let Some(pid) = job.printer_id {
+        if let Err(e) =
+            crate::maintenance::evaluate_printer(&state.foreman_db.pool, &state.bus_tx, pid).await
+        {
+            tracing::warn!(printer_id = pid, "maintenance evaluate: {e}");
+        }
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
