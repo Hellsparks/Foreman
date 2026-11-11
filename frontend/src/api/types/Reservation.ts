@@ -3,4 +3,8 @@
 /**
  * Grams one job holds on one spool.
  */
-export type Reservation = { spool_id: number, queue_item_id: number, file_name: string, grams: number, };
+export type Reservation = { spool_id: number, 
+/**
+ * `null` for project prints not on a queue yet.
+ */
+queue_item_id: number | null, project_plate_id: number | null, file_name: string, grams: number, };

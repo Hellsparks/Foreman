@@ -94,6 +94,32 @@ const MIGRATIONS: &[&str] = &[
        target INTEGER NOT NULL, \
        buy_below INTEGER NOT NULL, \
        updated_at TEXT NOT NULL)",
+    // 0012: templates + projects (5.1, see migrations/0012_projects.sql).
+    "CREATE TABLE IF NOT EXISTS template (\
+       id INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL, category TEXT, notes TEXT, \
+       thumb_file_id INTEGER, body_json TEXT NOT NULL DEFAULT '{}', \
+       created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS project (\
+       id INTEGER PRIMARY KEY NOT NULL, name TEXT NOT NULL, \
+       template_id INTEGER REFERENCES template(id) ON DELETE SET NULL, template_name TEXT, \
+       sets INTEGER NOT NULL DEFAULT 1, due_date TEXT, status TEXT NOT NULL DEFAULT 'active', \
+       created_at TEXT NOT NULL, closed_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS project_slot (\
+       id INTEGER PRIMARY KEY NOT NULL, \
+       project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE, \
+       key TEXT NOT NULL, label TEXT, hex TEXT, spool_id INTEGER, position INTEGER NOT NULL DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS project_plate (\
+       id INTEGER PRIMARY KEY NOT NULL, \
+       project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE, \
+       name TEXT NOT NULL, file_id INTEGER NOT NULL, copies INTEGER NOT NULL DEFAULT 1, \
+       printed INTEGER NOT NULL DEFAULT 0, tools_json TEXT NOT NULL DEFAULT '[]', \
+       position INTEGER NOT NULL DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS project_event (\
+       id INTEGER PRIMARY KEY NOT NULL, \
+       project_id INTEGER NOT NULL REFERENCES project(id) ON DELETE CASCADE, \
+       at TEXT NOT NULL, text TEXT NOT NULL)",
+    "ALTER TABLE queue_item ADD COLUMN project_plate_id INTEGER",
+    "ALTER TABLE job ADD COLUMN project_plate_id INTEGER",
 ];
 
 /// Foreman-native database handle.

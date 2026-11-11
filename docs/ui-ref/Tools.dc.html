@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Tools</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1000px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="Projects.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="Service.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="Tools.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Tools</a>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="padding: 20px 32px 0; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--fw-border)">
+<h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Tools</h1>
+<div role="tablist" aria-label="Tools" style="display: flex; flex-wrap: wrap; margin-bottom: -1px">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+<button type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 0 18px; background: {{t.bg}}; border: 1px solid {{t.border}}; border-bottom-color: {{t.bottom}}; margin-right: -1px; cursor: pointer; font-weight: {{t.weight}}">{{t.label}}</button>
+</sc-for>
+</div>
+</header>
+<main style="padding: 20px 32px 48px; display: flex; flex-direction: column; gap: 16px; max-width: 960px">
+
+<sc-if value="{{isCal}}" hint-placeholder-val="{{ true }}">
+<div role="tablist" aria-label="Calibration type" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{calModes}}" as="c" hint-placeholder-count="2">
+<button type="button" role="tab" aria-selected="{{c.on}}" onClick="{{c.pick}}" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; text-align: left; cursor: pointer; border: 1px solid {{c.border}}; background: {{c.bg}}; color: var(--fw-text); outline: {{c.outline}}">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">{{c.kicker}}</span>
+<b style="font-size: 16px">{{c.title}}</b>
+<span style="font-size: 12px; color: var(--fw-muted)">{{c.desc}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: {{c.stFg}}">{{c.status}}</span>
+</button>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Order matters: skew is a frame error, so fix it once per printer first. Shrinkage is a material property, stored per filament and measured on a printer that is already square, or the skew error leaks into the shrinkage number.</p>
+<sc-if value="{{calSkew}}" hint-placeholder-val="{{ true }}">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">1 · Printer</h2>
+<label style="display: flex; flex-direction: column; gap: 6px; max-width: 360px"><span style="font-size: 13px; font-weight: bold">Printer</span><select onChange="{{sk.setP}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><sc-for list="{{sk.printers}}" as="o" hint-placeholder-count="4"><option value="{{o.i}}" selected="{{o.on}}">{{o.label}}</option></sc-for></select></label>
+<div style="border: 1px solid {{sk.stBorder}}; background: var(--fw-surface); padding: 10px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px"><b>{{sk.stTitle}}</b><span style="color: var(--fw-muted)">{{sk.stText}}</span></div>
+</section>
+<sc-if value="{{sk.supported}}" hint-placeholder-val="{{ true }}">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; flex-direction: row; flex-wrap: wrap; align-items: center">
+<h2 style="flex: 1 1 100%; margin: 0; font-size: 18px">2 · Print the skew test</h2>
+<img src="{{skewThumb}}" alt="" width="80" height="60" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<span style="flex: 1 1 260px; font-size: 13px; color: var(--fw-muted)">skew_test_xy.stl · 25 min · Foreman sends <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">SET_SKEW CLEAR=1</code> first so the old correction doesn't hide the error.</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{sk.printFg}}; background: {{sk.printBg}}">{{sk.printStatus}}</span>
+<button type="button" onClick="{{sk.print}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; cursor: pointer">{{sk.printLabel}}</button>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">3 · Measure the diagonals</h2>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Per plane: corner A→C, B→D, and the side A→D (skip the corner flats). Same three numbers Klipper's SET_SKEW takes.</p>
+<sc-for list="{{sk.planes}}" as="pl" hint-placeholder-count="1">
+<div style="display: grid; grid-template-columns: 48px repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end">
+<b style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; padding-bottom: 12px">{{pl.name}}</b>
+<sc-for list="{{pl.fields}}" as="f" hint-placeholder-count="3"><label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; font-weight: bold">{{f.k}} mm</span><input type="number" step="0.01" value="{{f.v}}" onInput="{{f.set}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace"></label></sc-for>
+</div>
+</sc-for>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px"><input type="checkbox" checked="{{sk.more}}" onChange="{{sk.toggleMore}}" style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"> Also correct XZ and YZ (needs the tall test piece)</label>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">4 · Result</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
+<sc-for list="{{sk.results}}" as="r" hint-placeholder-count="1">
+<div style="background: var(--fw-surface); border: 1px solid var(--fw-border); padding: 10px 12px"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{r.name}} SKEW</div><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 22px; font-weight: bold; color: {{r.fg}}">{{r.deg}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{r.mm}}</div></div>
+</sc-for>
+</div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; background: #0b0c0a; color: #d9e7c4; padding: 10px 12px; white-space: pre-wrap">{{sk.gcode}}</div>
+<label style="display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 13px"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"> Add <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">SKEW_PROFILE LOAD=foreman</code> to PRINT_START (after homing) and <code style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">SET_SKEW CLEAR=1</code> to PRINT_END</label>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px"><button type="button" onClick="{{sk.apply}}" disabled="{{sk.applyOff}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{sk.applyLabel}}</button><span style="font-size: 12px; color: var(--fw-muted)">{{sk.applyNote}}</span></div>
+<p style="margin: 0; font-size: 12px; color: var(--fw-muted)">To check it: print the test again with correction on and enter the new numbers. They should be close to 0°. Keep parts away from the bed edges; corrected moves can reach past them.</p>
+</section>
+</sc-if>
+</sc-if>
+<sc-if value="{{calShr}}" hint-placeholder-val="{{ false }}">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+<h2 style="grid-column: 1 / -1; margin: 0; font-size: 18px">1 · Filament and printer</h2>
+<div style="grid-column: 1 / -1; border: 1px solid {{shrSkewBorder}}; background: {{shrSkewBg}}; padding: 8px 12px; font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="flex: 1 1 260px">{{shrSkewNote}}</span><sc-if value="{{shrSkewMissing}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{goSkew}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; cursor: pointer; font-size: 13px">Do printer skew first</button></sc-if></div>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Filament</span><select style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>eSun ABS+ Grey (#63)</option><option>Prusament PETG Galaxy Black (#42)</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Printer</span><select style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>Bambu P1S (ABS+ loaded)</option><option>Voron 2.4 350</option></select></label>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h2 style="flex: 1 1 100%; margin: 0; font-size: 18px">2 · Print the test piece</h2>
+<img src="{{caliThumb}}" alt="" width="80" height="60" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<span style="flex: 1 1 260px; font-size: 13px; color: var(--fw-muted)">calistar_100mm.3mf · 48 min · 21 g</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{printFg}}; background: {{printBg}}">{{printStatus}}</span>
+<button type="button" onClick="{{printTest}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">{{printLabel}}</button>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">3 · Measure</h2>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Nominal 100.00 mm on each axis. Use calipers on the outer faces.</p>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{axes}}" as="a" hint-placeholder-count="3">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">{{a.name}} measured mm</span><input type="number" step="0.01" value="{{a.val}}" onInput="{{a.set}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace"></label>
+</sc-for>
+</div>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">4 · Result</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{axes}}" as="a" hint-placeholder-count="3">
+<div style="background: var(--fw-surface); border: 1px solid var(--fw-border); padding: 10px 12px"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{a.name}} CORRECTION</div><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 22px; font-weight: bold">{{a.pct}}</div><div style="font-size: 12px; color: var(--fw-muted)">{{a.shrink}}</div></div>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px"><button type="button" onClick="{{apply}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Apply to eSun ABS+ Grey</button><span style="font-size: 13px; color: var(--fw-muted)">Saved as the filament's shrinkage field; OrcaSlicer export picks it up.</span></div>
+</section>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{isSwatch}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<section style="flex: 1 1 320px; border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px">Swatch text</h2>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Filament</span><select onChange="{{pickSwatch}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option value="0">Prusament PETG Galaxy Black</option><option value="1">Polymaker PolyLite PLA Teal</option><option value="2">Silk Dual Copper/Silver</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Line 1 · brand + material</span><input type="text" value="{{l1}}" onInput="{{setL1}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Line 2 · colour</span><input type="text" value="{{l2}}" onInput="{{setL2}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<span style="font-size: 12px; color: {{fitFg}}">{{fitNote}}</span>
+<div style="display: flex; gap: 8px"><button type="button" style="flex: 1; min-height: 44px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Download STL</button><a href="Library.dc.html" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center">Send to printer…</a></div>
+</section>
+<section aria-label="Preview" style="flex: 1 1 360px; border: 1px solid var(--fw-border); background: var(--fw-surface); padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center">
+<div role="img" aria-label="Swatch preview: {{l1}} / {{l2}}" style="width: 375px; max-width: 100%; aspect-ratio: 75 / 40; background: {{swHex}}; border: 1px solid var(--fw-muted); position: relative; box-shadow: var(--fw-shadow-overlay)">
+<div style="position: absolute; left: 11%; right: 6%; top: 5%; height: 20%; display: flex; align-items: center; font-family: Arial, Helvetica, sans-serif; font-weight: bold; font-size: 22px; color: {{swInk}}; white-space: nowrap; overflow: hidden">{{l1}}</div>
+<div style="position: absolute; left: 0; right: 0; top: 27%; border-top: 1px solid {{swInk}}; opacity: .5"></div>
+<div style="position: absolute; left: 11%; right: 6%; top: 28%; height: 20%; display: flex; align-items: center; font-family: Arial, Helvetica, sans-serif; font-size: 22px; color: {{swInk}}; white-space: nowrap; overflow: hidden">{{l2}}</div>
+</div>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">75 × 40 × 3 mm · text debossed 0.6 mm · Liberation Sans</span>
+</section>
+</div>
+</sc-if>
+
+<sc-if value="{{isImport}}" hint-placeholder-val="{{ false }}">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<h2 style="flex: 1 1 100%; margin: 0; font-size: 18px">1 · File</h2>
+<span style="flex: 1; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px">spool_inventory_2026.csv · 16 rows · 7 columns</span>
+<button type="button" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Choose another file</button>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 18px">2 · Match columns</h2>
+<sc-for list="{{mapping}}" as="m" hint-placeholder-count="5">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--fw-border)"><span style="flex: 1 1 160px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px">{{m.col}}</span><span style="font-size: 12px; color: var(--fw-muted); flex: 1 1 160px">e.g. {{m.sample}}</span><span aria-hidden="true">→</span><select aria-label="Field for {{m.col}}" style="min-height: 40px; min-width: 200px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>{{m.field}}</option><option>Ignore this column</option></select></div>
+</sc-for>
+</section>
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 18px">3 · Preview</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 4px 8px; color: var(--fw-success); background: var(--fw-success-bg)">+ 12 new spools</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 4px 8px; color: var(--fw-info); background: var(--fw-info-bg)">↻ 3 updated (weight)</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 4px 8px; color: var(--fw-warning); background: var(--fw-warning-bg)">⚠ 1 skipped: unknown vendor “Sunlu”</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; padding: 4px 8px; color: var(--fw-info); background: var(--fw-info-bg)">+ 2 new filaments</span>
+</div>
+<label style="display: flex; align-items: center; gap: 8px; min-height: 40px; font-size: 13px"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: var(--fw-accent-hover)"> Create missing vendors instead of skipping (adds “Sunlu”)</label>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px"><button type="button" onClick="{{applyImport}}" disabled="{{imported}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{importLabel}}</button><span style="font-size: 13px; color: var(--fw-muted)">Runs as one batch. You can undo the whole import afterwards.</span></div>
+</section>
+</sc-if>
+
+<sc-if value="{{isExport}}" hint-placeholder-val="{{ false }}">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px">
+<sc-for list="{{exports}}" as="e" hint-placeholder-count="4">
+<section style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px; display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-size: 17px">{{e.name}}</h2>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted); flex: 1">{{e.desc}}</p>
+<span style="font-size: 12px; color: {{e.noteFg}}">{{e.note}}</span>
+<button type="button" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">{{e.action}}</button>
+</section>
+</sc-for>
+</div>
+</sc-if>
+</main>
+</div>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'cal', printed: false, m: { X: '99.31', Y: '99.36', Z: '99.62' }, sw: 0, l1: 'PRUSAMENT PETG', l2: 'Galaxy Black', imported: false, toasts: [], calMode: 'skew', skP: 0, skPrinted: false, sk: { XY: ['140.40', '142.80', '99.80'], XZ: ['141.60', '141.40', '99.80'], YZ: ['142.40', '140.50', '99.50'] }, skMore: false, skApplied: {} };
+    this.tid = 0;
+  }
+  toast(text, undo) { const id = ++this.tid; this.setState({ toasts: [{ id, text, undo }] }); }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  renderVals() {
+    const s = this.state;
+    const tabDefs = [['cal', 'Calibration'], ['swatch', 'Swatches'], ['import', 'Import'], ['export', 'Export']];
+    const tabs = tabDefs.map(([id, label]) => { const on = s.tab === id; return { label, sel: on ? 'true' : 'false', bg: on ? 'var(--fw-background)' : 'transparent', border: on ? 'var(--fw-border)' : 'transparent', bottom: on ? 'var(--fw-background)' : 'transparent', weight: on ? 'bold' : 'normal', pick: () => this.setState({ tab: id }) }; });
+    const axes = ['X', 'Y', 'Z'].map(a => { const v = parseFloat(s.m[a]) || 100; const pct = 100 / v * 100; return { name: a, val: s.m[a], set: (e) => this.setState({ m: { ...this.state.m, [a]: e.target.value } }), pct: pct.toFixed(2) + '%', shrink: 'shrank ' + (100 - v).toFixed(2) + ' mm' }; });
+    const SW = [['PRUSAMENT PETG', 'Galaxy Black', '#1d1d22', '#9a9a9a'], ['POLYMAKER PLA', 'PolyLite Teal', '#1f8a8a', '#0b3b3b'], ['GENERIC PLA SILK', 'Dual Copper/Silver', 'linear-gradient(90deg, #b87333 50%, #c0c0c0 50%)', '#3a2a1a']];
+    const sw = SW[s.sw];
+    const longest = Math.max(s.l1.length, s.l2.length);
+    const SKP = [['Voron 2.4 350', 'klipper', 'printing'], ['Voron Trident', 'klipper', 'idle'], ['Sovol SV08', 'klipper', 'printing'], ['Ender 3 S1', 'klipper', 'idle'], ['Bambu X1C', 'bambu', 'printing'], ['Prusa MK4', 'octoprint', 'idle']];
+    const PREV = { 0: '−0.12° · 2 Nov', 1: null, 2: '0.31° · Sep', 3: null };
+    const P = SKP[s.skP]; const sup = P[1] === 'klipper';
+    const calc = (ac, bd, ad) => { ac = +ac; bd = +bd; ad = +ad; const side = Math.sqrt(2 * ac * ac + 2 * bd * bd - 4 * ad * ad) / 2; const f = Math.tan(Math.PI / 2 - Math.acos((ac * ac - side * side - ad * ad) / (2 * side * ad))); return isFinite(f) ? f : 0; };
+    const planesK = s.skMore ? ['XY', 'XZ', 'YZ'] : ['XY'];
+    const results = planesK.map(k => { const f = calc(...s.sk[k]); const deg = Math.atan(f) * 180 / Math.PI; return { name: k, deg: (deg >= 0 ? '+' : '−') + Math.abs(deg).toFixed(2) + '°', mm: Math.abs(f * 100).toFixed(2) + ' mm off over 100 mm', fg: Math.abs(deg) > 0.5 ? 'var(--fw-warning)' : 'var(--fw-text)' }; });
+    const applied = s.skApplied[s.skP];
+    const skStatus = (i) => { const pp = SKP[i]; if (pp[1] !== 'klipper') return 'not supported'; return s.skApplied[i] ? 'corrected today' : PREV[i] ? 'corrected ' + PREV[i] : 'not calibrated'; };
+    const nSkewDone = SKP.filter((pp, i) => pp[1] === 'klipper' && (s.skApplied[i] || PREV[i])).length;
+    const sk = {
+      printers: SKP.map((pp, i) => ({ i, on: i === s.skP, label: pp[0] + ' · ' + skStatus(i) })), setP: (e) => this.setState({ skP: Number(e.target.value), skPrinted: false }),
+      supported: sup, stBorder: sup ? 'var(--fw-border)' : 'var(--fw-warning)',
+      stTitle: sup ? (applied ? 'Skew corrected today · profile “foreman”' : PREV[s.skP] ? 'Current: ' + PREV[s.skP] + ' · profile “foreman”' : 'No skew correction yet') : P[0] + ': no software skew correction',
+      stText: sup ? '[skew_correction] is in printer.cfg (Foreman adds it if missing, with your OK). Stored on the printer, not on any filament.' : 'Only Klipper is supported for now. For this printer, square the frame mechanically; its shrinkage results will include any skew.',
+      printStatus: s.skPrinted ? '✓ Printed today' : '○ Not printed yet', printFg: s.skPrinted ? 'var(--fw-success)' : 'var(--fw-warning)', printBg: s.skPrinted ? 'var(--fw-success-bg)' : 'var(--fw-warning-bg)',
+      printLabel: s.skPrinted ? 'Print again…' : 'Send test piece…', print: () => this.setState({ skPrinted: true }),
+      planes: planesK.map(k => ({ name: k, fields: ['AC', 'BD', 'AD'].map((lab, j) => ({ k: lab, v: s.sk[k][j], set: (e) => { const arr = this.state.sk[k].slice(); arr[j] = e.target.value; this.setState({ sk: { ...this.state.sk, [k]: arr } }); } })) })),
+      more: s.skMore, toggleMore: () => this.setState({ skMore: !s.skMore }), results,
+      gcode: 'SET_SKEW ' + planesK.map(k => k + '=' + s.sk[k].join(',')).join(' ') + '\nSKEW_PROFILE SAVE=foreman\nSAVE_CONFIG',
+      applyOff: !!applied, applyLabel: applied ? '✓ Applied' : 'Apply to ' + P[0],
+      applyNote: P[2] === 'printing' ? 'Printer is printing: SET_SKEW + SAVE is sent now; SAVE_CONFIG (restarts Klipper) waits until the job ends.' : 'SAVE_CONFIG restarts Klipper. The printer is idle, so it runs right away.',
+      apply: () => { const i = s.skP; this.setState({ skApplied: { ...s.skApplied, [i]: true } }); this.toast('Skew saved on ' + P[0] + (P[2] === 'printing' ? ' · SAVE_CONFIG queued until the job ends' : ''), () => { const a = { ...this.state.skApplied }; delete a[i]; this.setState({ skApplied: a }); }); }
+    };
+    const seg3 = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-focus)' : 'var(--fw-border)', outline: on ? '2px solid var(--fw-focus)' : 'none', bg: on ? 'var(--fw-raised)' : 'var(--fw-surface)' });
+    const calModes = [
+      { kicker: 'Per printer · do first', title: 'Printer skew', desc: 'Frame not square. Klipper [skew_correction], stored on the printer.', status: nSkewDone + ' of 4 Klipper printers corrected', stFg: nSkewDone < 4 ? 'var(--fw-warning)' : 'var(--fw-success)', ...seg3(s.calMode === 'skew'), pick: () => this.setState({ calMode: 'skew' }) },
+      { kicker: 'Per filament', title: 'Filament shrinkage', desc: 'Material shrinks as it cools. Stored on the filament, used by Orca export.', status: '6 of 9 filaments calibrated', stFg: 'var(--fw-muted)', ...seg3(s.calMode === 'shr'), pick: () => this.setState({ calMode: 'shr' }) }
+    ];
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      tabs, skewThumb: this.thumbOf('skew_test_xy.stl', '#e46a1a'), caliThumb: this.thumbOf('calistar_100mm.3mf', '#8a8f94'), isCal: s.tab === 'cal', calModes, sk, calSkew: s.calMode === 'skew', calShr: s.calMode === 'shr', goSkew: () => this.setState({ calMode: 'skew', skP: 0 }), shrSkewNote: 'Test printer: Bambu P1S · no software skew correction. Shrinkage measured here includes any frame skew. Better: use a Klipper printer that is already corrected (Voron 2.4 350, −0.12°).', shrSkewMissing: true, shrSkewBorder: 'var(--fw-warning)', shrSkewBg: 'var(--fw-warning-bg)', isSwatch: s.tab === 'swatch', isImport: s.tab === 'import', isExport: s.tab === 'export',
+      printStatus: s.printed ? '✓ Printed today · Bambu P1S' : '○ Not printed yet', printFg: s.printed ? 'var(--fw-success)' : 'var(--fw-warning)', printBg: s.printed ? 'var(--fw-success-bg)' : 'var(--fw-warning-bg)',
+      printLabel: s.printed ? 'Print again…' : 'Send test piece…', printTest: () => this.setState({ printed: true }),
+      axes,
+      apply: () => this.toast('Shrinkage X ' + axes[0].pct + ' · Y ' + axes[1].pct + ' · Z ' + axes[2].pct + ' saved on the filament eSun ABS+ Grey (its Orca profile shrinkage XY/Z). Every printer uses it.', () => {}),
+      pickSwatch: (e) => { const i = Number(e.target.value); this.setState({ sw: i, l1: SW[i][0], l2: SW[i][1] }); },
+      l1: s.l1, l2: s.l2, setL1: (e) => this.setState({ l1: e.target.value }), setL2: (e) => this.setState({ l2: e.target.value }),
+      swHex: sw[2], swInk: sw[3],
+      fitNote: longest > 18 ? '⚠ Long text: font will shrink to fit 62 mm.' : '✓ Fits at full size (6.4 mm text).', fitFg: longest > 18 ? 'var(--fw-warning)' : 'var(--fw-success)',
+      mapping: [['Name', 'Galaxy Black', 'Filament name'], ['Brand', 'Prusament', 'Vendor'], ['Type', 'PETG', 'Material'], ['Remaining (g)', '812', 'Remaining weight'], ['Shelf', 'B2', 'Location'], ['Hex', '#1d1d22', 'Colour'], ['Bought', '2026-03-02', 'First used (approx.)']].map(([col, sample, field]) => ({ col, sample, field })),
+      imported: s.imported, importLabel: s.imported ? 'Imported' : 'Import 16 rows',
+      applyImport: () => { this.setState({ imported: true }); this.toast('Imported 12 new + 3 updated spools (batch #7)', () => this.setState({ imported: false })); },
+      exports: [
+        { name: 'OrcaSlicer filament profiles', desc: 'One profile per filament with temps, shrinkage and flow from Foreman.', note: '2 multi-colour filaments export with all colours listed', noteFg: 'var(--fw-muted)', action: 'Export 14 profiles' },
+        { name: 'HueForge catalogue', desc: 'Filaments with transmission distance (TD) for HueForge.', note: '⚠ 2 multi-colour filaments skipped (need one TD)', noteFg: 'var(--fw-warning)', action: 'Export 11 filaments' },
+        { name: 'CSV', desc: 'Spools with weights, locations and prices for spreadsheets.', note: '', noteFg: 'var(--fw-muted)', action: 'Download CSV' },
+        { name: 'Spoolman JSON', desc: 'Full vendors, filaments and spools; loads into any Spoolman.', note: '', noteFg: 'var(--fw-muted)', action: 'Download JSON' }
+      ],
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => { t.undo(); this.setState({ toasts: [] }); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

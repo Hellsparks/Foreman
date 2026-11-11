@@ -26,6 +26,7 @@ struct QueueRow {
     position: i64,
     error: Option<String>,
     updated_at: String,
+    project_plate_id: Option<i64>,
 }
 
 impl QueueRow {
@@ -43,6 +44,7 @@ impl QueueRow {
             position: self.position,
             error: self.error,
             updated_at: self.updated_at,
+            project_plate_id: self.project_plate_id,
         }
     }
 }
@@ -52,7 +54,7 @@ macro_rules! select_items {
     ($rest:literal) => {
         concat!(
             "SELECT id, file_id, file_name, source, added_by, added_at, status, printer_id, \
-             from_fleet, position, error, updated_at FROM queue_item ",
+             from_fleet, position, error, updated_at, project_plate_id FROM queue_item ",
             $rest
         )
     };

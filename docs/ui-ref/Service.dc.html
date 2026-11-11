@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Service</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1000px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="Projects.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="Service.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Service</a>
+<a href="Tools.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+<div style="flex: 1 1 300px"><h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Service</h1><p style="margin: 4px 0 0; color: var(--fw-muted)">{{headline}}</p></div>
+<button type="button" onClick="{{newTask}}" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">New task type</button>
+</div>
+<div role="group" aria-label="Show" style="display: flex">
+<sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="min-height: 40px; padding: 0 14px; margin-left: -1px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; cursor: pointer; font-size: 13px">{{f.label}}</button>
+</sc-for>
+</div>
+<div style="border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-height: 64px; padding: 8px 14px; border-bottom: 1px solid var(--fw-border); background: {{r.rowBg}}">
+<button type="button" onClick="{{r.open}}" style="flex: 1 1 220px; min-width: 0; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; min-height: 44px"><b>{{r.task}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{r.printer}} · every {{r.every}}</span></button>
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 3px">
+<div style="height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="height: 100%; width: {{r.pct}}%; background: {{r.fg}}"></div></div>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: {{r.fg}}">{{r.status}}</span>
+</div>
+<button type="button" onClick="{{r.snooze}}" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px">Snooze 10 h</button>
+<button type="button" onClick="{{r.done}}" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 13px; font-weight: bold">Done</button>
+</div>
+</sc-for>
+</div>
+</main>
+
+<sc-if value="{{inspOpen}}" hint-placeholder-val="{{ true }}">
+<aside aria-label="Task" style="flex: 1 1 360px; max-width: 420px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Service task · {{sel.printer}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{sel.task}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<span style="align-self: flex-start; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{sel.fg}}; background: {{sel.bg}}">{{sel.status}}</span>
+<section style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Mark done</h3>
+<label style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: bold">Note (optional)</span><textarea placeholder="What did you do? Parts replaced?" style="min-height: 64px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 8px; border-radius: 2px; resize: vertical"></textarea></label>
+<button type="button" style="align-self: flex-start; min-height: 36px; padding: 0 10px; border: 1px dashed var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">+ Photo</button>
+<button type="button" onClick="{{sel.done}}" style="min-height: 44px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Done · reset counter</button>
+</section>
+<section style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<h3 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Interval</h3>
+<div style="display: flex; gap: 8px; align-items: center"><input type="number" value="{{sel.of}}" aria-label="Interval amount" style="width: 96px; min-height: 40px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace">
+<div role="radiogroup" aria-label="Interval unit" style="display: flex; flex: 1">
+<sc-for list="{{units}}" as="u" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{u.on}}" onClick="{{u.pick}}" style="flex: 1; min-height: 40px; margin-left: -1px; border: 1px solid {{u.border}}; background: {{u.bg}}; color: {{u.fg}}; cursor: pointer; font-size: 12px">{{u.label}}</button></sc-for>
+</div></div>
+</section>
+<section style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<h3 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">History</h3>
+<sc-for list="{{sel.history}}" as="h" hint-placeholder-count="3"><div style="font-size: 13px; display: flex; gap: 10px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); width: 84px; flex: none">{{h.d}}</span><span>{{h.x}}</span></div></sc-for>
+</section>
+</aside>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'due', sel: 'belt', unit: {}, reset: {}, snooze: {}, toasts: [] };
+    this.tid = 0;
+  }
+  renderVals() {
+    const s = this.state;
+    const tone = { warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'] };
+    const T = [
+      { id: 'belt', task: 'Belt tension', printer: 'Voron 2.4 350', v: 212, of: 200, unit: 'h', hist: [['3 Oct', 'Tensioned A/B to 110 Hz'], ['12 Aug', 'Done']] },
+      { id: 'noz', task: 'Nozzle swap', printer: 'Bambu X1C', v: 380, of: 400, unit: 'h', hist: [['1 Sep', 'Hardened 0.4 installed']] },
+      { id: 'wipe', task: 'Nozzle brush & wipe', printer: 'Voron 2.4 350', v: 41, of: 50, unit: 'h', hist: [['Mon', 'Brush replaced']] },
+      { id: 'ptfe', task: 'PTFE tube check', printer: 'Prusa MK4', v: 2.6, of: 3, unit: 'kg', hist: [['Aug', 'Replaced']] },
+      { id: 'lube', task: 'Lubricate rails', printer: 'Sovol SV08', v: 260, of: 300, unit: 'h', hist: [['Sep', 'Done']] },
+      { id: 'rails', task: 'Lubricate linear rails', printer: 'Voron 2.4 350', v: 120, of: 300, unit: 'h', hist: [['Aug', 'Done']] },
+      { id: 'carb', task: 'Carbon rods clean', printer: 'Bambu X1C', v: 90, of: 200, unit: 'h', hist: [] },
+      { id: 'wiper', task: 'Purge wiper', printer: 'Bambu P1S', v: 410, of: 500, unit: 'jobs', hist: [] }
+    ];
+    const unitOf = (t) => s.unit[t.id] || t.unit;
+    const rowsAll = T.map(t => {
+      const v = s.reset[t.id] ? 0 : t.v; const snoozed = s.snooze[t.id] ? 10 : 0; const of = t.of + snoozed;
+      const ratio = v / of; const over = ratio > 1; const soon = !over && ratio >= 0.8;
+      const k = over ? 'bad' : soon ? 'warn' : 'ok'; const u = unitOf(t);
+      return { t, k, over, soon, task: t.task, printer: t.printer, every: of + ' ' + (u === 'h' ? 'print hours' : u === 'kg' ? 'kg filament' : 'jobs'), pct: Math.min(100, Math.round(ratio * 100)),
+        fg: tone[k][0], bg: tone[k][1], status: (over ? '✖ Overdue · ' : soon ? '⚠ Due soon · ' : '✓ ') + v + ' / ' + of + ' ' + u + (snoozed ? ' · snoozed' : '') };
+    });
+    const act = (key, id, val, text) => { const prev = s[key]; this.setState({ [key]: { ...s[key], [id]: val } }); const tid = ++this.tid; this.setState({ toasts: [{ id: tid, text, undo: () => this.setState({ [key]: prev }) }] }); };
+    const shown = rowsAll.filter(r => s.filter === 'all' || (s.filter === 'due' ? (r.over || r.soon) : r.over));
+    const rows = shown.map(r => ({ ...r, rowBg: s.sel === r.t.id ? 'var(--fw-info-bg)' : 'transparent', open: () => this.setState({ sel: r.t.id }),
+      done: () => act('reset', r.t.id, true, r.task + ' on ' + r.printer + ' done · counter reset'),
+      snooze: () => act('snooze', r.t.id, true, r.task + ' snoozed 10 h') }));
+    const selR = rowsAll.find(r => r.t.id === s.sel);
+    const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const over = rowsAll.filter(r => r.over).length, soon = rowsAll.filter(r => r.soon).length;
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      headline: over + ' overdue · ' + soon + ' due soon · ' + T.length + ' tasks across 6 printers',
+      filters: [['due', 'Due & soon'], ['over', 'Overdue'], ['all', 'All']].map(([id, label]) => ({ label, ...seg(s.filter === id), pick: () => this.setState({ filter: id }) })),
+      rows, newTask: () => {},
+      inspOpen: !!selR, closeInsp: () => this.setState({ sel: null }),
+      sel: selR ? { task: selR.task, printer: selR.printer, status: selR.status, fg: selR.fg, bg: selR.bg, of: selR.t.of, history: selR.t.hist.map(([d, x]) => ({ d, x })).concat([{ d: '—', x: 'Counter started' }]),
+        done: () => act('reset', selR.t.id, true, selR.task + ' done · counter reset') } : { history: [] },
+      units: selR ? [['h', 'Print hours'], ['kg', 'kg filament'], ['jobs', 'Jobs']].map(([id, label]) => ({ label, ...seg(unitOf(selR.t) === id), pick: () => this.setState({ unit: { ...s.unit, [selR.t.id]: id } }) })) : [],
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => { t.undo(); this.setState({ toasts: [] }); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

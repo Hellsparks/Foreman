@@ -8,6 +8,7 @@ pub mod library;
 pub mod printer_commands;
 pub mod printer_paths;
 pub mod printers;
+pub mod projects;
 pub mod queue;
 pub mod send;
 pub mod spools;

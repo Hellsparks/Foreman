@@ -86,6 +86,8 @@ pub async fn demands(
             i.id,
         )
     });
+    // Project prints draw from their slot spool, whatever the file was sliced for.
+    let plate_spools = crate::projects::plate_spools(pool).await?;
     let mut out = Vec::new();
     for item in items {
         if !matches!(
@@ -101,10 +103,14 @@ pub async fn demands(
             .tools
             .iter()
             .filter_map(|t| {
+                let slot_spool = item
+                    .project_plate_id
+                    .and_then(|p| plate_spools.get(&p))
+                    .and_then(|m| m.get(&t.index).copied());
                 Some(ToolDemand {
                     tool: t.index,
                     grams: t.grams.filter(|g| *g > 0.0)?,
-                    spool_id: t.spool_id,
+                    spool_id: slot_spool.or(t.spool_id),
                 })
             })
             .collect();
@@ -126,13 +132,16 @@ pub async fn demands(
             _ => 1.0,
         };
         out.push(JobDemand {
-            queue_item_id: item.id,
+            queue_item_id: Some(item.id),
+            project_plate_id: item.project_plate_id,
             file_name: item.file_name,
             printer_id: item.printer_id,
             tools,
             left,
         });
     }
+    // Then project prints not on a queue yet.
+    out.extend(crate::projects::unqueued_demands(pool, lib, &plate_spools).await?);
     Ok(out)
 }
 

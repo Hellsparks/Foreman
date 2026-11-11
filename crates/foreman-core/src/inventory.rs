@@ -65,10 +65,14 @@ pub struct ToolDemand {
     pub spool_id: Option<i64>,
 }
 
-/// A queue item that is waiting, sending or printing.
+/// A queue item that is waiting, sending or printing, or project prints that
+/// are not on a queue yet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JobDemand {
-    pub queue_item_id: i64,
+    /// `None` for project prints not queued yet.
+    pub queue_item_id: Option<i64>,
+    /// The project plate these prints are for.
+    pub project_plate_id: Option<i64>,
     pub file_name: String,
     /// Lane: `None` = fleet queue (no printer picked yet).
     pub printer_id: Option<i64>,
@@ -91,8 +95,11 @@ pub struct SlotSpool {
 pub struct Reservation {
     #[ts(type = "number")]
     pub spool_id: i64,
-    #[ts(type = "number")]
-    pub queue_item_id: i64,
+    /// `null` for project prints not on a queue yet.
+    #[ts(type = "number | null")]
+    pub queue_item_id: Option<i64>,
+    #[ts(type = "number | null")]
+    pub project_plate_id: Option<i64>,
     pub file_name: String,
     pub grams: f64,
 }
@@ -134,12 +141,15 @@ pub fn reservations(
             }
             *avail -= g;
             match out.iter_mut().find(|r: &&mut Reservation| {
-                r.spool_id == spool_id && r.queue_item_id == job.queue_item_id
+                r.spool_id == spool_id
+                    && r.queue_item_id == job.queue_item_id
+                    && r.project_plate_id == job.project_plate_id
             }) {
                 Some(r) => r.grams += g,
                 None => out.push(Reservation {
                     spool_id,
                     queue_item_id: job.queue_item_id,
+                    project_plate_id: job.project_plate_id,
                     file_name: job.file_name.clone(),
                     grams: g,
                 }),
@@ -209,7 +219,8 @@ mod tests {
         left: f64,
     ) -> JobDemand {
         JobDemand {
-            queue_item_id: id,
+            queue_item_id: Some(id),
+            project_plate_id: None,
             file_name: format!("job{id}.gcode"),
             printer_id: printer,
             tools: tools

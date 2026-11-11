@@ -316,7 +316,7 @@ export default function InventoryTab({
             Reserved by the queue · {kg(inv.grams_reserved)}
           </summary>
           {inv.reservations.map((r) => (
-            <div key={`${r.queue_item_id}-${r.spool_id}`} className="inv-res">
+            <div key={`${r.queue_item_id ?? "p" + r.project_plate_id}-${r.spool_id}`} className="inv-res">
               <span style={{ flex: 1 }}>{r.file_name}</span>
               <span className="fil-mono">spool #{r.spool_id}</span>
               <span className="fil-mono">{Math.round(r.grams)} g</span>
