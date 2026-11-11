@@ -104,7 +104,9 @@ a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
 <p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Free = grams left minus what other projects and queued jobs already reserved.</p>
 <sc-for list="{{slots}}" as="sl" hint-placeholder-count="2">
 <div style="border: 1px solid var(--fw-border); background: var(--fw-surface); padding: 12px; display: flex; flex-direction: column; gap: 8px">
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px"><b style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{sl.key}}</b><span style="font-size: 13px; color: var(--fw-muted)">{{sl.label}} · used on {{sl.plates}}</span><span style="flex: 1"></span><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">needs {{sl.need}} g</span></div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px"><b style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">{{sl.key}}</b><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; padding: 2px 7px; color: var(--fw-info); background: var(--fw-info-bg)">{{sl.mat}}</span><span style="font-size: 13px; color: var(--fw-muted)">{{sl.label}} · used on {{sl.plates}}</span><span style="flex: 1"></span><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace">needs {{sl.need}} g</span></div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span style="flex: 1 1 240px; font-size: 12px; color: var(--fw-muted)">{{sl.poolNote}}</span><button type="button" onClick="{{sl.toggle}}" style="min-width: 150px; min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; cursor: pointer; font-size: 13px">{{sl.toggleLabel}}</button></div>
+<sc-if value="{{sl.warnMat}}" hint-placeholder-val="{{ '' }}"><div style="padding: 8px 10px; border: 1px solid var(--fw-warning); background: var(--fw-warning-bg); color: var(--fw-warning); font-size: 13px">{{sl.warnMat}}</div></sc-if>
 <div role="radiogroup" aria-label="Spool for {{sl.key}}" style="display: flex; flex-direction: column; gap: 4px">
 <sc-for list="{{sl.options}}" as="o" hint-placeholder-count="4">
 <button type="button" role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 10px; background: var(--fw-raised); border: 1px solid {{o.border}}; outline: {{o.outline}}; cursor: pointer; text-align: left">
@@ -130,7 +132,7 @@ a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { source: 'files', tpl: 'chess', sets: 1, pick: { PRIMARY: 57, ACCENT: 61 }, fsel: { housing: true, lid: true, benchy: true }, assign: {}, fqty: { housing: 2 } };
+    this.state = { source: 'files', tpl: 'chess', sets: 1, pick: {}, fsel: { housing: true, lid: true, benchy: true }, assign: {}, fqty: { housing: 2 }, showAll: {} };
   }
   thumbOf(name, hex) {
     const n = String(name || '').toLowerCase();
@@ -180,15 +182,16 @@ class Component extends DCLogic {
     const s = this.state;
     const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
     const T = {
-      chess: { name: 'Chess set', sub: '6 plates · 2 colours · ~13 h', slots: [['PRIMARY', 'Light pieces', 'plates 1–5', 202], ['ACCENT', 'Dark pieces + frame', 'plates 1–3, 5, 6', 139]], hexes: ['#1f8a8a', '#f4f4ef'] },
-      desk: { name: 'Desk organiser', sub: '4 plates · 2 colours · ~9 h', slots: [['BODY', 'Trays', 'plates 1–3', 260], ['TRIM', 'Labels and feet', 'plate 4', 30]], hexes: ['#3b3b3b', '#e46a1a'] },
-      clips: { name: 'Cable clips', sub: '2 plates · 1 colour · ~1.5 h', slots: [['PRIMARY', 'Clips', 'plates 1–2', 44]], hexes: ['#1d1d22'] }
+      chess: { name: 'Chess set', sub: '6 plates · 2 colours · ~13 h', slots: [['PRIMARY', 'Light pieces', 'plates 1–5', 202, '#f4f4ef', 'PLA'], ['ACCENT', 'Dark pieces + frame', 'plates 1–3, 5, 6', 139, '#1d1d22', 'PLA']], hexes: ['#1f8a8a', '#f4f4ef'] },
+      desk: { name: 'Desk organiser', sub: '4 plates · 2 colours · ~9 h', slots: [['BODY', 'Trays', 'plates 1–3', 260, '#3b3b3b', 'PLA'], ['TRIM', 'Labels and feet', 'plate 4', 30, '#e46a1a', 'PLA']], hexes: ['#3b3b3b', '#e46a1a'] },
+      clips: { name: 'Cable clips', sub: '2 plates · 1 colour · ~1.5 h', slots: [['PRIMARY', 'Clips', 'plates 1–2', 44, '#1d1d22', 'PETG']], hexes: ['#1d1d22'] }
     };
     const F = [
       { id: 'housing', name: 'housing_top.gcode', sub: 'OrcaSlicer · 2 h 05 m · single tool', tools: [['T0', 'PLA', 'White', '#f4f4ef', 64]] },
       { id: 'lid', name: 'lid_with_logo.3mf', sub: 'OrcaSlicer · 1 h 40 m · 2 colours (AMS)', tools: [['T0', 'PLA', 'Teal', '#1f8a8a', 30], ['T1', 'PLA', 'White', '#f4f4ef', 18]] },
       { id: 'benchy', name: 'benchy.gcode', sub: 'PrusaSlicer · 42 m · single tool', tools: [['T0', 'PLA', 'Teal', '#1f8a8a', 12]] },
-      { id: 'clip', name: 'cable_clip_x20.gcode', sub: 'OrcaSlicer · 45 m · single tool', tools: [['T0', 'PETG', 'Black', '#1d1d22', 22]] }
+      { id: 'clip', name: 'cable_clip_x20.gcode', sub: 'OrcaSlicer · 45 m · single tool', tools: [['T0', 'PETG', 'Black', '#1d1d22', 22]] },
+      { id: 'sign', name: 'door_sign.gcode', sub: 'PrusaSlicer · 1 h 10 m · 2 colours by filament change (M600)', tools: [['CHANGE 1', 'PLA', 'Charcoal', '#3b3b3b', 34], ['CHANGE 2', 'PLA', 'White', '#f4f4ef', 9]] }
     ];
     const autoSlot = (tl) => (tl[1] + ' ' + tl[2]).toUpperCase();
     const toolList = [];
@@ -199,24 +202,31 @@ class Component extends DCLogic {
     toolList.forEach(x => { const n = slotOf(x); if (slotNames.indexOf(n) < 0) slotNames.push(n); });
     const fileSlots = slotNames.map(n => {
       const users = toolList.filter(x => slotOf(x) === n);
-      return [n, 'from slicer: ' + users[0].tl[1] + ' ' + users[0].tl[2], users.map(x => x.f.name.split('.')[0] + ' ' + x.tl[0] + (x.q > 1 ? ' ×' + x.q : '')).join(', '), users.reduce((a, x) => a + x.tl[4] * x.q, 0), users[0].tl[3]];
+      return [n, 'from slicer: ' + users[0].tl[1] + ' ' + users[0].tl[2], users.map(x => x.f.name.split('.')[0] + ' ' + x.tl[0] + (x.q > 1 ? ' ×' + x.q : '')).join(', '), users.reduce((a, x) => a + x.tl[4] * x.q, 0), users[0].tl[3], users[0].tl[1]];
     });
     const t = s.source === 'files' ? { name: 'Loose files', slots: fileSlots } : T[s.tpl];
     const SP = [
-      { id: 57, label: '#57 PolyLite PLA Teal', hex: '#1f8a8a', left: 120, other: 58, loc: 'Loaded · Sovol SV08' },
-      { id: 58, label: '#58 PolyLite PLA Teal', hex: '#1f8a8a', left: 1000, other: 61, loc: 'Shelf B1' },
-      { id: 61, label: '#61 Bambu PLA Basic White', hex: '#f4f4ef', left: 946, other: 54, loc: 'Loaded · Prusa MK4' },
-      { id: 64, label: '#64 Bambu PLA Basic White', hex: '#f4f4ef', left: 640, other: 0, loc: 'Shelf B2' },
-      { id: 71, label: '#71 PolyTerra PLA Charcoal', hex: '#3b3b3b', left: 1000, other: 0, loc: 'Shelf A1' },
-      { id: 66, label: '#66 Silk Dual Copper/Silver', hex: 'conic-gradient(#b87333 0 50%, #c0c0c0 50% 100%)', left: 760, other: 0, loc: 'Shelf A1 · coextruded' },
-      { id: 67, label: '#67 Rainbow PLA Sunset', hex: 'linear-gradient(90deg, #e8505b, #f9a03f, #f3d34a, #7bc67b, #4a90d9)', left: 1000, other: 0, loc: 'Shelf A1 · gradient', gradient: true }
+      { id: 57, mat: 'PLA', label: '#57 PolyLite PLA Teal', hex: '#1f8a8a', left: 120, other: 58, loc: 'Loaded · Sovol SV08' },
+      { id: 58, mat: 'PLA', label: '#58 PolyLite PLA Teal', hex: '#1f8a8a', left: 1000, other: 61, loc: 'Shelf B1' },
+      { id: 61, mat: 'PLA', label: '#61 Bambu PLA Basic White', hex: '#f4f4ef', left: 946, other: 54, loc: 'Loaded · Prusa MK4' },
+      { id: 64, mat: 'PLA', label: '#64 Bambu PLA Basic White', hex: '#f4f4ef', left: 640, other: 0, loc: 'Shelf B2' },
+      { id: 71, mat: 'PLA', label: '#71 PolyTerra PLA Charcoal', hex: '#3b3b3b', left: 1000, other: 0, loc: 'Shelf A1' },
+      { id: 73, mat: 'PETG', label: '#73 Prusament PETG Jet Black', hex: '#1d1d22', left: 870, other: 0, loc: 'Shelf B3' },
+      { id: 74, mat: 'PETG', label: '#74 3D Jake PETG Black', hex: '#1d1d22', left: 410, other: 0, loc: 'Shelf B3' },
+      { id: 75, mat: 'ASA', label: '#75 3D Jake ASA Black', hex: '#1d1d22', left: 980, other: 0, loc: 'Dry box 1' },
+      { id: 66, mat: 'PLA', label: '#66 Silk Dual Copper/Silver', hex: 'conic-gradient(#b87333 0 50%, #c0c0c0 50% 100%)', left: 760, other: 0, loc: 'Shelf A1 · coextruded' },
+      { id: 67, mat: 'PLA', label: '#67 Rainbow PLA Sunset', hex: 'linear-gradient(90deg, #e8505b, #f9a03f, #f3d34a, #7bc67b, #4a90d9)', left: 1000, other: 0, loc: 'Shelf A1 · gradient', gradient: true }
     ];
     let short = 0, warnGrad = false;
-    const slots = t.slots.map(([key, label, plates, per], _i, _a) => {
+    let wrongMat = false;
+    const slots = t.slots.map(([key, label, plates, per, slotHex, slotMat], _i, _a) => {
       const need = per * s.sets;
-      const slotHex = (t.slots.find(x => x[0] === key) || [])[4];
-      const chosen = s.pick[key] || (SP.find(sp => slotHex && sp.hex === slotHex) || SP[0]).id;
-      const options = SP.map(sp => {
+      const all = !!s.showAll[key];
+      const pool = all ? SP : SP.filter(sp => sp.mat === slotMat);
+      const chosen = s.pick[key] || (pool.find(sp => slotHex && sp.hex === slotHex) || pool[0] || SP[0]).id;
+      const chosenSp = SP.find(sp => sp.id === chosen);
+      if (chosenSp && chosenSp.mat !== slotMat) wrongMat = true;
+      const options = pool.map(sp => {
         const free = sp.left - sp.other; const fits = free >= need; const on = chosen === sp.id;
         if (on && !fits) short += need - free;
         if (on && sp.gradient) warnGrad = true;
@@ -227,7 +237,11 @@ class Component extends DCLogic {
           on: on ? 'true' : 'false', border: on ? 'var(--fw-focus)' : 'var(--fw-border)', outline: on ? '1px solid var(--fw-focus)' : 'none',
           pick: () => this.setState({ pick: { ...this.state.pick, [key]: sp.id } }) };
       });
-      return { key, label, plates, need, options };
+      return { key, label, plates, need, options, mat: slotMat,
+        poolNote: all ? 'Showing all ' + SP.length + ' spools · sliced for ' + slotMat : 'Showing ' + pool.length + ' of ' + SP.length + ' spools · ' + slotMat + ' only, as sliced',
+        toggleLabel: all ? 'Only ' + slotMat : 'Show all materials',
+        toggle: () => this.setState({ showAll: { ...this.state.showAll, [key]: !all } }),
+        warnMat: chosenSp && chosenSp.mat !== slotMat ? '⚠ ' + chosenSp.mat + ' chosen, file sliced for ' + slotMat + ' — temperatures and shrinkage will differ' : '' };
     });
     const totalNeed = slots.reduce((a, x) => a + x.need, 0);
     return {
