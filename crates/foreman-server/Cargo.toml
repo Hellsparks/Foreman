@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 foreman-core = { path = "../foreman-core" }
 spoolman-rs = { path = "../spoolman-rs" }
+foreman-swatch = { path = "../foreman-swatch" }
 
 # Async runtime
 tokio = { workspace = true }
@@ -59,6 +60,7 @@ reqwest = { workspace = true }
 russh = { workspace = true }
 russh-sftp = { workspace = true }
 tokio-util = { workspace = true }
+zip = { workspace = true }
 
 # URL parsing (path failover health checks)
 url = "2"

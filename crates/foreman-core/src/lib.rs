@@ -9,6 +9,7 @@ pub mod driver;
 pub mod drivers;
 pub mod error;
 pub mod events;
+pub mod exports;
 pub mod filament;
 pub mod inventory;
 pub mod library;
