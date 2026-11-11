@@ -334,6 +334,27 @@ function SpoolInspector({
         </div>
       </div>
 
+      <div className="spool-insp__actions">
+        <button type="button" className="fil-btn fil-btn--primary" onClick={onLoad}>
+          Load onto…
+        </button>
+        <button type="button" className="fil-btn" onClick={onEdit}>
+          Edit
+        </button>
+        <button
+          type="button"
+          className="fil-btn"
+          style={{ gridColumn: "1 / -1" }}
+          onClick={() => void archive()}
+        >
+          {s.archived ? "Unarchive" : confirmArchive ? `Archive #${s.id}? Click again to confirm` : "Archive"}
+        </button>
+      </div>
+      {row.loaded.length > 0 && !s.archived && confirmArchive && (
+        <p className="fil-muted">It stays loaded on {row.loaded.map((l) => `${l.printer_name} ${l.label}`).join(", ")} until you unload it.</p>
+      )}
+      {archErr && <p className="fil-note fil-note--bad" role="alert">{archErr}</p>}
+
       <section aria-label="Weigh" className="spool-insp__box">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <h3>Weigh · scale</h3>
@@ -364,26 +385,7 @@ function SpoolInspector({
         ))}
       </div>
 
-      <div className="spool-insp__actions">
-        <button type="button" className="fil-btn fil-btn--primary" onClick={onLoad}>
-          Load onto…
-        </button>
-        <button type="button" className="fil-btn" onClick={onEdit}>
-          Edit
-        </button>
-        <button
-          type="button"
-          className="fil-btn"
-          style={{ gridColumn: "1 / -1" }}
-          onClick={() => void archive()}
-        >
-          {s.archived ? "Unarchive" : confirmArchive ? `Archive #${s.id}? Click again to confirm` : "Archive"}
-        </button>
-      </div>
-      {row.loaded.length > 0 && !s.archived && confirmArchive && (
-        <p className="fil-muted">It stays loaded on {row.loaded.map((l) => `${l.printer_name} ${l.label}`).join(", ")} until you unload it.</p>
-      )}
-      {archErr && <p className="fil-note fil-note--bad" role="alert">{archErr}</p>}
+
     </div>
   );
 }

@@ -299,7 +299,7 @@
 .spool-insp__fact > span:first-child { color: var(--fw-muted); }
 .spool-insp__fact > span:last-child { text-align: right; }
 .spool-insp__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fw-space-2); }
-.spool-insp__colour { display: flex; align-items: center; gap: 10px; font: 12px var(--fw-mono); }
+.spool-insp__colour { flex-direction: row; align-items: center; gap: 10px; font: 12px var(--fw-mono); }
 
 /* ── Printer page: Spools tab ───────────────────────────────────────────── */
 .pspools { display: flex; flex-wrap: wrap; gap: var(--fw-space-4); align-items: flex-start; }
