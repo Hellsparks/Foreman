@@ -98,3 +98,37 @@
 .tl-fg--ok { color: var(--fw-success); }
 .tl-fg--warn { color: var(--fw-warning); }
 .tl-fg--muted { color: var(--fw-muted); }
+
+/* Swatches + Export (5.5) */
+.sw-wrap { display: flex; flex-wrap: wrap; gap: var(--fw-space-4); }
+.sw-form { flex: 1 1 320px; }
+.sw-preview { flex: 1 1 360px; align-items: center; justify-content: center; background: var(--fw-surface); }
+.sw-grow { flex: 1; }
+.sw-search { max-width: 320px; }
+.sw-plate {
+  --sw-colour: var(--fw-muted);
+  container-type: inline-size; position: relative; width: 375px; max-width: 100%; aspect-ratio: 75 / 40;
+  background: var(--sw-colour); border: 1px solid var(--fw-muted); box-shadow: var(--fw-shadow-overlay); overflow: hidden;
+}
+/* Debossed text reads as a shade of the filament colour. */
+.sw-plate--light { --sw-ink: color-mix(in srgb, var(--sw-colour) 45%, var(--fw-inverse)); }
+.sw-plate--dark { --sw-ink: color-mix(in srgb, var(--sw-colour) 45%, var(--fw-on-inverse)); }
+.sw-line {
+  position: absolute; transform: translateY(-50%); white-space: nowrap; line-height: 1;
+  font-family: "Liberation Sans", sans-serif; color: var(--sw-ink);
+}
+.sw-groove { position: absolute; left: 0; right: 0; border-top: 1px solid var(--sw-ink); opacity: .5; }
+.sw-hole {
+  position: absolute; width: 5.3%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
+  background: var(--fw-surface); border: 1px solid var(--sw-ink);
+}
+.ex-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.ex-card { gap: 8px; }
+.ex-grow { flex: 1; }
+.ex-list { max-height: 420px; overflow-y: auto; }
+.ex-check { min-height: 32px; flex: 1 1 260px; }
+.ex-note { flex-basis: 100%; }
+.ex-dot {
+  --sw-colour: var(--fw-muted);
+  width: 14px; height: 14px; flex: none; background: var(--sw-colour); border: 1px solid var(--fw-border);
+}

@@ -7,6 +7,9 @@ mod calibration;
 mod calibration_tests;
 pub mod config;
 mod driver_manager;
+mod exports;
+#[cfg(test)]
+mod exports_tests;
 mod filaments;
 #[cfg(test)]
 mod filaments_tests;
@@ -792,6 +795,13 @@ fn build_router(app_state: AppState) -> Router {
             "/api/calibration/shrinkage/{id}",
             post(api::calibration::shrink_save),
         )
+        // Exports + swatches (5.5, W11)
+        .route("/api/exports", get(api::exports::list))
+        .route("/api/exports/orca", post(api::exports::orca))
+        .route("/api/exports/hueforge", post(api::exports::hueforge))
+        .route("/api/swatch/fit", post(api::exports::swatch_fit))
+        .route("/api/swatch/stl", post(api::exports::swatch_stl))
+        .route("/api/swatch/batch", post(api::exports::swatch_batch))
         .route("/api/maintenance", get(api::maintenance::overview))
         .route(
             "/api/maintenance/settings",

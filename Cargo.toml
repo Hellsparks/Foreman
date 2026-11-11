@@ -4,6 +4,7 @@ members = [
     "crates/spoolman-rs",
     "crates/foreman-server",
     "crates/foreman-desktop",
+    "crates/foreman-swatch",
     "xtask",
 ]
 resolver = "2"
@@ -87,3 +88,20 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# Swatch generator (D8): the CSG / font / polygon crates are ~30x slower
+# unoptimised. Build them optimised in dev and test too so swatches stay < 1 s.
+[profile.dev.package.csgrs]
+opt-level = 3
+[profile.dev.package.foreman-swatch]
+opt-level = 3
+[profile.dev.package.i_overlay]
+opt-level = 3
+[profile.dev.package.geo]
+opt-level = 3
+[profile.dev.package.spade]
+opt-level = 3
+[profile.dev.package.nalgebra]
+opt-level = 3
+[profile.dev.package.ttf-parser]
+opt-level = 3

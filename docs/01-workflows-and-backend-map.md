@@ -87,7 +87,7 @@ Each workflow lists: trigger · steps · backend pieces · what changes vs today
 - **Changes:** "Print all remaining plates" → fleet queue. Project shows which plate is on which printer live.
 
 ### W10 — Calibration
-- Shrinkage (Calistar / fleur_de_cali port) → per-axis correction → saved to filament `material_modifier` extra field → feeds Orca export.
+- Shrinkage (Calistar / fleur_de_cali port) → per-axis correction → saved to the filament's `orcaslicer_config` extra field as `shrinkage_xy` / `shrinkage_z` (percent, stored as strings) → feeds Orca export (`filament_shrink` / `filament_shrinkage_compensation_z`). `material_modifier` holds modifiers (CF, Silk), not shrinkage. *(corrected session 33)*
 - Pure math → Rust module with unit tests ported from current page.
 
 ### W11 — Exports / generators
@@ -171,3 +171,5 @@ Cross-cutting: typed API (Rust → TS type generation, tool picked at scaffold s
 7. **Bonus:** same crate compiled to WASM → live preview in the browser is the *real* mesh, not an approximation.
 
 Removes: `swatch-service/`, Python/uv/Docker swatch options, `PYTHON_BIN`, `SWATCH_SERVICE_URL`, `publish-swatch.yml`.
+
+**Done (session 33):** `crates/foreman-swatch` — csgrs boolean, base mesh = `swatch.step` tessellated at the Python exporter's tolerances (2,884 triangles; the old 27 MB `swatch_base.stl` measures the same within 0.009 % volume), Liberation Sans, auto-shrink to 62 mm (min 3 mm), output checked watertight before it is returned. None of the removed items existed in this repo (only in the old app). Details in doc 05, session 33.

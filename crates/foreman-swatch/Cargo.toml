@@ -1,0 +1,14 @@
+[package]
+name = "foreman-swatch"
+description = "Filament swatch STL generator: debossed text on a base plate (D8, port of swatch_generator.py)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+csgrs = { version = "0.20.1", default-features = false, features = ["f64", "stl-io", "delaunay"] }
+geo = { version = "0.29.3", default-features = false }
+ttf-parser = "0.25"
+i_overlay = "1.9"
+thiserror = { workspace = true }
