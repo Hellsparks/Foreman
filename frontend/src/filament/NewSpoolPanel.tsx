@@ -33,6 +33,7 @@ export default function NewSpoolPanel({
   filaments,
   locations,
   preset,
+  presetQty,
   onClose,
   onCreated,
   onLoad,
@@ -43,6 +44,8 @@ export default function NewSpoolPanel({
   locations: string[];
   /** Start with this filament picked ("Save + add spool of it"). */
   preset?: FilamentRow | null;
+  /** Start with this many spools (shopping list "Bought → add N"). */
+  presetQty?: number;
   onClose: () => void;
   onCreated: (c: CreatedSpools) => void;
   /** "Load onto a printer…" after creating. */
@@ -53,12 +56,12 @@ export default function NewSpoolPanel({
   const [picked, setPicked] = useState<FilamentRow | null>(preset ?? null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<FilamentDraft>(() => emptyDraft(catalogue?.materials[0]));
-  const [weight, setWeight] = useState("1000");
+  const [weight, setWeight] = useState(String(preset?.weight ?? 1000));
   const [empty, setEmpty] = useState<string | null>(null); // null = follow the default
   const [price, setPrice] = useState<string | null>(null);
   const [location, setLocation] = useState("");
   const [lot, setLot] = useState("");
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState(Math.min(MAX_QTY, Math.max(1, presetQty ?? 1)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<CreatedSpools | null>(null);
@@ -92,6 +95,7 @@ export default function NewSpoolPanel({
     setComboOpen(false);
     setEmpty(null);
     setPrice(null);
+    if (f.weight != null) setWeight(String(f.weight));
   };
   const startCreate = () => {
     setCreating(true);

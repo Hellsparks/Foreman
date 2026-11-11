@@ -299,6 +299,8 @@ pub struct FilamentRow {
     /// Non-archived spools of it.
     pub spool_count: u32,
     pub grams_left: f64,
+    /// Net filament weight of a full spool, g.
+    pub weight: Option<f64>,
 }
 
 /// What the filament form sends (create and edit).
@@ -453,6 +455,7 @@ fn row(f: &FilamentResponse, spools: &[SpoolFacts]) -> FilamentRow {
             .or_else(|| f.vendor.as_ref().and_then(|v| v.empty_spool_weight)),
         spool_count: mine.len() as u32,
         grams_left: mine.iter().filter_map(|s| s.remaining_weight).sum(),
+        weight: f.weight,
     }
 }
 

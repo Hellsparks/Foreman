@@ -88,6 +88,12 @@ const MIGRATIONS: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS ix_job_started ON job (started_at)",
     "ALTER TABLE printer ADD COLUMN usage_reporter TEXT NOT NULL DEFAULT 'auto'",
     "ALTER TABLE attention_item ADD COLUMN job_id INTEGER",
+    // 0011: tracked filaments (4.3, see migrations/0011_inventory.sql).
+    "CREATE TABLE IF NOT EXISTS tracked_filament (\
+       filament_id INTEGER PRIMARY KEY NOT NULL, \
+       target INTEGER NOT NULL, \
+       buy_below INTEGER NOT NULL, \
+       updated_at TEXT NOT NULL)",
 ];
 
 /// Foreman-native database handle.

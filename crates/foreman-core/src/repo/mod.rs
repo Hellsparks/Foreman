@@ -9,3 +9,4 @@ pub mod queue;
 pub mod setting;
 pub mod shell_macro;
 pub mod temp_preset;
+pub mod tracked_filament;

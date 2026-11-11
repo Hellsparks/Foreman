@@ -2,6 +2,7 @@ pub mod attention;
 pub mod auth;
 pub mod filaments;
 pub mod health;
+pub mod inventory;
 pub mod jobs;
 pub mod library;
 pub mod printer_commands;
