@@ -257,6 +257,48 @@ fn verdict_order(v: &Verdict) -> u8 {
     }
 }
 
+/// How well the loaded filament matches the file: +2 per tool whose material is
+/// loaded in a tray, +1 more when the colour matches too. 0 when the printer reports
+/// no trays (Klipper). The fleet queue prefers the highest score.
+pub fn filament_score(file: &FileMeta, snap: &PrinterSnapshot) -> u32 {
+    let trays = snap
+        .status
+        .as_ref()
+        .map(|s| &s.ams_trays[..])
+        .unwrap_or(&[]);
+    let mut score = 0;
+    for tool in &file.tools {
+        let Some(mat) = tool.material.as_deref() else {
+            continue;
+        };
+        let want_colour = tool
+            .colour
+            .as_deref()
+            .map(|c| c.trim_start_matches('#').to_uppercase());
+        let mut best = 0;
+        for t in trays.iter().filter(|t| tray_has_material(t, mat)) {
+            let colour_ok = match (&want_colour, t.color.as_deref()) {
+                (Some(w), Some(c)) => c.trim_start_matches('#').to_uppercase().starts_with(w),
+                _ => false,
+            };
+            best = best.max(if colour_ok { 3 } else { 2 });
+        }
+        score += best;
+    }
+    score
+}
+
+fn tray_has_material(t: &AmsTray, needed: &str) -> bool {
+    let needed_up = needed.to_uppercase();
+    t.material
+        .as_deref()
+        .map(|m| {
+            let m_up = m.to_uppercase();
+            m_up.starts_with(&needed_up) || needed_up.starts_with(&m_up)
+        })
+        .unwrap_or(false)
+}
+
 /// Check if any AMS tray has a material matching the needed one (case-insensitive prefix).
 fn ams_has_material(trays: &[AmsTray], needed: &str) -> bool {
     let needed_up = needed.to_uppercase();

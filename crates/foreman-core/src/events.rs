@@ -12,6 +12,7 @@
 //! - `attention.cleared`  — attention item dismissed
 //! - `job`                — job start/end/cancel (stub until Phase 3.6)
 //! - `transfer.started` / `transfer.progress` / `transfer.finished` — Library transfers
+//! - `queue`              — a printer queue / the fleet queue / a plate flag changed (3.5)
 //! - `device`             — device discovery/change (stub until Phase 4)
 //!
 //! Heartbeat has no topic and is always forwarded regardless of subscription.
@@ -238,6 +239,12 @@ pub enum ServerEvent {
     TransferFinished {
         transfer: TransferInfo,
     },
+    /// A queue changed (item added/moved/removed/dispatched/finished) or a printer's
+    /// plate flag changed. `printer_id` is the lane (None = fleet queue or several).
+    /// Clients refetch `GET /api/queue`.
+    QueueChanged {
+        printer_id: Option<i64>,
+    },
     /// Device discovery / change (Phase 4).
     Device {
         printer_id: Option<i64>,
@@ -266,6 +273,7 @@ impl ServerEvent {
             ServerEvent::TransferStarted { .. } => Some("transfer.started"),
             ServerEvent::TransferProgress { .. } => Some("transfer.progress"),
             ServerEvent::TransferFinished { .. } => Some("transfer.finished"),
+            ServerEvent::QueueChanged { .. } => Some("queue"),
             ServerEvent::Device { .. } => Some("device"),
         }
     }
@@ -280,6 +288,7 @@ impl ServerEvent {
             ServerEvent::AttentionCleared { printer_id, .. } => *printer_id,
             ServerEvent::Job { printer_id, .. } => *printer_id,
             ServerEvent::Device { printer_id, .. } => *printer_id,
+            ServerEvent::QueueChanged { printer_id } => *printer_id,
             _ => None,
         }
     }

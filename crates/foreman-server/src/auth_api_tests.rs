@@ -51,7 +51,17 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
         driver_manager.clone(),
         Arc::clone(&tx),
     );
+    let scheduler = crate::scheduler::Scheduler::new(
+        db.pool.clone(),
+        Arc::clone(&tx),
+        Arc::new(crate::scheduler::LiveEnv {
+            pool: db.pool.clone(),
+            drivers: driver_manager.clone(),
+            library: Arc::clone(&library),
+        }),
+    );
     let state = AppState {
+        scheduler,
         driver_manager,
         bus_tx: tx,
         foreman_db: db,

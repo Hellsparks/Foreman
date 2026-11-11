@@ -8,6 +8,7 @@ use tokio::sync::broadcast;
 use crate::{
     auth::{AuthState, ServerInfo},
     driver_manager::DriverManager,
+    scheduler::Scheduler,
     ssh_pool::SshPool,
     transfers::Transfers,
 };
@@ -34,4 +35,6 @@ pub struct AppState {
     pub library: Arc<LibraryStore>,
     /// Copy/move jobs between the Library and printers.
     pub transfers: Arc<Transfers>,
+    /// Printer queues + fleet queue dispatcher.
+    pub scheduler: Arc<Scheduler>,
 }

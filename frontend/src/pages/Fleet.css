@@ -166,6 +166,13 @@
 }
 
 .fleet__attn-btn:hover { background: var(--fw-surface); }
+.fleet__attn-btn--primary {
+  background: var(--fw-accent-hover);
+  border-color: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+  font-weight: 700;
+}
+.fleet__attn-btn--primary:hover { background: var(--fw-accent); }
 .fleet__attn-btn:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
 
 /* ── Printer grid ────────────────────────────────────────────────────────── */
