@@ -23,7 +23,7 @@ use crate::{
 const CODE: &str = "ABCD-EFGH";
 const PW: &str = "a long password";
 
-async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
+pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
     let db = ForemanDb::connect(&dir.path().join("foreman.db"))
         .await
         .expect("db");
@@ -44,9 +44,16 @@ async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
     let library = Arc::new(
         foreman_core::library::LibraryStore::new(dir.path(), db.pool.clone()).expect("library"),
     );
+    let tx = Arc::new(tx);
+    let driver_manager = DriverManager::new(Arc::clone(&tx), db.pool.clone());
+    let transfers = crate::transfers::Transfers::new(
+        Arc::clone(&library),
+        driver_manager.clone(),
+        Arc::clone(&tx),
+    );
     let state = AppState {
-        driver_manager: DriverManager::new(Arc::new(tx.clone()), db.pool.clone()),
-        bus_tx: Arc::new(tx),
+        driver_manager,
+        bus_tx: tx,
         foreman_db: db,
         http_client: reqwest::Client::new(),
         ssh_identity: Arc::new((key, public)),
@@ -64,6 +71,7 @@ async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, AppState) {
             bind: tokio::sync::watch::channel("127.0.0.1".to_owned()).0,
         }),
         library,
+        transfers,
     };
     (build_router(state.clone()), state)
 }

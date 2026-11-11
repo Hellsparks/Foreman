@@ -328,6 +328,11 @@ pub struct LibraryEntry {
     pub format: Option<String>,
     /// `/api/library/files/{id}/thumb` when a thumbnail exists.
     pub thumb_url: Option<String>,
+    /// Parsed print time (seconds), for grid cards.
+    #[ts(type = "number | null")]
+    pub print_time_secs: Option<i64>,
+    /// Parsed per-tool filament use, for grid cards.
+    pub tools: Vec<ToolUsage>,
 }
 
 /// Filament use for one tool / extruder / AMS slot.

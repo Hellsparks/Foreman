@@ -144,7 +144,8 @@ macro_rules! select_entries {
     ($rest:literal) => {
         concat!(
             "SELECT e.id, e.path, e.kind, e.size, e.hash, e.added_at, e.starred, e.deleted_at, \
-             m.format, m.thumb_file FROM library_entry e LEFT JOIN file_meta m ON m.entry_id = e.id ",
+             m.format, m.thumb_file, m.print_time_secs, m.tools_json \
+             FROM library_entry e LEFT JOIN file_meta m ON m.entry_id = e.id ",
             $rest
         )
     };
@@ -156,8 +157,13 @@ fn entry_from_row(r: &sqlx::sqlite::SqliteRow) -> Result<LibraryEntry, AppError>
     let kind: String = r.try_get("kind").map_err(db)?;
     let thumb: Option<String> = r.try_get("thumb_file").map_err(db)?;
     let hash: Option<String> = r.try_get("hash").map_err(db)?;
+    let tools: Option<String> = r.try_get("tools_json").map_err(db)?;
     Ok(LibraryEntry {
         id,
+        print_time_secs: r.try_get("print_time_secs").map_err(db)?,
+        tools: tools
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default(),
         name: name_of(&path).to_owned(),
         kind: if kind == "folder" {
             LibraryEntryKind::Folder
@@ -488,6 +494,47 @@ impl LibraryStore {
                 .await?;
         }
         self.set_path(id, &new_path).await?;
+        self.get(id).await
+    }
+
+    /// Live entry at `path`, if any.
+    pub async fn find(&self, path: &str) -> Result<Option<LibraryEntry>, AppError> {
+        match self.live_id(&clean_rel(path)?).await? {
+            Some(id) => Ok(Some(self.get(id).await?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Move an entry (and a folder's contents) into `folder` as `name`, which must be free.
+    pub async fn move_to(
+        &self,
+        id: i64,
+        folder: &str,
+        name: &str,
+    ) -> Result<LibraryEntry, AppError> {
+        let e = self.live(id).await?;
+        let folder = clean_rel(folder)?;
+        let new_path = join(&folder, &clean_name(name)?);
+        if new_path == e.path {
+            return Ok(e);
+        }
+        if folder == e.path || folder.starts_with(&format!("{}/", e.path)) {
+            return Err(AppError::InvalidInput(format!(
+                "can't move {} into itself",
+                e.name
+            )));
+        }
+        if !new_path.eq_ignore_ascii_case(&e.path) && self.taken(&new_path).await? {
+            return Err(AppError::InvalidInput(format!("{new_path} already exists")));
+        }
+        self.ensure_folder(&folder).await?;
+        fs::rename(self.abs(&e.path), self.abs(&new_path)).map_err(io)?;
+        for (child, p) in self.descendants(&e.path).await? {
+            self.set_path(child, &format!("{new_path}{}", &p[e.path.len()..]))
+                .await?;
+        }
+        self.set_path(id, &new_path).await?;
+        info!(from = %e.path, to = %new_path, "library: moved");
         self.get(id).await
     }
 

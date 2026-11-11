@@ -12,3 +12,4 @@ pub mod remote_fs;
 pub mod repo;
 pub mod secrets;
 pub mod ssh_client;
+pub mod storage;

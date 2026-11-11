@@ -28,6 +28,7 @@ export type EventCallback = (event: {
 
 const MIN_RECONNECT_MS = 1_000;
 const MAX_RECONNECT_MS = 30_000;
+const PRINTER_TOPICS = ["printer.status", "printer.connection"];
 
 function wsUrl(): Promise<string> {
   return serverWsUrl("/ws/events");
@@ -40,8 +41,13 @@ function wsUrl(): Promise<string> {
  * Optionally accepts a callback that fires for every non-heartbeat event.
  *
  * Reconnects automatically with exponential backoff (1 s → 30 s).
+ * `topics` defaults to printer status + connection events.
  */
-export function useEventStream(onEvent?: EventCallback): EventStreamState {
+export function useEventStream(
+  onEvent?: EventCallback,
+  topics: string[] = PRINTER_TOPICS,
+): EventStreamState {
+  const topicsKey = topics.join(",");
   const [state, setState] = useState<EventStreamState>({
     connectionState: "connecting",
     lastHeartbeat: null,
@@ -86,10 +92,10 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
       reconnectDelayRef.current = MIN_RECONNECT_MS;
       setState((s) => ({ ...s, connectionState: "connected" }));
 
-      // Subscribe to printer events.
+      // Subscribe to the requested topics.
       ws.send(
         JSON.stringify({
-          topics: ["printer.status", "printer.connection"],
+          topics: topicsKey.split(","),
           printer_ids: [],
         })
       );
@@ -120,7 +126,7 @@ export function useEventStream(onEvent?: EventCallback): EventStreamState {
     ws.onerror = () => {
       ws.close();
     };
-  }, []);
+  }, [topicsKey]);
 
   useEffect(() => {
     mountedRef.current = true;

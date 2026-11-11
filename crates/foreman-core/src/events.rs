@@ -11,7 +11,7 @@
 //! - `attention.updated`  — attention item body/actions changed
 //! - `attention.cleared`  — attention item dismissed
 //! - `job`                — job start/end/cancel (stub until Phase 3.6)
-//! - `transfer`           — file transfer progress (stub until Phase 3.2)
+//! - `transfer.started` / `transfer.progress` / `transfer.finished` — Library transfers
 //! - `device`             — device discovery/change (stub until Phase 4)
 //!
 //! Heartbeat has no topic and is always forwarded regardless of subscription.
@@ -140,6 +140,49 @@ pub struct AttentionItemEvent {
     pub body: Option<String>,
 }
 
+/// Lifecycle of a Library transfer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum TransferState {
+    Queued,
+    Running,
+    Done,
+    Failed,
+    Cancelled,
+}
+
+impl TransferState {
+    pub fn is_finished(self) -> bool {
+        matches!(self, Self::Done | Self::Failed | Self::Cancelled)
+    }
+}
+
+/// One copy/move between two Library locations (Library, a printer's G-code storage).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TransferInfo {
+    pub id: String,
+    /// Name of the copied item (`folder/` for folders).
+    pub name: String,
+    /// `copy` or `move`.
+    pub mode: String,
+    /// Human route, e.g. `Library → HellV0` or `HellV0 → Foreman → Voron`.
+    pub route: String,
+    /// Final path at the destination (relative to its root).
+    pub dest_path: String,
+    /// Bytes moved so far over all legs (printer→printer counts download + upload).
+    #[ts(type = "number")]
+    pub bytes_done: u64,
+    #[ts(type = "number")]
+    pub bytes_total: u64,
+    pub state: TransferState,
+    pub error: Option<String>,
+    /// Non-fatal remark, e.g. STL files skipped inside a folder.
+    pub note: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 // ---------------------------------------------------------------------------
 // ServerEvent
 // ---------------------------------------------------------------------------
@@ -183,10 +226,17 @@ pub enum ServerEvent {
         #[ts(type = "unknown")]
         payload: serde_json::Value,
     },
-    /// File transfer progress (Phase 3.2).
-    Transfer {
-        #[ts(type = "unknown")]
-        payload: serde_json::Value,
+    /// File transfer queued/started.
+    TransferStarted {
+        transfer: TransferInfo,
+    },
+    /// File transfer progress (throttled).
+    TransferProgress {
+        transfer: TransferInfo,
+    },
+    /// File transfer done, failed or cancelled.
+    TransferFinished {
+        transfer: TransferInfo,
     },
     /// Device discovery / change (Phase 4).
     Device {
@@ -213,7 +263,9 @@ impl ServerEvent {
             ServerEvent::AttentionUpdated { .. } => Some("attention.updated"),
             ServerEvent::AttentionCleared { .. } => Some("attention.cleared"),
             ServerEvent::Job { .. } => Some("job"),
-            ServerEvent::Transfer { .. } => Some("transfer"),
+            ServerEvent::TransferStarted { .. } => Some("transfer.started"),
+            ServerEvent::TransferProgress { .. } => Some("transfer.progress"),
+            ServerEvent::TransferFinished { .. } => Some("transfer.finished"),
             ServerEvent::Device { .. } => Some("device"),
         }
     }
@@ -363,8 +415,20 @@ mod tests {
             topics: vec![],
             printer_ids: vec![42],
         };
-        let ev = ServerEvent::Transfer {
-            payload: serde_json::json!({}),
+        let ev = ServerEvent::TransferProgress {
+            transfer: TransferInfo {
+                id: "t".into(),
+                name: "a.gcode".into(),
+                mode: "copy".into(),
+                route: "Library → P".into(),
+                dest_path: "a.gcode".into(),
+                bytes_done: 1,
+                bytes_total: 2,
+                state: TransferState::Running,
+                error: None,
+                note: None,
+                created_at: Utc::now(),
+            },
         };
         assert!(filter.matches(&ev));
     }

@@ -28,10 +28,12 @@ use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 use crate::driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile, WebcamInfo};
+use crate::drivers::moonraker_files::MoonrakerFiles;
 use crate::error::AppError;
 use crate::events::{
     ConnectionEvent, ConnectionEventKind, PrinterState, PrinterStatus, ServerEvent, TempReading,
 };
+use crate::storage::PrinterStorage;
 
 // ---------------------------------------------------------------------------
 // JSON-RPC types
@@ -265,6 +267,8 @@ pub struct MoonrakerDriver {
     shutdown_tx: watch::Sender<bool>,
     /// Handle to the background task.
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// `/server/files/*` for the gcodes root.
+    files: Arc<MoonrakerFiles>,
 }
 
 impl MoonrakerDriver {
@@ -274,6 +278,7 @@ impl MoonrakerDriver {
             .timeout(Duration::from_secs(10))
             .build()
             .unwrap_or_default();
+        let files = Arc::new(MoonrakerFiles::new(&config.url, config.api_key.clone()));
         Self {
             config,
             bus_tx,
@@ -282,6 +287,7 @@ impl MoonrakerDriver {
             http,
             shutdown_tx,
             task: Mutex::new(None),
+            files,
         }
     }
 
@@ -842,32 +848,39 @@ impl PrinterDriver for MoonrakerDriver {
         Ok(())
     }
 
-    async fn list_files(&self, _path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
-        Err(AppError::NotImplemented(
-            "file ops deferred to Phase 3".into(),
-        ))
+    async fn list_files(&self, path: Option<&str>) -> Result<Vec<PrinterFile>, AppError> {
+        Ok(self
+            .files
+            .list_dir(path.unwrap_or(""))
+            .await?
+            .into_iter()
+            .filter(|e| !e.is_dir)
+            .map(|e| PrinterFile {
+                path: e.path,
+                size: Some(e.size),
+                modified: Some(e.modified),
+            })
+            .collect())
     }
 
-    async fn upload_file(&self, _path: &str, _data: Vec<u8>) -> Result<(), AppError> {
-        Err(AppError::NotImplemented(
-            "file ops deferred to Phase 3".into(),
-        ))
+    async fn upload_file(&self, path: &str, data: Vec<u8>) -> Result<(), AppError> {
+        self.files.upload_bytes(path, data).await
     }
 
-    async fn delete_file(&self, _path: &str) -> Result<(), AppError> {
-        Err(AppError::NotImplemented(
-            "file ops deferred to Phase 3".into(),
-        ))
+    async fn delete_file(&self, path: &str) -> Result<(), AppError> {
+        self.files.delete_file(path).await
     }
 
     async fn start_print(&self, _path: &str) -> Result<(), AppError> {
-        Err(AppError::NotImplemented(
-            "file ops deferred to Phase 3".into(),
-        ))
+        Err(AppError::NotImplemented("Send is not built yet".into()))
     }
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
         Ok(self.status.read().await.to_printer_status())
+    }
+
+    fn storage(&self) -> Option<Arc<dyn PrinterStorage>> {
+        Some(self.files.clone())
     }
 }
 
