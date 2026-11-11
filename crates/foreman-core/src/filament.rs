@@ -98,21 +98,6 @@ impl SpoolFacts {
     }
 }
 
-/// True when the material / modifier names an abrasive filled filament.
-pub fn is_abrasive_material(material: &str) -> bool {
-    material
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .filter(|t| !t.is_empty())
-        .any(|t| {
-            let t = t.to_ascii_uppercase();
-            let filled = ["CF", "GF", "AF"].iter().any(|p| {
-                t.strip_prefix(p)
-                    .is_some_and(|rest| rest.chars().all(|c| c.is_ascii_digit()))
-            });
-            filled || t == "METAL" || t == "GLOW" || t.starts_with("GLOWINTHEDARK")
-        })
-}
-
 /// `#rrggbb` / `rrggbbaa` → `RRGGBB`.
 pub fn norm_hex(c: &str) -> String {
     let c = c.trim().trim_start_matches('#').to_ascii_uppercase();
@@ -466,7 +451,7 @@ mod tests {
             id: 1,
             name: format!("{material} Black"),
             material: Some(material.into()),
-            abrasive: is_abrasive_material(material),
+            abrasive: crate::materials::is_abrasive_filament(Some(material), None),
             color_hex: Some("1D1D22".into()),
             remaining_weight: Some(grams),
             initial_weight: Some(1000.0),
@@ -521,12 +506,8 @@ mod tests {
     }
 
     #[test]
-    fn abrasive_from_modifier_or_explicit_flag() {
-        assert!(is_abrasive_material("PETG CF"));
-        assert!(is_abrasive_material("PA6-GF30"));
-        assert!(is_abrasive_material("Glow"));
-        assert!(!is_abrasive_material("PLA Silk"));
-        assert!(!is_abrasive_material("CFRP-ish"));
+    fn abrasive_reads_the_flag() {
+        // The guard reads the stored flag, not the material string.
         let mut s = spool("PLA", 800.0);
         s.abrasive = true; // explicit flag wins
         let ws = run(&printer(false), None, &s, None, None, &[]);

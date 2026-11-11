@@ -13,7 +13,7 @@ use foreman_core::{
         self, ams_slot_label, GuardInput, GuardWarning, JobNeed, LoadedSlot, SpoolFacts,
         BAMBU_READ_ONLY,
     },
-    repo,
+    materials, repo,
 };
 use library_meta::MetaSource;
 use serde_json::{Map, Value};
@@ -63,13 +63,10 @@ fn extra_bool(map: &Map<String, Value>, key: &str) -> Option<bool> {
 pub fn facts(s: &SpoolResponse) -> SpoolFacts {
     let f = &s.filament;
     let modifier = extra_str(&f.extra, "material_modifier");
+    // The stored flag decides. Filaments made before the flag existed fall back
+    // to the same rule the form uses to auto-tick it.
     let abrasive = extra_bool(&f.extra, "abrasive").unwrap_or_else(|| {
-        let m = format!(
-            "{} {}",
-            f.material.as_deref().unwrap_or(""),
-            modifier.as_deref().unwrap_or("")
-        );
-        filament::is_abrasive_material(&m)
+        materials::is_abrasive_filament(f.material.as_deref(), modifier.as_deref())
     });
     let multi: Vec<String> = f
         .multi_color_hexes

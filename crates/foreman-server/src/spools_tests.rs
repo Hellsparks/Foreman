@@ -224,7 +224,7 @@ async fn add_printer(state: &AppState, name: &str, firmware: FirmwareKind) -> i6
     .id
 }
 
-async fn setup() -> (tempfile::TempDir, Router, AppState, String) {
+pub(crate) async fn setup() -> (tempfile::TempDir, Router, AppState, String) {
     let dir = tempfile::TempDir::new().expect("dir");
     let (router, state) = app(&dir, true).await;
     let sm = spoolman(&dir).await;
@@ -245,7 +245,7 @@ async fn login(app: &Router) -> String {
     format!("Bearer {}", b["token"].as_str().expect("token"))
 }
 
-async fn call(
+pub(crate) async fn call(
     app: &Router,
     method: &str,
     uri: &str,

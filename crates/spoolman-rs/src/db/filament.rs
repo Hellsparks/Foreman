@@ -580,6 +580,76 @@ pub async fn update(
     find_by_id(pool, id).await
 }
 
+/// Set all three colour columns at once, NULLs included (Foreman 4.2).
+///
+/// [`update`] skips `None` fields, so it cannot turn a single-colour filament
+/// into a multi-colour one (the old `color_hex` would stay). This writes the
+/// three columns together after the same validation as [`create`].
+pub async fn set_colours(
+    pool: &AnyPool,
+    id: i64,
+    color_hex: Option<&str>,
+    multi_color_hexes: Option<&str>,
+    multi_color_direction: Option<&str>,
+) -> Result<FilamentResponse> {
+    validate_multi_color(color_hex, multi_color_hexes, multi_color_direction)?;
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*tp(
+        "UPDATE filament SET color_hex = ?, multi_color_hexes = ?, multi_color_direction = ? \
+         WHERE id = ?",
+    )))
+    .bind(color_hex.map(str::to_owned))
+    .bind(multi_color_hexes.map(str::to_owned))
+    .bind(multi_color_direction.map(str::to_owned))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    if result.rows_affected() == 0 {
+        return Err(SpoolmanError::NotFound(format!("filament with id {id}")));
+    }
+    find_by_id(pool, id).await
+}
+
+/// Columns [`clear_columns`] may set to NULL.
+pub const CLEARABLE: &[&str] = &[
+    "vendor_id",
+    "price",
+    "weight",
+    "spool_weight",
+    "article_number",
+    "comment",
+    "settings_extruder_temp",
+    "settings_bed_temp",
+];
+
+/// Set nullable columns to NULL (Foreman 4.2 edit forms).
+///
+/// [`update`] treats `None` as "not sent", so a form could not clear a value.
+/// Only columns listed in [`CLEARABLE`] are accepted.
+pub async fn clear_columns(pool: &AnyPool, id: i64, cols: &[&str]) -> Result<()> {
+    if cols.is_empty() {
+        return Ok(());
+    }
+    if let Some(bad) = cols.iter().find(|c| !CLEARABLE.contains(c)) {
+        return Err(SpoolmanError::BadRequest(format!(
+            "filament.{bad} cannot be cleared"
+        )));
+    }
+    let sets = cols
+        .iter()
+        .map(|c| format!("{c} = NULL"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = tp(&format!("UPDATE filament SET {sets} WHERE id = ?"));
+    let result = sqlx::query(sqlx::AssertSqlSafe(&*sql))
+        .bind(id)
+        .execute(pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(SpoolmanError::NotFound(format!("filament with id {id}")));
+    }
+    Ok(())
+}
+
 pub async fn delete(pool: &AnyPool, id: i64) -> Result<()> {
     // Remove extra field values first; filament_field.filament_id has no ON DELETE CASCADE.
     sqlx::query(sqlx::AssertSqlSafe(&*tp(

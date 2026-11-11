@@ -425,15 +425,10 @@ pub async fn set_values(
 /// | orcaslicer_config  | text    |      |
 /// | material_modifier  | text    |      |
 /// | abrasive           | boolean |      |  (Foreman 4.1: filament guard)
+///
+/// Vendor: `url` (text, "Website") — Foreman 4.2 vendor form.
 pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::error::Result<()> {
     use crate::models::ExtraFieldType;
-
-    struct DefaultField {
-        key: &'static str,
-        name: &'static str,
-        field_type: ExtraFieldType,
-        unit: Option<&'static str>,
-    }
 
     let defaults = [
         DefaultField {
@@ -474,11 +469,37 @@ pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::
         },
     ];
 
-    let existing = get_definitions(pool, "filament").await?;
+    // Vendor: website / store (Foreman 4.2: vendor form, shopping-list "Store" link).
+    let vendor_defaults = [DefaultField {
+        key: "url",
+        name: "Website",
+        field_type: ExtraFieldType::Text,
+        unit: None,
+    }];
+
+    ensure_fields(pool, engine, "filament", &defaults).await?;
+    ensure_fields(pool, engine, "vendor", &vendor_defaults).await
+}
+
+struct DefaultField {
+    key: &'static str,
+    name: &'static str,
+    field_type: crate::models::ExtraFieldType,
+    unit: Option<&'static str>,
+}
+
+/// Create each field in `list` on `entity` unless a field with that key exists.
+async fn ensure_fields(
+    pool: &AnyPool,
+    engine: &Engine,
+    entity: &str,
+    list: &[DefaultField],
+) -> crate::error::Result<()> {
+    let existing = get_definitions(pool, entity).await?;
     let existing_keys: std::collections::HashSet<&str> =
         existing.iter().map(|f| f.key.as_str()).collect();
 
-    for d in &defaults {
+    for d in list {
         if existing_keys.contains(d.key) {
             continue;
         }
@@ -491,8 +512,8 @@ pub async fn ensure_foreman_defaults(pool: &AnyPool, engine: &Engine) -> crate::
             choices: None,
             multi_choice: None,
         };
-        upsert_definition(pool, engine, "filament", d.key, &params).await?;
-        tracing::info!(key = d.key, "created Foreman default extra field");
+        upsert_definition(pool, engine, entity, d.key, &params).await?;
+        tracing::info!(entity, key = d.key, "created Foreman default extra field");
     }
 
     Ok(())

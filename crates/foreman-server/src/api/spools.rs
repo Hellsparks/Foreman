@@ -31,9 +31,9 @@ use crate::{
     state::AppState,
 };
 
-type ApiErr = (StatusCode, Json<serde_json::Value>);
+pub(crate) type ApiErr = (StatusCode, Json<serde_json::Value>);
 
-fn err(e: AppError) -> ApiErr {
+pub(crate) fn err(e: AppError) -> ApiErr {
     let status = match &e {
         AppError::NotFound(_) => StatusCode::NOT_FOUND,
         AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
@@ -44,7 +44,7 @@ fn err(e: AppError) -> ApiErr {
     (status, Json(json!({ "error": e.to_string() })))
 }
 
-fn sm(state: &AppState) -> Result<&Spoolman, ApiErr> {
+pub(crate) fn sm(state: &AppState) -> Result<&Spoolman, ApiErr> {
     state.spoolman.get().ok_or_else(|| {
         (
             StatusCode::SERVICE_UNAVAILABLE,
