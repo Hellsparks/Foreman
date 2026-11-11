@@ -32,6 +32,9 @@ mod spools;
 mod spools_tests;
 mod ssh_pool;
 mod state;
+mod theme_files;
+#[cfg(test)]
+mod theme_files_tests;
 #[cfg(test)]
 mod transfer_tests;
 mod transfers;
@@ -286,6 +289,7 @@ pub async fn serve_with(
         transfers,
         scheduler,
         spoolman: Arc::clone(&spoolman),
+        data_dir: cfg.data_dir.clone(),
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -1020,6 +1024,9 @@ fn build_router(app_state: AppState) -> Router {
             get(api::terminal_ws::terminal_ws),
         )
         .route("/ws/events", get(api::ws::ws_handler))
+        // Theme assets (public: not under /api): user fonts + unsupported custom.css.
+        .route("/theme/custom.css", get(theme_files::custom_css))
+        .route("/theme/fonts/{name}", get(theme_files::font))
         .fallback_service(static_service)
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
