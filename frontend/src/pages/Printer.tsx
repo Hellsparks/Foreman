@@ -9,6 +9,7 @@ import { StatusChip, SectionLabel, Button } from "../ui";
 import { createPortal } from "react-dom";
 import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
+import PrinterSpoolsTab from "../filament/PrinterSpoolsTab";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import { useSignedUrl } from "../hooks/useSignedUrl";
@@ -744,7 +745,9 @@ export default function Printer() {
             </section>
           </div>
         </div>
-      ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Config" ? (
+      ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Spools" ? (
+        <PrinterSpoolsTab printerId={printerId} />
+      ) : activeTab === "Config" ? (
         <PrinterConfigTab
           printerId={printerId}
           printer={printer}

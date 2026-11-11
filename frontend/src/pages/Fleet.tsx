@@ -14,6 +14,8 @@ import type { PrinterWithStatus, AttentionItem } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
+import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
+import LoadSpoolPanel from "../filament/LoadSpoolPanel";
 import { StatusChip, ProgressBar, Swatch } from "../ui";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
@@ -107,8 +109,22 @@ function tempsLine(status: PrinterStatus | null | undefined): string {
 
 function amsChips(
   status: PrinterStatus | null | undefined,
-  fw: string
+  fw: string,
+  slots: LoadedSlot[] = [],
 ): ChipData[] {
+  // Klipper: Moonraker's active spool (task 4.1).
+  const klipper = slots.filter((s) => s.spool_id != null || s.writable);
+  if (fw !== "bambu" && klipper.length) {
+    return klipper.map((s) => ({
+      hex: s.spool?.color_hex ? `#${s.spool.color_hex}` : undefined,
+      label: s.spool
+        ? `${s.label} #${s.spool.id} ${s.spool.material ?? ""} ${Math.round(s.spool.remaining_weight ?? 0)} g`.replace(/\s+/g, " ")
+        : s.spool_id != null
+          ? `${s.label} #${s.spool_id}`
+          : `${s.label} no spool`,
+      empty: !s.spool?.color_hex,
+    }));
+  }
   if (!status) return [];
   if (fw === "bambu" && status.ams_trays && status.ams_trays.length > 0) {
     return status.ams_trays
@@ -163,6 +179,8 @@ export default function Fleet() {
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [slots, setSlots] = useState<LoadedSlot[]>([]);
+  const [loadFor, setLoadFor] = useState<number | null>(null);
 
   // Snapshot timestamps for cache-busting (per printer).
   const [snapTs, setSnapTs] = useState<Record<number, number>>({});
@@ -188,10 +206,22 @@ export default function Fleet() {
     }
   }, []);
 
+  const loadSlots = useCallback(async () => {
+    try {
+      setSlots(await spools.loaded());
+    } catch (e) {
+      console.error("Failed to load spools:", e);
+    }
+  }, []);
+
   useEffect(() => {
     loadPrinters();
     loadAttention();
-  }, [loadPrinters, loadAttention]);
+    loadSlots();
+  }, [loadPrinters, loadAttention, loadSlots]);
+
+  const onSpoolEvent = useCallback(() => void loadSlots(), [loadSlots]);
+  useEventStream(onSpoolEvent, SPOOL_TOPICS);
 
   // Live Attention strip (e.g. "clear the plate" when a print finishes).
   const onAttentionEvent = useCallback(() => void loadAttention(), [loadAttention]);
@@ -231,12 +261,21 @@ export default function Fleet() {
 
   const selectPrinter = (id: number) => {
     setSelectedId(id);
+    setLoadFor(null);
     openInspector();
   };
 
   const deselectPrinter = () => {
     setSelectedId(null);
+    setLoadFor(null);
     closeInspector();
+  };
+
+  const startLoad = (id: number) => {
+    setSelectedId(id);
+    setLoadFor(id);
+    setMenuFor(null);
+    openInspector();
   };
 
   // Summary line.
@@ -480,6 +519,8 @@ export default function Fleet() {
               <PrinterCard
                 key={p.id}
                 printer={p}
+                slots={slots.filter((s) => s.printer_id === p.id)}
+                onLoadSpool={() => startLoad(p.id)}
                 status={st}
                 state={state}
                 selected={isSelected}
@@ -500,12 +541,22 @@ export default function Fleet() {
       {/* ── Inspector portal ─────────────────────────────────────────────── */}
       {portalTarget && selectedPrinter && inspectorOpen &&
         createPortal(
-          <PrinterInspector
-            printer={selectedPrinter}
-            status={liveStatus(selectedPrinter)}
-            onClose={deselectPrinter}
-            onOpenPage={() => navigate(`/printer/${selectedPrinter.id}`)}
-          />,
+          loadFor === selectedPrinter.id ? (
+            <LoadSpoolPanel
+              printerId={selectedPrinter.id}
+              onClose={() => setLoadFor(null)}
+              onLoaded={() => void loadSlots()}
+            />
+          ) : (
+            <PrinterInspector
+              printer={selectedPrinter}
+              status={liveStatus(selectedPrinter)}
+              slots={slots.filter((s) => s.printer_id === selectedPrinter.id)}
+              onLoadSpool={() => startLoad(selectedPrinter.id)}
+              onClose={deselectPrinter}
+              onOpenPage={() => navigate(`/printer/${selectedPrinter.id}`)}
+            />
+          ),
           portalTarget
         )
       }
@@ -517,6 +568,8 @@ export default function Fleet() {
 
 function PrinterCard({
   printer,
+  slots,
+  onLoadSpool,
   status,
   state,
   selected,
@@ -527,6 +580,8 @@ function PrinterCard({
   onOpenPage,
 }: {
   printer: PrinterWithStatus;
+  slots: LoadedSlot[];
+  onLoadSpool: () => void;
   status: PrinterStatus | null;
   state: string;
   selected: boolean;
@@ -540,7 +595,8 @@ function PrinterCard({
   const pct =
     status?.progress != null ? Math.round(status.progress * 100) : 0;
   const hasProgress = pct > 0 && pct < 100;
-  const chips = amsChips(status, printer.firmware);
+  const chips = amsChips(status, printer.firmware, slots);
+  const canLoad = slots.some((s) => s.writable);
   const jobName = status?.filename ?? (state === "offline" ? "Not reachable" : "Ready for next job");
   const sub = jobSubLine(status);
   const isOffline = state === "offline";
@@ -634,6 +690,11 @@ function PrinterCard({
           >
             Open printer page
           </button>
+          {canLoad && (
+            <button type="button" className="fleet-card__dropdown-item" onClick={onLoadSpool}>
+              Load spool…
+            </button>
+          )}
           {printer.primary_url && (
             <button
               type="button"
@@ -684,11 +745,15 @@ function CameraThumb({ url }: { url: string | null }) {
 function PrinterInspector({
   printer,
   status,
+  slots,
+  onLoadSpool,
   onClose,
   onOpenPage,
 }: {
   printer: PrinterWithStatus;
   status: PrinterStatus | null;
+  slots: LoadedSlot[];
+  onLoadSpool: () => void;
   onClose: () => void;
   onOpenPage: () => void;
 }) {
@@ -697,7 +762,9 @@ function PrinterInspector({
   const pct =
     status?.progress != null ? Math.round(status.progress * 100) : 0;
   const hasProgress = pct > 0 && pct < 100;
-  const chips = amsChips(status, printer.firmware);
+  const chips = amsChips(status, printer.firmware, slots);
+  const canLoad = slots.some((s) => s.writable);
+  const readOnly = slots.find((s) => !s.writable)?.read_only_reason;
 
   return (
     <div className="fleet-insp">
@@ -747,7 +814,7 @@ function PrinterInspector({
       </div>
 
       {/* Loaded filament */}
-      {chips.length > 0 && (
+      {(chips.length > 0 || canLoad) && (
         <div className="fleet-insp__section">
           <div className="fleet-insp__section-label">Loaded filament</div>
           {chips.map((c, i) => (
@@ -760,6 +827,13 @@ function PrinterInspector({
               <span className="fleet-insp__chip-label">{c.label}</span>
             </div>
           ))}
+          {canLoad ? (
+            <button type="button" className="fleet-insp__btn" style={{ marginTop: 8 }} onClick={onLoadSpool}>
+              Load spool…
+            </button>
+          ) : (
+            readOnly && <div className="fleet-insp__job-sub">{readOnly}</div>
+          )}
         </div>
       )}
 
