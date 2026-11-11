@@ -871,8 +871,17 @@ impl PrinterDriver for MoonrakerDriver {
         self.files.delete_file(path).await
     }
 
-    async fn start_print(&self, _path: &str) -> Result<(), AppError> {
-        Err(AppError::NotImplemented("Send is not built yet".into()))
+    async fn start_print(&self, path: &str) -> Result<(), AppError> {
+        let url = format!("{}/printer/print/start", self.config.url);
+        self.http
+            .post(&url)
+            .query(&[("filename", path)])
+            .send()
+            .await
+            .map_err(|e| AppError::Driver(format!("start_print http: {e}")))?
+            .error_for_status()
+            .map_err(|e| AppError::Driver(format!("start_print rejected: {e}")))?;
+        Ok(())
     }
 
     async fn current_status(&self) -> Result<PrinterStatus, AppError> {
