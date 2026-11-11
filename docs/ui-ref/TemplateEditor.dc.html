@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Template editor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="Projects.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="Service.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="Tools.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+<header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 32px; border-bottom: 1px solid var(--fw-border)">
+<a href="Projects.dc.html" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M15 5l-7 7 7 7"/></svg>Projects</a>
+<span style="color: var(--fw-muted)">/</span><span style="font-size: 13px">Templates</span>
+<div style="flex: 1"></div>
+<span role="status" style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">{{savedNote}}</span>
+<a href="ProjectNew.dc.html" style="min-height: 44px; padding: 0 16px; background: var(--fw-accent-hover); color: var(--fw-on-accent); text-decoration: none; border-radius: 2px; display: flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Start a project from it</a>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; padding: 20px 32px 48px; align-items: flex-start">
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+<section id="basics" aria-label="Basics" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+<h2 style="grid-column: 1 / -1; margin: 0; font-size: 18px">Basics</h2>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Name</span><input type="text" value="{{name}}" onInput="{{setName}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 12px; border-radius: 2px"></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Category</span><select style="min-height: 44px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 0 8px; border-radius: 2px"><option>Games</option><option>Workshop</option><option>Home</option></select></label>
+<label style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: bold">Notes</span><textarea style="min-height: 72px; border: 1px solid var(--fw-muted); background: var(--fw-raised); padding: 10px 12px; border-radius: 2px; resize: vertical">Print pieces at 0.16 mm. Felt pads go under every piece.</textarea></label>
+</section>
+
+<section id="plates" aria-label="Plates" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 12px"><h2 style="flex: 1; margin: 0; font-size: 18px">Plates · {{plateCount}}</h2><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px">{{printsPerSet}}</span><span style="font-size: 12px; color: var(--fw-muted)">Files are copied into the template, so deleting them from the Library is safe.</span></div>
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{plates}}" as="p" hint-placeholder-count="4">
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 8px; background: var(--fw-surface); border: 1px solid var(--fw-border)">
+<span aria-hidden="true" style="cursor: grab; color: var(--fw-muted)">⋮⋮</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--fw-muted); width: 18px">{{p.n}}</span>
+<img src="{{p.thumb}}" alt="" width="56" height="42" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<label style="flex: 1; min-width: 0"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Plate name</span><input type="text" value="{{p.name}}" style="width: 100%; min-height: 40px; border: 1px solid transparent; background: transparent; padding: 0 6px; font-weight: bold"></label>
+<span style="font-size: 12px; color: var(--fw-muted); white-space: nowrap">{{p.file}} · {{p.meta}}</span>
+<span role="group" aria-label="Copies of {{p.name}} per set" style="display: inline-flex; align-items: center; flex: none"><button type="button" onClick="{{p.qDown}}" aria-label="Fewer copies" disabled="{{p.qMin}}" style="width: 32px; height: 36px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">−</button><output style="min-width: 44px; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--fw-muted); border-bottom: 1px solid var(--fw-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; font-weight: bold">× {{p.qty}}</output><button type="button" onClick="{{p.qUp}}" aria-label="More copies" style="width: 32px; height: 36px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">+</button></span>
+<button type="button" onClick="{{p.up}}" aria-label="Move {{p.name}} up" style="width: 36px; height: 36px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px">↑</button>
+<button type="button" onClick="{{p.remove}}" aria-label="Remove {{p.name}}" style="width: 36px; height: 36px; border: 1px solid var(--fw-border); background: transparent; cursor: pointer; border-radius: 2px">✕</button>
+</li>
+</sc-for>
+</ol>
+</section>
+
+<section id="slots" aria-label="Colour slots" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 12px"><h2 style="flex: 1; margin: 0; font-size: 18px">Colour slots</h2><button type="button" onClick="{{addSlot}}" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">+ Slot</button></div>
+<p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Tick which slots each plate uses. Preferred colour is only a suggestion when someone starts a project.</p>
+<div style="overflow-x: auto">
+<table style="border-collapse: collapse; min-width: 640px; width: 100%">
+<thead><tr>
+<th style="text-align: left; padding: 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Slot</th>
+<th style="text-align: left; padding: 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">Preferred</th>
+<sc-for list="{{plates}}" as="p" hint-placeholder-count="4"><th style="padding: 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); border-bottom: 1px solid var(--fw-border)">P{{p.n}}</th></sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{slots}}" as="sl" hint-placeholder-count="2">
+<tr>
+<td style="padding: 6px 8px; border-bottom: 1px solid var(--fw-border)"><input type="text" value="{{sl.key}}" aria-label="Slot name" style="width: 110px; min-height: 40px; border: 1px solid var(--fw-border); background: var(--fw-surface); padding: 0 8px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold"></td>
+<td style="padding: 6px 8px; border-bottom: 1px solid var(--fw-border)"><span style="display: flex; align-items: center; gap: 6px"><span aria-hidden="true" style="width: 22px; height: 22px; background: {{sl.hex}}; border: 1px solid var(--fw-muted)"></span><span style="font-size: 12px">{{sl.pref}}</span></span></td>
+<sc-for list="{{sl.cells}}" as="c" hint-placeholder-count="4">
+<td style="padding: 6px 8px; border-bottom: 1px solid var(--fw-border); text-align: center"><input type="checkbox" checked="{{c.on}}" onChange="{{c.toggle}}" aria-label="{{c.aria}}" style="width: 22px; height: 22px; accent-color: var(--fw-accent-hover)"></td>
+</sc-for>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<sc-if value="{{orphan}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 13px; color: var(--fw-warning)">⚠ {{orphanText}}</p></sc-if>
+</section>
+
+<section id="thumb" aria-label="Thumbnail" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center">
+<div style="flex: 1 1 260px"><h2 style="margin: 0 0 4px; font-size: 18px">Thumbnail <span style="font-size: 13px; font-weight: normal; color: var(--fw-muted)">optional</span></h2><p style="margin: 0; font-size: 13px; color: var(--fw-muted)">Drop a photo of the finished thing, or use a plate thumbnail from the G-code.</p></div>
+<sc-if value="{{hasThumb}}" hint-placeholder-val="{{ false }}"><img src="{{thumbSrc}}" alt="{{thumbText}}" width="160" height="120" style="display: block; border: 1px solid var(--fw-border)"></sc-if><sc-if value="{{noThumb}}" hint-placeholder-val="{{ true }}"><div style="width: 160px; height: 120px; border: 1px dashed var(--fw-muted); display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; color: var(--fw-muted)">{{thumbText}}</div></sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px"><button type="button" onClick="{{useThumb}}" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Use plate 1 thumbnail</button><button type="button" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Upload photo…</button></div>
+</section>
+</main>
+
+<aside style="flex: 1 1 280px; max-width: 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Checklist" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0 0 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Ready to use? {{doneCount}}</h2>
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="5">
+<a href="{{c.href}}" style="display: flex; gap: 8px; align-items: center; min-height: 36px; text-decoration: none; color: var(--fw-text); font-size: 13px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: {{c.fg}}; width: 16px">{{c.sym}}</span>{{c.label}}</a>
+</sc-for>
+</section>
+<section aria-label="Add plates" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0 0 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Library · Chess set folder</h2>
+<sc-for list="{{library}}" as="f" hint-placeholder-count="4">
+<div draggable="true" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px; border: 1px solid var(--fw-border); background: var(--fw-surface)"><span aria-hidden="true" style="color: var(--fw-muted); cursor: grab">⋮⋮</span><span style="flex: 1; font-size: 13px">{{f.file}}</span><button type="button" onClick="{{f.add}}" disabled="{{f.added}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">{{f.label}}</button></div>
+</sc-for>
+<span style="font-size: 12px; color: var(--fw-muted)">Drag onto Plates, or press Add.</span>
+</section>
+</aside>
+</div>
+</div>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      name: 'Chess set', thumb: false, edits: 0, toasts: [],
+      plates: [
+        { id: 'a', name: 'Pawns', file: 'pawns.3mf', meta: '2 h 02 m · 8 pawns', qty: 2 },
+        { id: 'b', name: 'Rooks + knights', file: 'rooks_knights.3mf', meta: '1 h 54 m' },
+        { id: 'c', name: 'Bishops', file: 'bishops.3mf', meta: '2 h 10 m' },
+        { id: 'd', name: 'King + queen', file: 'king_queen.3mf', meta: '2 h 05 m' }
+      ],
+      slots: [{ key: 'PRIMARY', pref: 'PLA Teal', hex: '#1f8a8a' }, { key: 'ACCENT', pref: 'PLA White', hex: '#f4f4ef' }],
+      map: { 'PRIMARY:a': true, 'ACCENT:a': true, 'PRIMARY:b': true, 'ACCENT:b': true, 'PRIMARY:c': true, 'PRIMARY:d': true, 'ACCENT:d': true }
+    };
+    this.tid = 0;
+  }
+  bump(patch, toast, undoState) {
+    this.setState({ ...patch, edits: this.state.edits + 1 });
+    if (toast) { const id = ++this.tid; this.setState({ toasts: [{ id, text: toast, undoState }] }); }
+  }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  renderVals() {
+    const s = this.state;
+    const qOf = (p) => p.qty || 1;
+    const setQ = (id, q) => this.bump({ plates: this.state.plates.map(x => x.id === id ? { ...x, qty: Math.max(1, Math.min(50, q)) } : x) });
+    const plates = s.plates.map((p, i) => ({ ...p, n: i + 1, thumb: this.thumbOf('chess ' + p.name, i % 2 ? '#f4f4ef' : '#1f8a8a'), qty: qOf(p), qMin: qOf(p) <= 1, qUp: () => setQ(p.id, qOf(p) + 1), qDown: () => setQ(p.id, qOf(p) - 1),
+      up: () => { if (i === 0) return; const a = s.plates.slice(); [a[i - 1], a[i]] = [a[i], a[i - 1]]; this.bump({ plates: a }); },
+      remove: () => this.bump({ plates: s.plates.filter(x => x.id !== p.id) }, 'Removed plate ' + p.name, { plates: s.plates }) }));
+    const slots = s.slots.map(sl => ({ ...sl, cells: s.plates.map(p => { const k = sl.key + ':' + p.id; return { on: !!s.map[k], aria: sl.key + ' used on ' + p.name, toggle: () => this.bump({ map: { ...this.state.map, [k]: !this.state.map[k] } }) }; }) }));
+    const noSlot = s.plates.filter(p => !s.slots.some(sl => s.map[sl.key + ':' + p.id]));
+    const unused = s.slots.filter(sl => !s.plates.some(p => s.map[sl.key + ':' + p.id]));
+    const LIB = [['frame.3mf', 'Board frame', '1 h 50 m'], ['pawns_dark.3mf', 'Pawns (dark)', '2 h 18 m'], ['pawns.3mf', 'Pawns', '2 h 02 m'], ['felt_jig.gcode', 'Felt cutting jig', '20 m']];
+    const library = LIB.map(([file, name, meta]) => { const added = s.plates.some(p => p.file === file); return { file, added, label: added ? 'Added' : 'Add',
+      add: () => this.bump({ plates: [...s.plates, { id: file, name, file, meta }] }, 'Added ' + name + ' as plate ' + (s.plates.length + 1), { plates: s.plates }) }; });
+    const checks = [
+      [!!s.name.trim(), 'Has a name', '#basics'],
+      [s.plates.length > 0, s.plates.length + ' plate' + (s.plates.length === 1 ? '' : 's') + ' · ' + s.plates.reduce((a, p) => a + (p.qty || 1), 0) + ' prints per set', '#plates'],
+      [noSlot.length === 0, noSlot.length ? noSlot.length + ' plate(s) without a colour slot' : 'Every plate uses a slot', '#slots'],
+      [unused.length === 0, unused.length ? 'Slot ' + unused.map(u => u.key).join(', ') + ' not used' : 'Every slot is used', '#slots'],
+      [s.thumb, s.thumb ? 'Thumbnail set' : 'Thumbnail (optional)', '#thumb']
+    ].map(([ok, label, href], i) => ({ label, href, sym: ok ? '✓' : i === 4 ? '○' : '⚠', fg: ok ? 'var(--fw-success)' : i === 4 ? 'var(--fw-muted)' : 'var(--fw-warning)' }));
+    const required = checks.slice(0, 4).filter(c => c.sym === '✓').length;
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      name: s.name, setName: (e) => this.bump({ name: e.target.value }),
+      savedNote: s.edits ? 'Draft saved · just now' : 'All changes saved',
+      plates, plateCount: s.plates.length, printsPerSet: s.plates.reduce((a, p) => a + (p.qty || 1), 0) + ' prints per set', slots,
+      addSlot: () => { const key = String(s.slots.length + 1); this.bump({ slots: [...s.slots, { key, pref: 'any', hex: 'transparent' }] }); },
+      orphan: noSlot.length > 0 || unused.length > 0,
+      orphanText: [noSlot.length ? noSlot.map(p => p.name).join(', ') + ' has no slot' : '', unused.length ? 'slot ' + unused.map(u => u.key).join(', ') + ' is not used by any plate' : ''].filter(Boolean).join('; ') + '.',
+      hasThumb: !!s.thumb, noThumb: !s.thumb, thumbSrc: this.thumbOf('chess pawns', '#1f8a8a'), thumbText: s.thumb ? 'Pawns · plate thumbnail' : 'No thumbnail', useThumb: () => this.bump({ thumb: true }),
+      checks, doneCount: required + ' of 4',
+      library,
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => this.setState({ ...t.undoState, toasts: [] }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

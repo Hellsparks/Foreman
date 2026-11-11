@@ -79,3 +79,29 @@ Rules that came out of the UI workshop and must hold:
 - No weight field when adding a *filament*; no TD1 box when adding a *spool* — those live inside the boxes that need them.
 - Abrasive is an explicit flag, auto-ticked for CF/GF/AF/Metal/Glow modifiers, user-overridable.
 - Swatches: single = filled circle; coextruded = split circle; gradient = bar; empty = dashed.
+# docs/ui-ref — Phase 5 additions (append to README.md)
+
+Five boards. Read only the lines you need; `renderVals()` in each is the behaviour spec.
+
+| File | Lines | What |
+|---|---|---|
+| `Projects.dc.html` (313) | 47–71 | project list |
+| | 72–244 | project detail: plates, colour slots, per-file copies, progress, live plate status, archive |
+| | 245+ | logic |
+| `ProjectNew.dc.html` (261) | 1–178 | new project: from template or loose files, auto-grouped colour slots, spool per slot, due date, instances |
+| | 179+ | logic |
+| `TemplateEditor.dc.html` (246) | 1–207 | template editor: plates, colour slots, plate↔slot map, copies per set, categories, thumbnail, swap options |
+| | 208+ | logic |
+| `Service.dc.html` (158) | 1–113 | maintenance: due work, intervals, mark done, history |
+| | 114+ | logic |
+| `Tools.dc.html` (327) | 48–55 | tab bar |
+| | 56–141 | **Calibration**: skew (printer) and shrinkage (filament) as separate flows |
+| | 142–162 | swatch generator |
+| | 163–187 | import |
+| | 188–264 | export: OrcaSlicer profiles, HueForge catalogue |
+| | 265+ | logic |
+
+Phase 5 rules from the workshop:
+- Copies are per file/plate, editable on a running project, never below what's already printed or printing. Grams, reservations, progress and the fleet queue count prints, not plates.
+- Skew is a printer property (Klipper `[skew_correction]`); shrinkage is a filament property stored in `orcaslicer_config` as `shrinkage_xy` / `shrinkage_z`. Two separate flows, never mixed.
+- A project built from loose files groups tool+colour across files into shared colour slots, which the user can split or merge.

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foreman — Projects</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+[data-fw-mode="light"]{color-scheme:light;--fw-success:#386348;--fw-warning:#795A12;--fw-danger:#B02E25;--fw-info:#345F87;--fw-success-bg:#E3EBDD;--fw-warning-bg:#F1E9CF;--fw-danger-bg:#F5E2DB;--fw-info-bg:#E1E8EF;--fw-shadow-overlay:0 4px 16px #2528201A}
+[data-fw-mode="dark"]{color-scheme:dark;--fw-success:#A8D6B1;--fw-warning:#EAD08E;--fw-danger:#FFB4A4;--fw-info:#A9CDED;--fw-success-bg:#263C2C;--fw-warning-bg:#3E3521;--fw-danger-bg:#432C27;--fw-info-bg:#283745;--fw-shadow-overlay:0 4px 16px #00000055}
+[data-fw-theme="fieldwork"][data-fw-mode="light"]{--fw-background:#F5F3EC;--fw-surface:#ECEAE2;--fw-raised:#FFFDF7;--fw-text:#252820;--fw-muted:#64675C;--fw-border:#D2D3C7;--fw-accent:#DA4B27;--fw-accent-hover:#BF3D1C;--fw-on-accent:#FFFFFF;--fw-button-hover:#A93216;--fw-focus:#345F87}
+[data-fw-theme="fieldwork"][data-fw-mode="dark"]{--fw-background:#191B18;--fw-surface:#232620;--fw-raised:#2C3028;--fw-text:#F0F0E5;--fw-muted:#AFB4A6;--fw-border:#484D42;--fw-accent:#F57951;--fw-accent-hover:#F57951;--fw-on-accent:#1C2119;--fw-button-hover:#FF9574;--fw-focus:#9CC7F0}
+[data-fw-theme="vector"][data-fw-mode="light"]{--fw-background:#F1F3E9;--fw-surface:#E5E9DA;--fw-raised:#FAFCF3;--fw-text:#192119;--fw-muted:#59634E;--fw-border:#C8CFBC;--fw-accent:#C4E830;--fw-accent-hover:#455900;--fw-on-accent:#FFFFFF;--fw-button-hover:#344400;--fw-focus:#4F398A}
+[data-fw-theme="vector"][data-fw-mode="dark"]{--fw-background:#101510;--fw-surface:#1B231A;--fw-raised:#242E22;--fw-text:#EDF4DB;--fw-muted:#AFBE9B;--fw-border:#43503C;--fw-accent:#D5FA39;--fw-accent-hover:#D5FA39;--fw-on-accent:#192000;--fw-button-hover:#E6FF82;--fw-focus:#C1A7FF}
+[data-fw-theme="foundry"][data-fw-mode="light"]{--fw-background:#F1F1F1;--fw-surface:#E5E5E5;--fw-raised:#FFFFFF;--fw-text:#202020;--fw-muted:#606060;--fw-border:#CCCCCC;--fw-accent:#595959;--fw-accent-hover:#3D3D3D;--fw-on-accent:#FFFFFF;--fw-button-hover:#242424;--fw-focus:#454545}
+[data-fw-theme="foundry"][data-fw-mode="dark"]{--fw-background:#151515;--fw-surface:#212121;--fw-raised:#2B2B2B;--fw-text:#EEEEEE;--fw-muted:#AFAFAF;--fw-border:#4A4A4A;--fw-accent:#D5D5D5;--fw-accent-hover:#D5D5D5;--fw-on-accent:#171717;--fw-button-hover:#FFFFFF;--fw-focus:#DDDDDD}
+[data-fw-theme="olive"][data-fw-mode="light"]{--fw-background:#F0EDDF;--fw-surface:#E5E0CD;--fw-raised:#FAF7EA;--fw-text:#282C20;--fw-muted:#62664F;--fw-border:#CBCBB7;--fw-accent:#8A7438;--fw-accent-hover:#5D622D;--fw-on-accent:#FFFFFF;--fw-button-hover:#44491D;--fw-focus:#385D7A}
+[data-fw-theme="olive"][data-fw-mode="dark"]{--fw-background:#1B2017;--fw-surface:#262E20;--fw-raised:#303A28;--fw-text:#EEEEDD;--fw-muted:#B5B99F;--fw-border:#505B43;--fw-accent:#C2C78D;--fw-accent-hover:#C2C78D;--fw-on-accent:#202717;--fw-button-hover:#DDE2A8;--fw-focus:#A5C5DF}
+button,input,select,textarea{font:inherit;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--fw-focus);outline-offset:3px}
+button:disabled{opacity:.5;cursor:not-allowed}
+a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
+</style>
+</helmet>
+<div data-fw-theme="{{scheme}}" data-fw-mode="{{mode}}" style="position: relative; display: flex; flex-wrap: wrap; align-items: stretch; min-height: 1100px; background: var(--fw-background); color: var(--fw-text); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5">
+<nav aria-label="Main" style="flex: 0 0 auto; width: 176px; box-sizing: border-box; background: var(--fw-surface); border-right: 1px solid var(--fw-border); display: flex; flex-direction: column; padding: 16px 0">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 16px 16px; border-bottom: 1px solid var(--fw-border); margin-bottom: 8px">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="color: var(--fw-accent)"><rect x="3" y="3" width="18" height="18"></rect><path d="M3 9h18M9 9v12"></path></svg>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; letter-spacing: .12em; font-size: 13px">FOREMAN</span>
+</div>
+<a href="Main.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Fleet</a>
+<a href="Jobs.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Jobs</a>
+<a href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Library</a>
+<a href="Projects.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; text-decoration: none; color: var(--fw-text); border-left: 3px solid var(--fw-accent); background: var(--fw-raised); font-weight: bold">Projects</a>
+<a href="Filament.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Filament</a>
+<a href="Service.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Service</a>
+<a href="Tools.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Tools</a>
+<a href="Settings.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 19px; text-decoration: none; color: var(--fw-text)">Settings</a>
+</nav>
+
+<div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column">
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{ false }}">
+<main style="padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+<div style="flex: 1 1 300px"><h1 style="margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em">Projects</h1><p style="margin: 4px 0 0; color: var(--fw-muted)">Due soonest first.</p></div>
+<a href="TemplateEditor.dc.html" style="min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center">Templates</a>
+<a href="ProjectNew.dc.html" style="min-height: 44px; padding: 0 16px; background: var(--fw-accent-hover); color: var(--fw-on-accent); text-decoration: none; border-radius: 2px; display: flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">New project</a>
+</div>
+<div role="group" aria-label="Show" style="display: flex">
+<sc-for list="{{listFilters}}" as="f" hint-placeholder-count="2">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="min-height: 40px; padding: 0 14px; margin-left: -1px; border: 1px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; cursor: pointer; font-size: 13px">{{f.label}}</button>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px">
+<sc-for list="{{projects}}" as="pr" hint-placeholder-count="4">
+<button type="button" onClick="{{pr.open}}" style="text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--fw-raised); border: 1px solid var(--fw-border); cursor: pointer">
+<span style="display: flex; align-items: center; gap: 8px"><b style="flex: 1; font-size: 16px">{{pr.name}}</b><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 2px 6px; color: {{pr.fg}}; background: {{pr.bg}}">{{pr.due}}</span></span>
+<span style="height: 8px; background: var(--fw-surface); border: 1px solid var(--fw-border); display: flex"><span style="width: {{pr.donePct}}%; background: var(--fw-success)"></span><span style="width: {{pr.runPct}}%; background: var(--fw-info)"></span></span>
+<span style="font-size: 13px; color: var(--fw-muted)">{{pr.sub}}</span>
+<span style="display: flex; gap: 4px"><sc-for list="{{pr.swatches}}" as="w" hint-placeholder-count="2"><span aria-hidden="true" style="width: 16px; height: 16px; background: {{w}}; border: 1px solid var(--fw-muted)"></span></sc-for></span>
+</button>
+</sc-for>
+</div>
+</main>
+</sc-if>
+
+<sc-if value="{{isDetail}}" hint-placeholder-val="{{ true }}">
+<main style="padding: 20px 32px 48px; display: flex; flex-direction: column; gap: 16px">
+<button type="button" onClick="{{toList}}" style="align-self: flex-start; min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" style="flex: none; vertical-align: -3px"><path d="M15 5l-7 7 7 7"/></svg>Projects</button>
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px">
+<div style="flex: 1 1 360px; min-width: 0">
+<sc-if value="{{editingName}}" hint-placeholder-val="{{ false }}">
+<label style="display: flex; gap: 8px; align-items: center"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Project name</span>
+<input type="text" value="{{name}}" onInput="{{setName}}" style="flex: 1; min-height: 48px; font-size: 24px; border: 1px solid var(--fw-focus); background: var(--fw-raised); padding: 0 10px; border-radius: 2px">
+<button type="button" onClick="{{doneName}}" style="min-height: 48px; padding: 0 14px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Done</button></label>
+</sc-if>
+<sc-if value="{{notEditingName}}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{editName}}" aria-label="Rename project" style="background: none; border: 0; padding: 0; cursor: text; text-align: left; font-size: 32px; font-weight: bold; letter-spacing: -0.025em; line-height: 1.15; min-height: 44px">{{name}} <span aria-hidden="true" style="font-size: 14px; color: var(--fw-muted); font-weight: normal">✎</span></button>
+</sc-if>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 6px; font-size: 13px; color: var(--fw-muted)">
+<span>From template <a href="TemplateEditor.dc.html" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">Chess set</a></span>
+<label style="display: flex; align-items: center; gap: 6px">Due <input type="date" value="2026-11-13" style="min-height: 36px; border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 0 6px; border-radius: 2px"></label>
+<span>{{progressText}}</span>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" onClick="{{queueAll}}" disabled="{{queueDisabled}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">{{queueLabel}}</button>
+<a href="TemplateEditor.dc.html" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-muted); color: var(--fw-text); text-decoration: none; border-radius: 2px; display: flex; align-items: center">Save as template</a>
+<button type="button" onClick="{{archive}}" style="min-height: 44px; padding: 0 14px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer">Archive</button>
+</div>
+</div>
+
+<div style="display: flex; height: 10px; background: var(--fw-surface); border: 1px solid var(--fw-border)"><div style="width: {{donePct}}%; background: var(--fw-success)"></div><div style="width: {{runPct}}%; background: var(--fw-info)"></div><div style="width: {{queuedPct}}%; background: var(--fw-muted)"></div></div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+<section aria-label="Plates" style="flex: 999 1 520px; min-width: 0; border: 1px solid var(--fw-border); background: var(--fw-raised)">
+<div style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--fw-border)">
+<h2 style="flex: 1; margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Plates · {{plateCount}}</h2>
+<a href="Library.dc.html" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); text-decoration: none; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer">+ Add from Library</a>
+</div>
+<sc-for list="{{plates}}" as="pl" hint-placeholder-count="6">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 60px; padding: 6px 12px; border-bottom: 1px solid var(--fw-border); background: {{pl.rowBg}}">
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--fw-muted); width: 20px">{{pl.n}}</span>
+<img src="{{pl.thumb}}" alt="" width="56" height="42" style="flex: none; display: block; border: 1px solid var(--fw-border)">
+<button type="button" onClick="{{pl.open}}" style="flex: 1 1 180px; min-width: 0; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; min-height: 44px"><b>{{pl.name}}</b><br><span style="font-size: 12px; color: var(--fw-muted)">{{pl.meta}}</span></button>
+<span style="display: flex; gap: 3px"><sc-for list="{{pl.slots}}" as="sl" hint-placeholder-count="2"><span title="{{sl.key}}" style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 10px; padding: 1px 4px; border: 1px solid var(--fw-border); display: inline-flex; align-items: center; gap: 3px"><span aria-hidden="true" style="width: 10px; height: 10px; background: {{sl.hex}}"></span>{{sl.key}}</span></sc-for></span>
+<span role="group" aria-label="Copies of {{pl.name}}" style="display: inline-flex; align-items: center; flex: none"><button type="button" onClick="{{pl.qDown}}" aria-label="Fewer copies" disabled="{{pl.qMin}}" style="width: 32px; height: 36px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">−</button><output style="min-width: 44px; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--fw-muted); border-bottom: 1px solid var(--fw-muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; font-weight: bold">× {{pl.qty}}</output><button type="button" onClick="{{pl.qUp}}" aria-label="More copies" style="width: 32px; height: 36px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer">+</button></span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold; padding: 3px 7px; color: {{pl.fg}}; background: {{pl.bg}}; min-width: 150px">{{pl.status}}</span>
+</div>
+</sc-for>
+</section>
+
+<div style="flex: 1 1 320px; max-width: 420px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<section aria-label="Materials" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Materials</h2>
+<sc-for list="{{slots}}" as="m" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--fw-border)">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; font-weight: bold">{{m.key}}</span><span aria-hidden="true" style="width: 18px; height: 18px; background: {{m.hex}}; border: 1px solid var(--fw-muted)"></span><span style="flex: 1; font-size: 13px">{{m.spool}}</span>
+<button type="button" onClick="{{m.toggle}}" aria-expanded="{{m.open}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">Swap</button></div>
+<div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: {{m.fg}}">{{m.status}}</div>
+<sc-if value="{{m.hasFix}}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{m.fix}}" style="align-self: flex-start; min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-warning); background: var(--fw-warning-bg); color: var(--fw-warning); border-radius: 2px; cursor: pointer; font-size: 12px">{{m.fixLabel}}</button>
+</sc-if>
+<sc-if value="{{m.isOpen}}" hint-placeholder-val="{{ false }}">
+<div role="listbox" aria-label="Choose spool for {{m.key}}" style="display: flex; flex-direction: column; border: 1px solid var(--fw-border)">
+<sc-for list="{{m.options}}" as="o" hint-placeholder-count="3">
+<button type="button" role="option" onClick="{{o.pick}}" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; background: var(--fw-surface); border: 0; border-bottom: 1px solid var(--fw-border); cursor: pointer; text-align: left; font-size: 12px"><span aria-hidden="true" style="width: 14px; height: 14px; background: {{o.hex}}; border: 1px solid var(--fw-muted)"></span><span style="flex: 1">{{o.label}}</span><span style="color: {{o.fg}}">{{o.free}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</section>
+<section aria-label="Activity" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Activity</h2>
+<sc-for list="{{activity}}" as="a" hint-placeholder-count="4">
+<div style="display: flex; gap: 10px; font-size: 13px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted); width: 72px; flex: none">{{a.t}}</span><span>{{a.x}}</span></div>
+</sc-for>
+</section>
+</div>
+</div>
+</main>
+</sc-if>
+</div>
+
+<sc-if value="{{inspOpen}}" hint-placeholder-val="{{ false }}">
+<aside aria-label="Plate" style="flex: 1 1 360px; max-width: 420px; box-sizing: border-box; background: var(--fw-surface); border-left: 1px solid var(--fw-border); padding: 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="flex: 1"><div style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Plate {{sel.n}} of {{plateCount}}</div><h2 style="margin: 2px 0 0; font-size: 22px">{{sel.name}}</h2></div>
+<button type="button" onClick="{{closeInsp}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<span style="align-self: flex-start; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: bold; padding: 3px 8px; color: {{sel.fg}}; background: {{sel.bg}}">{{sel.status}}</span>
+<img src="{{sel.thumb}}" alt="Plate preview: {{sel.name}}" style="display: block; width: 100%; aspect-ratio: 4 / 3; border: 1px solid var(--fw-border)">
+<div style="background: var(--fw-raised); border: 1px solid var(--fw-border); padding: 10px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{sel.facts}}" as="f" hint-placeholder-count="4"><div style="display: flex; justify-content: space-between; gap: 12px; min-height: 26px"><span style="color: var(--fw-muted)">{{f.k}}</span><span>{{f.v}}</span></div></sc-for>
+</div>
+<div style="flex: 1"></div>
+<div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--fw-border); padding-top: 14px">
+<a href="Library.dc.html" style="min-height: 44px; background: var(--fw-accent-hover); color: var(--fw-on-accent); text-decoration: none; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Send this plate…</a>
+<button type="button" onClick="{{markDone}}" style="min-height: 44px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer">Mark done manually</button>
+<button type="button" onClick="{{removePlate}}" style="min-height: 44px; border: 1px solid var(--fw-border); background: transparent; border-radius: 2px; cursor: pointer">Remove from project</button>
+</div>
+</aside>
+</sc-if>
+
+<div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 380px; max-width: calc(100% - 48px)">
+<sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--fw-raised); border: 1px solid var(--fw-info); box-shadow: var(--fw-shadow-overlay)">
+<span style="flex: 1; font-size: 13px">{{t.text}}</span>
+<button type="button" onClick="{{t.undo}}" style="min-height: 36px; padding: 0 12px; border: 1px solid var(--fw-muted); background: transparent; cursor: pointer; font-size: 13px; border-radius: 2px; font-weight: bold">Undo</button>
+<button type="button" onClick="{{t.dismiss}}" aria-label="Dismiss" style="width: 36px; height: 36px; border: 0; background: none; cursor: pointer">✕</button>
+</div>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"scheme":{"editor":"enum","options":["fieldwork","vector","foundry","olive"],"default":"fieldwork","section":"Appearance"},"mode":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Appearance"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      view: 'detail', listFilter: 'active', archived: false, name: 'Chess set — walnut/maple', editingName: false, sel: null, open: null, toasts: [],
+      slotSpool: { PRIMARY: 57, ACCENT: 61 }, extra: {},
+      plates: [
+        { id: 1, name: 'Pawns ×8', slots: ['PRIMARY', 'ACCENT'], time: '2 h 02 m', g: { PRIMARY: 40, ACCENT: 15 }, status: 'done', printer: 'Bambu P1S' },
+        { id: 2, name: 'Pawns ×8 (dark)', slots: ['ACCENT', 'PRIMARY'], time: '2 h 18 m', g: { PRIMARY: 14, ACCENT: 43 }, status: 'done', printer: 'Bambu X1C' },
+        { id: 3, name: 'Rooks + knights', slots: ['PRIMARY', 'ACCENT'], time: '1 h 54 m', g: { PRIMARY: 44, ACCENT: 12 }, status: 'printing', printer: 'Bambu X1C', qty: 2, doneN: 1 },
+        { id: 4, name: 'Bishops', slots: ['PRIMARY'], time: '2 h 10 m', g: { PRIMARY: 58 }, status: 'queued', printer: 'Voron 2.4 350', qty: 2 },
+        { id: 5, name: 'King + queen', slots: ['PRIMARY', 'ACCENT'], time: '2 h 05 m', g: { PRIMARY: 46, ACCENT: 15 }, status: 'pending', printer: '' },
+        { id: 6, name: 'Board frame', slots: ['ACCENT'], time: '1 h 50 m', g: { ACCENT: 54 }, status: 'pending', printer: '' }
+      ]
+    };
+    this.tid = 0;
+  }
+  toast(text, undo) { const id = ++this.tid; this.setState({ toasts: [...this.state.toasts, { id, text, undo }].slice(-2) }); }
+  thumbOf(name, hex) {
+    const n = String(name || '').toLowerCase();
+    const c = /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#8a8f94';
+    const sh = (h, f) => { const v = parseInt(h.slice(1), 16); const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map(x => Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f)))); return '#' + ch.map(x => x.toString(16).padStart(2, '0')).join(''); };
+    const lum = (h) => { const v = parseInt(h.slice(1), 16); return (0.299 * (v >> 16 & 255) + 0.587 * (v >> 8 & 255) + 0.114 * (v & 255)) / 255; };
+    const top = sh(c, 1.18), left = c, right = sh(c, 0.72), edge = lum(c) > 0.6 ? sh(c, 0.55) : sh(c, 1.35);
+    const st = ' stroke="' + edge + '" stroke-width="0.8" stroke-linejoin="round"';
+    const iso = (x, y, w, d, h) => {
+      const A = [x, y], B = [x + w, y + w / 2], C = [x + w - d, y + w / 2 + d / 2], D = [x - d, y + d / 2];
+      const up = (p) => [p[0], p[1] - h]; const pt = (ps) => ps.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+      return '<polygon points="' + pt([D, C, up(C), up(D)]) + '" fill="' + left + '"' + st + '/>' +
+        '<polygon points="' + pt([C, B, up(B), up(C)]) + '" fill="' + right + '"' + st + '/>' +
+        '<polygon points="' + pt([up(A), up(B), up(C), up(D)]) + '" fill="' + top + '"' + st + '/>';
+    };
+    let body = '';
+    if (/gear/.test(n)) {
+      let p = ''; const cx = 60, cy = 48; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; const r = i % 2 ? 22 : 28; p += (cx + Math.cos(a) * r).toFixed(1) + ',' + (cy + Math.sin(a) * r * 0.62).toFixed(1) + ' '; }
+      body = '<ellipse cx="60" cy="54" rx="28" ry="17" fill="' + right + '"' + st + '/><polygon points="' + p + '" fill="' + top + '"' + st + '/><ellipse cx="60" cy="48" rx="8" ry="5" fill="#16181a"' + st + '/>';
+    } else if (/bench|boat/.test(n)) {
+      body = '<path d="M26 52 L94 52 L86 66 L36 66 Z" fill="' + right + '"' + st + '/><path d="M22 44 L98 44 L94 52 L26 52 Z" fill="' + top + '"' + st + '/><rect x="50" y="26" width="24" height="18" fill="' + left + '"' + st + '/><rect x="54" y="30" width="7" height="6" fill="#16181a"/><rect x="64" y="30" width="7" height="6" fill="#16181a"/><rect x="66" y="16" width="6" height="10" fill="' + right + '"' + st + '/>';
+    } else if (/chess|pawn|rook|king|bishop|knight/.test(n)) {
+      [[30, 58], [52, 50], [74, 58], [96, 50], [41, 70], [63, 70], [85, 70]].forEach(([x, y]) => { body += '<path d="M' + (x - 7) + ' ' + y + ' L' + (x + 7) + ' ' + y + ' L' + (x + 3) + ' ' + (y - 10) + ' L' + (x - 3) + ' ' + (y - 10) + ' Z" fill="' + right + '"' + st + '/><circle cx="' + x + '" cy="' + (y - 13) + '" r="4.5" fill="' + top + '"' + st + '/>'; });
+    } else if (/clip/.test(n)) {
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) { const x = 26 + k * 21 + r * 5, y = 36 + r * 13; body += '<path d="M' + (x + 5) + ' ' + (y - 5) + ' A6 5 0 1 0 ' + (x + 5) + ' ' + (y + 5) + '" fill="none" stroke="' + top + '" stroke-width="3.5" stroke-linecap="square"/>'; }
+    } else if (/duct|fan/.test(n)) {
+      body = '<path d="M30 30 Q60 18 88 34 L82 64 Q58 54 40 66 Z" fill="' + left + '"' + st + '/><path d="M30 30 Q60 18 88 34 L84 38 Q60 26 34 36 Z" fill="' + top + '"' + st + '/><ellipse cx="62" cy="44" rx="11" ry="7" fill="#16181a"' + st + '/>';
+    } else if (/calistar|cali/.test(n)) {
+      body = iso(60, 46, 34, 34, 4) + iso(60, 30, 8, 8, 18);
+    } else if (/skew/.test(n)) {
+      body = iso(60, 32, 38, 38, 3) + '<line x1="60" y1="29" x2="60" y2="67" stroke="' + edge + '" stroke-width="1.2"/><line x1="22" y1="48" x2="98" y2="48" stroke="' + edge + '" stroke-width="1.2"/>';
+    } else if (/bracket|hinge|mount|holder/.test(n)) {
+      body = iso(44, 40, 34, 18, 8) + iso(44, 40, 10, 18, 30);
+    } else if (/lid|panel|side|plate|enclosure/.test(n)) {
+      body = iso(60, 30, 44, 44, 7);
+    } else if (/housing|box|case/.test(n)) {
+      body = iso(60, 34, 32, 28, 20);
+    } else {
+      body = '<ellipse cx="60" cy="60" rx="24" ry="9" fill="' + right + '"' + st + '/><rect x="36" y="32" width="48" height="28" fill="' + left + '"/><ellipse cx="60" cy="32" rx="24" ry="9" fill="' + top + '"' + st + '/>';
+    }
+    let grid = '';
+    for (let i = -6; i <= 6; i++) { grid += '<line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 - 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/><line x1="' + (60 + i * 14) + '" y1="20" x2="' + (60 + i * 14 + 70) + '" y2="90" stroke="#23272a" stroke-width="0.6"/>'; }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><rect width="120" height="90" fill="#16181a"/>' + grid + '<ellipse cx="60" cy="72" rx="40" ry="6" fill="#000" opacity=".25"/>' + body + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+  renderVals() {
+    const s = this.state;
+    const tone = { info: ['var(--fw-info)', 'var(--fw-info-bg)'], warn: ['var(--fw-warning)', 'var(--fw-warning-bg)'], bad: ['var(--fw-danger)', 'var(--fw-danger-bg)'], ok: ['var(--fw-success)', 'var(--fw-success-bg)'], off: ['var(--fw-muted)', 'var(--fw-surface)'] };
+    const SP = { 57: ['#57 PolyLite PLA Teal', '#1f8a8a', 120, 0], 58: ['#58 PolyLite PLA Teal', '#1f8a8a', 1000, 0], 61: ['#61 Bambu PLA White', '#f4f4ef', 946, 0], 64: ['#64 Bambu PLA White', '#f4f4ef', 640, 0], 71: ['#71 PolyTerra Charcoal', '#3b3b3b', 1000, 0], 66: ['#66 Silk Dual Copper/Silver', 'conic-gradient(#b87333 0 50%, #c0c0c0 50% 100%)', 760, 0] };
+    const hexOf = (k) => SP[s.slotSpool[k]][1];
+    const ST = { done: ['ok', '✓ Done'], printing: ['info', '▶ Printing'], queued: ['off', '◷ Queued'], pending: ['warn', '○ Not started'] };
+    const qOf = (p) => p.qty || 1;
+    const cDone = (p) => p.status === 'done' ? qOf(p) : (p.doneN || 0);
+    const setQ = (p, q) => { const prev = this.state.plates; const nq = Math.max(Math.max(1, cDone(p) + (p.status === 'printing' ? 1 : 0)), Math.min(50, q)); this.setState({ plates: prev.map(x => x.id === p.id ? { ...x, qty: nq, status: x.status === 'done' && nq > cDone(x) ? 'pending' : x.status, doneN: x.status === 'done' && nq > cDone(x) ? qOf(x) : x.doneN } : x) }); };
+    const plates = s.plates.map((p, i) => {
+      const [t, label] = ST[p.status];
+      const cp = qOf(p) > 1 ? ' · copy ' + Math.min(qOf(p), cDone(p) + 1) + '/' + qOf(p) : '';
+      const status = (p.status === 'done' && qOf(p) > 1) ? '✓ Done ×' + qOf(p) : p.status === 'printing' ? '▶ Printing' + cp + ' · ' + p.printer : (p.doneN && p.status !== 'done') ? '◐ ' + p.doneN + ' of ' + qOf(p) + ' done' + (p.status === 'queued' ? ' · next queued' : '') : p.status === 'queued' ? '◷ Queued · ' + (p.printer || 'fleet') : p.status === 'done' ? '✓ Done · ' + p.printer : label;
+      const grams = Object.values(p.g).reduce((a, b) => a + b, 0);
+      return { ...p, n: i + 1, status, qty: qOf(p), qMin: qOf(p) <= Math.max(1, cDone(p) + (p.status === 'printing' ? 1 : 0)), qUp: () => setQ(p, qOf(p) + 1), qDown: () => setQ(p, qOf(p) - 1), fg: tone[t][0], bg: tone[t][1], meta: p.time + ' · ' + grams + ' g' + (qOf(p) > 1 ? ' each · ' + cDone(p) + ' of ' + qOf(p) + ' printed' : ''), rowBg: s.sel === p.id ? 'var(--fw-info-bg)' : 'transparent',
+        slots: p.slots.map(k => ({ key: k, hex: hexOf(k) })), thumb: this.thumbOf('chess ' + p.name, /^#/.test(hexOf(p.slots[0])) ? hexOf(p.slots[0]) : '#8a8f94'), open: () => this.setState({ sel: p.id }) };
+    });
+    const remaining = s.plates.filter(p => p.status === 'pending');
+    const count = (st) => s.plates.filter(p => p.status === st).length;
+    const need = (k) => s.plates.reduce((a, p) => a + (p.g[k] || 0) * (qOf(p) - cDone(p)), 0);
+    const slots = ['PRIMARY', 'ACCENT'].map(k => {
+      const id = s.slotSpool[k]; const sp = SP[id]; const extraId = s.extra[k];
+      const left = sp[2] + (extraId ? SP[extraId][2] : 0); const n = need(k);
+      const short = n > left;
+      return { key: k, hex: sp[1], spool: sp[0] + (extraId ? ' + ' + SP[extraId][0].split(' ')[0] : ''),
+        status: short ? '⚠ Needs ' + n + ' g · only ' + left + ' g left · short ' + (n - left) + ' g' : '✓ Needs ' + n + ' g · ' + left + ' g left · ' + n + ' g reserved',
+        fg: short ? 'var(--fw-warning)' : 'var(--fw-success)',
+        hasFix: short, fixLabel: '+ Add #58 PolyLite PLA Teal (1000 g) as overflow',
+        fix: () => { this.setState({ extra: { ...s.extra, [k]: 58 } }); this.toast('#58 added to ' + k + ' · ' + n + ' g reserved across 2 spools', () => { const e = { ...this.state.extra }; delete e[k]; this.setState({ extra: e }); }); },
+        open: s.open === k ? 'true' : 'false', isOpen: s.open === k,
+        toggle: () => this.setState({ open: s.open === k ? null : k }),
+        options: [58, 61, 64, 71, 66].filter(x => x !== id).map(x => ({ label: SP[x][0], hex: SP[x][1], free: SP[x][2] + ' g free', fg: SP[x][2] >= n ? 'var(--fw-success)' : 'var(--fw-warning)',
+          pick: () => { const prev = s.slotSpool; this.setState({ slotSpool: { ...s.slotSpool, [k]: x }, open: null }); this.toast(k + ' → ' + SP[x][0] + ' · reservation moved', () => this.setState({ slotSpool: prev })); } })) };
+    });
+    const selP = plates.find(p => p.id === s.sel);
+    const total = s.plates.reduce((a, p) => a + qOf(p), 0); const done = s.plates.reduce((a, p) => a + cDone(p), 0); const run = count('printing'); const q = s.plates.filter(p => p.status === 'queued').reduce((a, p) => a + qOf(p) - cDone(p), 0);
+    const PJ = [
+      { name: s.name, due: s.archived ? 'ARCHIVED' : 'DUE FRI', t: 'warn', donePct: Math.round(done / total * 100), runPct: Math.round(run / total * 100), sub: done + ' of ' + total + ' prints done · ' + run + ' printing', swatches: [hexOf('PRIMARY'), hexOf('ACCENT')], archived: s.archived },
+      { name: 'Desk organiser ×3', due: 'DUE 20 NOV', t: 'off', donePct: 25, runPct: 0, sub: '3 of 12 plates done', swatches: ['#3b3b3b', '#e46a1a'], archived: false },
+      { name: 'Cable clips for workshop', due: 'NO DATE', t: 'off', donePct: 0, runPct: 0, sub: 'Not started · 2 plates', swatches: ['#1d1d22'], archived: false },
+      { name: 'Enclosure panels', due: 'DONE 3 NOV', t: 'ok', donePct: 100, runPct: 0, sub: '8 of 8 plates done', swatches: ['#1d1d22'], archived: true }
+    ];
+    const seg = (on) => ({ on: on ? 'true' : 'false', border: on ? 'var(--fw-accent-hover)' : 'var(--fw-muted)', bg: on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)', fg: on ? 'var(--fw-on-accent)' : 'var(--fw-text)' });
+    const projects = PJ.filter(p => (s.listFilter === 'active') !== p.archived).map((p, i) => ({ ...p, fg: tone[p.t][0], bg: tone[p.t][1], open: () => this.setState({ view: i === 0 ? 'detail' : 'list' }) }));
+    return {
+      scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      isList: s.view === 'list', isDetail: s.view === 'detail',
+      listFilters: [['active', 'Active'], ['archived', 'Archived']].map(([id, label]) => ({ label, ...seg(s.listFilter === id), pick: () => this.setState({ listFilter: id }) })),
+      projects, toList: () => this.setState({ view: 'list', sel: null }),
+      name: s.name, editingName: s.editingName, notEditingName: !s.editingName,
+      editName: () => this.setState({ editingName: true }), doneName: () => this.setState({ editingName: false }), setName: (e) => this.setState({ name: e.target.value }),
+      progressText: done + ' of ' + total + ' prints done · ' + run + ' printing · ' + q + ' queued · ' + remaining.reduce((a, p) => a + qOf(p) - cDone(p), 0) + ' not started',
+      donePct: Math.round(done / total * 100), runPct: Math.round(run / total * 100), queuedPct: Math.round(q / total * 100),
+      queueDisabled: remaining.length === 0, queueLabel: remaining.length ? 'Queue remaining ' + remaining.reduce((a, p) => a + qOf(p) - cDone(p), 0) + ' prints · fleet' : 'All plates queued',
+      queueAll: () => { const prev = s.plates; this.setState({ plates: s.plates.map(p => p.status === 'pending' ? { ...p, status: 'queued', printer: 'fleet' } : p) }); this.toast(remaining.length + ' plates added to fleet queue · due Fri sets priority', () => this.setState({ plates: prev })); },
+      archive: () => { this.setState({ archived: true, view: 'list', listFilter: 'archived' }); this.toast('Project archived · find it under Archived', () => this.setState({ archived: false, view: 'detail', listFilter: 'active' })); },
+      plateCount: total, plates, slots,
+      activity: [{ t: '14:02', x: 'Plate 2 finished on Bambu X1C · marked Good' }, { t: '14:05', x: 'Plate 3 started on Bambu X1C' }, { t: '11:20', x: 'Plate 4 queued on Voron 2.4 350' }, { t: 'Yesterday', x: 'Plate 1 finished on Bambu P1S' }, { t: 'Mon', x: 'Project created from template Chess set' }],
+      inspOpen: !!selP, sel: selP ? { ...selP, facts: [{ k: 'Time', v: selP.time }, { k: 'Filament', v: Object.entries(selP.g).map(([k, g]) => k + ' ' + g + ' g').join(' · ') }, { k: 'Printer', v: selP.printer || '—' }, { k: 'File', v: 'chess_plate_' + selP.id + '.3mf' }] } : { facts: [] },
+      closeInsp: () => this.setState({ sel: null }),
+      markDone: () => { const prev = s.plates; this.setState({ plates: s.plates.map(p => p.id === s.sel ? { ...p, status: 'done', printer: p.printer || 'manual' } : p) }); this.toast('Plate marked done', () => this.setState({ plates: prev })); },
+      removePlate: () => { const prev = s.plates; this.setState({ plates: s.plates.filter(p => p.id !== s.sel), sel: null }); this.toast('Plate removed from project', () => this.setState({ plates: prev })); },
+      toasts: s.toasts.map(t => ({ text: t.text, undo: () => { if (t.undo) t.undo(); this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }); }, dismiss: () => this.setState({ toasts: this.state.toasts.filter(x => x.id !== t.id) }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
