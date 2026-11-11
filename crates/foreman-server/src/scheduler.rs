@@ -782,19 +782,22 @@ impl Scheduler {
         )
         .await
         {
-            Ok(a) => {
+            Ok(raised) => {
+                let created = raised.created;
+                let a = raised.item;
                 if let Some(j) = job_id {
                     let _ = repo::attention::set_job(&self.pool, a.id, j).await;
                 }
-                let _ = self.bus_tx.send(ServerEvent::AttentionAdded {
-                    item: AttentionItemEvent {
+                let _ = self.bus_tx.send(ServerEvent::attention_raised(
+                    created,
+                    AttentionItemEvent {
                         id: a.id,
                         printer_id: Some(printer_id),
                         kind: PLATE_ATTENTION.into(),
                         title: a.title,
                         body: a.body,
                     },
-                });
+                ));
             }
             Err(e) => warn!(printer_id, "raise plate attention: {e}"),
         }

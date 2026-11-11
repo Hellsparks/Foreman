@@ -165,21 +165,25 @@ impl DriverManager {
                                     )
                                     .await
                                     {
-                                        Ok(item) => {
+                                        Ok(raised) => {
+                                            let created = raised.created;
+                                            let item = raised.item;
                                             let att_id = item.id;
                                             mgr2.open_attention
                                                 .write()
                                                 .await
                                                 .insert(error_key, att_id);
-                                            let _ = mgr2.bus_tx.send(ServerEvent::AttentionAdded {
-                                                item: AttentionItemEvent {
-                                                    id: att_id,
-                                                    printer_id: Some(printer_id),
-                                                    kind: "error".to_owned(),
-                                                    title: item.title,
-                                                    body: item.body,
-                                                },
-                                            });
+                                            let _ =
+                                                mgr2.bus_tx.send(ServerEvent::attention_raised(
+                                                    created,
+                                                    AttentionItemEvent {
+                                                        id: att_id,
+                                                        printer_id: Some(printer_id),
+                                                        kind: "error".to_owned(),
+                                                        title: item.title,
+                                                        body: item.body,
+                                                    },
+                                                ));
                                             info!(printer_id, att_id, "error attention raised");
                                         }
                                         Err(e) => {
@@ -272,21 +276,24 @@ impl DriverManager {
                             )
                             .await
                             {
-                                Ok(item) => {
+                                Ok(raised) => {
+                                    let created = raised.created;
+                                    let item = raised.item;
                                     let att_id = item.id;
                                     mgr3.open_attention
                                         .write()
                                         .await
                                         .insert(offline_key, att_id);
-                                    let _ = mgr3.bus_tx.send(ServerEvent::AttentionAdded {
-                                        item: AttentionItemEvent {
+                                    let _ = mgr3.bus_tx.send(ServerEvent::attention_raised(
+                                        created,
+                                        AttentionItemEvent {
                                             id: att_id,
                                             printer_id: Some(printer_id),
                                             kind: "offline".to_owned(),
                                             title: item.title,
                                             body: item.body,
                                         },
-                                    });
+                                    ));
                                     info!(printer_id, att_id, "offline attention raised");
                                 }
                                 Err(e) => {
@@ -560,21 +567,24 @@ impl DriverManager {
             )
             .await
             {
-                Ok(item) => {
+                Ok(raised) => {
+                    let created = raised.created;
+                    let item = raised.item;
                     let att_id = item.id;
                     self.path_switched_attention
                         .write()
                         .await
                         .insert(printer_id, att_id);
-                    let _ = self.bus_tx.send(ServerEvent::AttentionAdded {
-                        item: AttentionItemEvent {
+                    let _ = self.bus_tx.send(ServerEvent::attention_raised(
+                        created,
+                        AttentionItemEvent {
                             id: att_id,
                             printer_id: Some(printer_id),
                             kind: "path_switched".to_owned(),
                             title: item.title,
                             body: item.body,
                         },
-                    });
+                    ));
                     info!(printer_id, att_id, path = %path.name, "path_switched attention raised");
                 }
                 Err(e) => {
@@ -786,6 +796,20 @@ impl DriverManager {
             .write()
             .await
             .insert(printer.id, Instant::now());
+        // Adopt open offline/error items from before a restart, so the
+        // "printer is back" path clears them instead of leaving them behind.
+        for kind in ["offline", "error"] {
+            if let Ok(Some(a)) = foreman_core::repo::attention::get_active_by_printer_kind(
+                &self.pool, printer.id, kind,
+            )
+            .await
+            {
+                self.open_attention
+                    .write()
+                    .await
+                    .insert((printer.id, kind.to_owned()), a.id);
+            }
+        }
         self.drivers
             .write()
             .await

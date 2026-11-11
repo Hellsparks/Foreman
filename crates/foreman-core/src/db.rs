@@ -140,6 +140,30 @@ const MIGRATIONS: &[&str] = &[
        notes TEXT, prev_since TEXT, prev_snooze REAL NOT NULL DEFAULT 0)",
     "CREATE INDEX IF NOT EXISTS ix_maintenance_log_task ON maintenance_log (task_id)",
     "CREATE INDEX IF NOT EXISTS ix_maintenance_log_printer ON maintenance_log (printer_id)",
+    // 0015: open Attention items unique per (printer, kind) (session 32, see
+    // migrations/0015_attention_unique.sql). Clear duplicates (keep the oldest
+    // open one), then enforce it.
+    "UPDATE attention_item SET cleared_at = COALESCE(cleared_at, created_at) \
+     WHERE cleared_at IS NULL AND id NOT IN (\
+       SELECT MIN(id) FROM attention_item WHERE cleared_at IS NULL \
+       GROUP BY COALESCE(printer_id, -1), kind)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_attention_item_open \
+     ON attention_item (COALESCE(printer_id, -1), kind) WHERE cleared_at IS NULL",
+    // 0016: calibration history (5.4, see migrations/0016_calibration.sql).
+    "CREATE TABLE IF NOT EXISTS skew_calibration (\
+       id INTEGER PRIMARY KEY NOT NULL, \
+       printer_id INTEGER NOT NULL REFERENCES printer(id) ON DELETE CASCADE, \
+       planes_json TEXT NOT NULL, measured_at TEXT NOT NULL, measured_by TEXT NOT NULL, \
+       applied_at TEXT, applied_by TEXT, notes TEXT)",
+    "CREATE INDEX IF NOT EXISTS ix_skew_calibration_printer ON skew_calibration (printer_id)",
+    "CREATE TABLE IF NOT EXISTS shrinkage_calibration (\
+       id INTEGER PRIMARY KEY NOT NULL, filament_id INTEGER NOT NULL, \
+       filament_name TEXT NOT NULL, \
+       printer_id INTEGER REFERENCES printer(id) ON DELETE SET NULL, printer_name TEXT, \
+       printer_skew_corrected INTEGER NOT NULL DEFAULT 0, input_json TEXT NOT NULL, \
+       shrinkage_xy REAL, shrinkage_z REAL, saved_at TEXT NOT NULL, saved_by TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS ix_shrinkage_calibration_filament \
+     ON shrinkage_calibration (filament_id)",
 ];
 
 /// Foreman-native database handle.

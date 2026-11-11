@@ -285,6 +285,16 @@ pub enum ServerEvent {
 }
 
 impl ServerEvent {
+    /// `attention.added` for a newly raised item, `attention.updated` when
+    /// `repo::attention::raise` reused an open one.
+    pub fn attention_raised(created: bool, item: AttentionItemEvent) -> Self {
+        if created {
+            ServerEvent::AttentionAdded { item }
+        } else {
+            ServerEvent::AttentionUpdated { item }
+        }
+    }
+
     pub fn heartbeat() -> Self {
         ServerEvent::Heartbeat {
             timestamp: Utc::now(),

@@ -1,6 +1,7 @@
 //! foreman-core — shared domain types, error definitions, event bus, and DB handle.
 
 pub mod auth;
+pub mod calibration;
 pub mod compat;
 pub mod db;
 pub mod domain;
