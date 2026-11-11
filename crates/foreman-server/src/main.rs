@@ -17,6 +17,14 @@ async fn main() {
         return;
     }
 
+    if std::env::args().nth(1).as_deref() == Some("dev-token") {
+        if let Err(err) = foreman_server::dev_token_cli(cfg).await {
+            eprintln!("dev-token failed: {err}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
     if let Err(err) = foreman_server::serve(cfg).await {
         eprintln!("server error: {err}");
         std::process::exit(1);

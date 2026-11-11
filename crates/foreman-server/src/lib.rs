@@ -91,6 +91,8 @@ pub async fn serve_with(
         host = %cfg.host,
         data_dir = %cfg.data_dir.display(),
         db_url = cfg.db_url.as_deref().unwrap_or("(none)"),
+        commit = api::health::GIT_COMMIT,
+        built_at = %api::health::built_at(),
         "foreman-server starting"
     );
 
@@ -447,6 +449,32 @@ pub async fn reset_admin_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
     }
     foreman_core::auth::reset_admin(&db.pool, &username, &pw).await?;
     println!("Admin '{username}' saved. All sessions were signed out.");
+    Ok(())
+}
+
+/// Lifetime of a `dev-token` session.
+const DEV_TOKEN_TTL_SECS: i64 = 30 * 60;
+
+/// `foreman-server dev-token`: mint a short-lived admin session for local testing and
+/// print only the bearer token to stdout. Use this instead of editing the database.
+pub async fn dev_token_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
+    let db = ForemanDb::connect(&cfg.data_dir.join("foreman.db")).await?;
+    if foreman_core::auth::admin_username(&db.pool)
+        .await?
+        .is_none()
+    {
+        anyhow::bail!(
+            "no admin account yet: finish setup first (an unclaimed server only answers health/info/setup)"
+        );
+    }
+    let (token, expires_at) =
+        foreman_core::auth::create_session(&db.pool, DEV_TOKEN_TTL_SECS, None, Some("dev-token"))
+            .await?;
+    eprintln!(
+        "dev-token: admin session valid for {} min (expires at unix {expires_at}); send as `Authorization: Bearer <token>`",
+        DEV_TOKEN_TTL_SECS / 60
+    );
+    println!("{token}");
     Ok(())
 }
 

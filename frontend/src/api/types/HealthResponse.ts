@@ -3,4 +3,12 @@
 /**
  * Response body for `GET /api/health`.
  */
-export type HealthResponse = { status: string, version: string, };
+export type HealthResponse = { status: string, version: string, 
+/**
+ * Git commit the running binary was built from.
+ */
+commit: string, 
+/**
+ * When the binary was built (RFC 3339 UTC).
+ */
+built_at: string, };
