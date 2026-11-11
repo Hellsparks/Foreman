@@ -1204,16 +1204,22 @@ mod tests {
         })
         .unwrap();
 
-        // Let the event listener task process it.
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        let items = foreman_core::repo::attention::list_active(&db.pool)
-            .await
-            .unwrap();
-        assert!(
-            items
+        // Let the event listener task process it (poll: CI runners can be slow).
+        let has_error = |pool: sqlx::SqlitePool| async move {
+            foreman_core::repo::attention::list_active(&pool)
+                .await
+                .unwrap()
                 .iter()
-                .any(|i| i.printer_id == Some(999) && i.kind == "error"),
+                .any(|i| i.printer_id == Some(999) && i.kind == "error")
+        };
+        for _ in 0..100 {
+            if has_error(db.pool.clone()).await {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert!(
+            has_error(db.pool.clone()).await,
             "error attention should have been raised"
         );
 
@@ -1224,15 +1230,14 @@ mod tests {
         })
         .unwrap();
 
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        let items = foreman_core::repo::attention::list_active(&db.pool)
-            .await
-            .unwrap();
+        for _ in 0..100 {
+            if !has_error(db.pool.clone()).await {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
         assert!(
-            !items
-                .iter()
-                .any(|i| i.printer_id == Some(999) && i.kind == "error"),
+            !has_error(db.pool.clone()).await,
             "error attention should have been cleared after recovery"
         );
     }
