@@ -124,6 +124,8 @@ export interface PrinterWithStatus {
   sort_order: number;
   fail_after_checks: number;
   return_after_secs: number;
+  /** Who reports filament use to Spoolman (auto | moonraker | foreman). */
+  usage_reporter?: "auto" | "moonraker" | "foreman";
   created_at: string;
   updated_at: string;
   status: PrinterStatus | null;
@@ -138,6 +140,8 @@ export interface AttentionItem {
   kind: string;
   title: string;
   body: string | null;
+  /** The job a "print finished" item is about (rate it Good / Failed). */
+  job_id?: number | null;
   created_at: string;
 }
 
@@ -264,6 +268,8 @@ export const api = {
       sort_order: number;
       primary_url: string | null;
       api_key: string | null;
+      access_code: string | null;
+      usage_reporter: "auto" | "moonraker" | "foreman";
     }>,
   ) => put<PrinterWithStatus>(`/api/printers/${id}`, body),
   /** Camera snapshot path — turn into an <img src> with `useSignedUrl`; `t` busts the cache. */

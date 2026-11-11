@@ -263,6 +263,7 @@ async fn print_now(
                 Json(json!({ "error": "no driver for printer" })),
             )
         })?;
+    state.scheduler.expect_start(printer_id).await;
     driver.start_print(&dest_name).await.map_err(|e| {
         (
             StatusCode::BAD_GATEWAY,
@@ -274,6 +275,10 @@ async fn print_now(
 
     // 6. Mark plate as not clear (a print is starting).
     let _ = repo::printer::set_plate_clear(&state.foreman_db.pool, printer_id, false).await;
+    state
+        .scheduler
+        .job_sent(printer_id, req.file_id, &dest_name)
+        .await;
     state.scheduler.queue_changed(Some(printer_id));
 
     Ok((

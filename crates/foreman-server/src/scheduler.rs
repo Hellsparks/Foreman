@@ -23,9 +23,11 @@ use async_trait::async_trait;
 use chrono::Utc;
 use foreman_core::{
     compat::{self, PrinterSnapshot, Verdict},
-    domain::{FileMeta, QueueItem, QueueStatus},
+    domain::{FileMeta, JobEnd, QueueItem, QueueStatus},
     error::AppError,
-    events::{AttentionItemEvent, ConnectionEventKind, PrinterState, PrinterStatus, ServerEvent},
+    events::{
+        AttentionItemEvent, ConnectionEventKind, PrintEnd, PrinterState, PrinterStatus, ServerEvent,
+    },
     library::LibraryStore,
     repo,
 };
@@ -36,7 +38,7 @@ use tokio::{
 };
 use tracing::{debug, info, warn};
 
-use crate::driver_manager::DriverManager;
+use crate::{driver_manager::DriverManager, job_engine};
 
 /// Attention kind raised when a print ends; its action is "Plate cleared".
 pub const PLATE_ATTENTION: &str = "print_finished";
@@ -60,6 +62,12 @@ pub trait SchedEnv: Send + Sync + 'static {
     async fn upload(&self, printer_id: i64, file_id: i64) -> Result<String, AppError>;
     /// Start printing a file already on the printer.
     async fn start(&self, printer_id: i64, name: &str) -> Result<(), AppError>;
+    /// Take `grams` off a Spoolman spool (Foreman-reported usage, 3.6).
+    async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError>;
+    /// Thumbnail URL of a Library file, if it has one.
+    async fn thumb_url(&self, _file_id: i64) -> Option<String> {
+        None
+    }
 }
 
 /// The real environment: drivers + Library.
@@ -67,6 +75,8 @@ pub struct LiveEnv {
     pub pool: SqlitePool,
     pub drivers: Arc<DriverManager>,
     pub library: Arc<LibraryStore>,
+    /// The built-in Spoolman, once it has started (None while disabled).
+    pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
 }
 
 #[async_trait]
@@ -119,6 +129,36 @@ impl SchedEnv for LiveEnv {
             .await
             .map_err(|e| AppError::Driver(format!("start_print failed: {e}")))
     }
+
+    async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
+        let sm = self
+            .spoolman
+            .get()
+            .ok_or_else(|| AppError::Internal("Spoolman is not running".into()))?;
+        spoolman_deduct(sm, spool_id, grams).await
+    }
+
+    async fn thumb_url(&self, file_id: i64) -> Option<String> {
+        self.library
+            .get(file_id)
+            .await
+            .ok()
+            .and_then(|e| e.thumb_url)
+    }
+}
+
+/// Take `grams` off a spool in the built-in Spoolman and tell its websocket
+/// clients (Spoolman UI, Moonraker) the spool changed.
+pub async fn spoolman_deduct(
+    sm: &spoolman_rs::state::AppState,
+    spool_id: i64,
+    grams: f64,
+) -> Result<(), AppError> {
+    let spool = spoolman_rs::db::spool::use_weight(&sm.db.pool, spool_id, grams)
+        .await
+        .map_err(|e| AppError::Internal(format!("spoolman use_weight: {e}")))?;
+    spoolman_rs::ws::broadcast(&sm.event_tx, "updated", "spool", spool.id, &spool);
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +499,7 @@ impl Scheduler {
             return Err(e);
         }
         repo::printer::set_plate_clear(&self.pool, printer_id, false).await?;
+        self.job_sent(printer_id, file_id, &name).await;
         info!(item = id, printer_id, file = %name, "queue: print started");
         self.changed(Some(printer_id));
         Ok(())
@@ -497,6 +538,37 @@ impl Scheduler {
                 self.changed(Some(pid));
             }
         }
+        // Jobs Foreman started that never ran (Print now or queue).
+        for snap in snaps {
+            let pid = snap.printer.id;
+            let idle = snap
+                .status
+                .as_ref()
+                .is_some_and(|st| st.state == PrinterState::Idle);
+            if !idle || seen.get(&pid).copied().unwrap_or(true) {
+                continue;
+            }
+            let Ok(Some(job)) = repo::job::running_for_printer(&self.pool, pid).await else {
+                continue;
+            };
+            let age = chrono::DateTime::parse_from_rfc3339(&job.started_at)
+                .map(|t| Utc::now().signed_duration_since(t))
+                .ok()
+                .and_then(|d| d.to_std().ok())
+                .unwrap_or_default();
+            if age > NEVER_STARTED_AFTER {
+                let st = PrinterStatus {
+                    state: PrinterState::Idle,
+                    print_end: Some(PrintEnd::Error),
+                    print_message: Some("printer stayed idle; the print did not start".into()),
+                    progress: Some(0.0),
+                    ..Default::default()
+                };
+                let _ =
+                    job_engine::job_ended(&self.pool, self.env.as_ref(), &self.bus_tx, pid, &st)
+                        .await;
+            }
+        }
     }
 
     /// Track printer state. A print that ends (printing/paused → idle or error)
@@ -509,45 +581,135 @@ impl Scheduler {
             .await
             .insert(printer_id, status.state.clone());
         let was_running = matches!(prev, Some(PrinterState::Printing | PrinterState::Paused));
+        // First status after a restart, or back from offline: a job may have ended
+        // while Foreman wasn't watching.
+        let unseen = matches!(prev, None | Some(PrinterState::Offline));
         match status.state {
             PrinterState::Printing | PrinterState::Paused => {
                 self.seen_running.lock().await.insert(printer_id, true);
+                if !was_running {
+                    self.print_started(printer_id, status).await;
+                }
                 false
             }
-            PrinterState::Idle if was_running => {
-                self.print_ended(printer_id, status, true).await;
-                true
-            }
-            PrinterState::Error if was_running => {
-                self.print_ended(printer_id, status, false).await;
-                false
+            PrinterState::Idle | PrinterState::Error
+                if was_running || (unseen && self.has_running_job(printer_id).await) =>
+            {
+                self.print_ended(printer_id, status).await;
+                status.state == PrinterState::Idle
             }
             PrinterState::Idle => prev != Some(PrinterState::Idle),
             _ => false,
         }
     }
 
-    async fn print_ended(&self, printer_id: i64, status: &PrinterStatus, ok: bool) {
+    async fn has_running_job(&self, printer_id: i64) -> bool {
+        repo::job::running_for_printer(&self.pool, printer_id)
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+    }
+
+    /// A print began (sent by Foreman or started on the printer): open its job
+    /// unless one is already running (restart / back online mid-print).
+    async fn print_started(&self, printer_id: i64, status: &PrinterStatus) {
+        let item = repo::queue::active_for_printer(&self.pool, printer_id)
+            .await
+            .ok()
+            .flatten()
+            .filter(|i| i.status == QueueStatus::Printing);
+        if let Err(e) = job_engine::job_started(
+            &self.pool,
+            self.env.as_ref(),
+            &self.bus_tx,
+            printer_id,
+            None,
+            status.filename.as_deref(),
+            item.as_ref(),
+        )
+        .await
+        {
+            warn!(printer_id, "job start: {e}");
+        }
+    }
+
+    /// Print now is about to send a start command: watch whether the printer
+    /// actually starts (a job that never runs is closed as an error).
+    pub async fn expect_start(&self, printer_id: i64) {
+        self.seen_running.lock().await.insert(printer_id, false);
+    }
+
+    /// Foreman just sent the start command: open the job with the Library file.
+    pub async fn job_sent(&self, printer_id: i64, file_id: i64, name: &str) {
+        let item = repo::queue::active_for_printer(&self.pool, printer_id)
+            .await
+            .ok()
+            .flatten()
+            .filter(|i| i.status == QueueStatus::Printing);
+        if let Err(e) = job_engine::job_started(
+            &self.pool,
+            self.env.as_ref(),
+            &self.bus_tx,
+            printer_id,
+            Some(file_id),
+            Some(name),
+            item.as_ref(),
+        )
+        .await
+        {
+            warn!(printer_id, "job start: {e}");
+        }
+    }
+
+    async fn print_ended(&self, printer_id: i64, status: &PrinterStatus) {
+        let end = job_engine::end_of(status);
         let item = repo::queue::active_for_printer(&self.pool, printer_id)
             .await
             .ok()
             .flatten()
             .filter(|i| i.status == QueueStatus::Printing);
         if let Some(item) = &item {
-            let (to, err) = if ok {
-                (QueueStatus::Done, None)
-            } else {
-                (QueueStatus::Failed, Some("printer reported an error"))
+            let (to, err) = match end {
+                JobEnd::Cancelled => (QueueStatus::Cancelled, None),
+                JobEnd::Error => (QueueStatus::Failed, Some("printer reported an error")),
+                _ => (QueueStatus::Done, None),
             };
             let _ =
                 repo::queue::transition(&self.pool, item.id, QueueStatus::Printing, to, err).await;
-            info!(item = item.id, printer_id, ok, "queue item finished");
+            info!(
+                item = item.id,
+                printer_id,
+                end = end.as_str(),
+                "queue item finished"
+            );
         }
+        let job = match job_engine::job_ended(
+            &self.pool,
+            self.env.as_ref(),
+            &self.bus_tx,
+            printer_id,
+            status,
+        )
+        .await
+        {
+            Ok(j) => j,
+            Err(e) => {
+                warn!(printer_id, "job end: {e}");
+                None
+            }
+        };
         if let Err(e) = repo::printer::set_plate_clear(&self.pool, printer_id, false).await {
             warn!(printer_id, "set plate_clear false: {e}");
         }
-        self.raise_plate_attention(printer_id, status, item.as_ref(), ok)
-            .await;
+        self.raise_plate_attention(
+            printer_id,
+            status,
+            item.as_ref(),
+            end,
+            job.as_ref().map(|j| j.id),
+        )
+        .await;
         self.changed(Some(printer_id));
     }
 
@@ -556,12 +718,19 @@ impl Scheduler {
         printer_id: i64,
         status: &PrinterStatus,
         item: Option<&QueueItem>,
-        ok: bool,
+        end: JobEnd,
+        job_id: Option<i64>,
     ) {
         match repo::attention::get_active_by_printer_kind(&self.pool, printer_id, PLATE_ATTENTION)
             .await
         {
-            Ok(Some(_)) => return,
+            Ok(Some(a)) => {
+                // Still uncleared from an earlier print: point it at the newest job.
+                if let Some(j) = job_id {
+                    let _ = repo::attention::set_job(&self.pool, a.id, j).await;
+                }
+                return;
+            }
             Ok(None) => {}
             Err(e) => {
                 warn!(printer_id, "plate attention lookup: {e}");
@@ -572,10 +741,10 @@ impl Scheduler {
             .await
             .map(|p| p.name)
             .unwrap_or_else(|_| format!("Printer {printer_id}"));
-        let title = if ok {
-            format!("{name}: print finished — clear the plate")
-        } else {
-            format!("{name}: print stopped with an error — clear the plate")
+        let title = match end {
+            JobEnd::Cancelled => format!("{name}: print cancelled — clear the plate"),
+            JobEnd::Error => format!("{name}: print stopped with an error — clear the plate"),
+            _ => format!("{name}: print finished — clear the plate"),
         };
         let file = status
             .filename
@@ -592,6 +761,9 @@ impl Scheduler {
         .await
         {
             Ok(a) => {
+                if let Some(j) = job_id {
+                    let _ = repo::attention::set_job(&self.pool, a.id, j).await;
+                }
                 let _ = self.bus_tx.send(ServerEvent::AttentionAdded {
                     item: AttentionItemEvent {
                         id: a.id,

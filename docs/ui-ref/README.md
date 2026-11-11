@@ -52,3 +52,30 @@ These files are exported from the Foreman UI demo (claude.ai design artifact). T
 - lines 105–141: History (filters, outcome rating)
 - lines 142–209: Stats
 - lines 210–385: demo logic (`renderVals()` from line 274)
+# docs/ui-ref — Phase 4 additions (append to README.md)
+
+## Filament — `Filament.dc.html` (899 lines, big: read only the part you need)
+Tabs: Spools · Filaments · Inventory · Vendors · Other (locations etc).
+
+| Lines | What |
+|---|---|
+| 1–56 | styles + shell |
+| 57–64 | tab bar |
+| 65–121 | **Spools** list: filters, search, colour swatches, remaining bar, rows |
+| 122–147 | **Filaments** list |
+| 148–195 | **Inventory**: tracked filaments, target/buy-below, OK/BUY/OUT, summary tiles, shopping list |
+| 196–208 | **Vendors** |
+| 209–211 | Other |
+| 222–260 | right panel: spool inspector (`mSpool`) — weigh, load, measure, edit |
+| 261–398 | **filament form** (`mFil`) — vendor, material + modifier, abrasive, colour type (single / coextruded / gradient), TD, collapsing sections |
+| 399–420 | vendor form (`mVend`) |
+| 421–442 | add stock (`mStock`) |
+| 443–554 | **new spool flow** (`mNew`): search existing → form → create |
+| 555–899 | demo logic; `renderVals()` from 578 = behaviour spec |
+
+Rules that came out of the UI workshop and must hold:
+- Dropdowns are inline, not modal.
+- Sections in the right panel collapse as fields are filled.
+- No weight field when adding a *filament*; no TD1 box when adding a *spool* — those live inside the boxes that need them.
+- Abrasive is an explicit flag, auto-ticked for CF/GF/AF/Metal/Glow modifiers, user-overridable.
+- Swatches: single = filled circle; coextruded = split circle; gradient = bar; empty = dashed.

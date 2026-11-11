@@ -1,5 +1,5 @@
-/** Jobs page (docs/ui-ref/Jobs.dc.html). Queue board is live (task 3.5); History and
- *  Stats arrive with the job engine (3.6). */
+/** Jobs page (docs/ui-ref/Jobs.dc.html). Queue board (task 3.5); History and Stats
+ *  (task 3.6, JobsHistory.tsx). */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { queue, type QueueBoard, type QueueCard, type QueueLane } from "../api/queue";
@@ -8,6 +8,7 @@ import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import type { ShellContext } from "../shell/Shell";
 import { StatusChip, ToastStack, useToasts, type Tone } from "../ui";
+import { JobsHistory, JobsStats } from "./JobsHistory";
 import "./Jobs.css";
 
 type Tab = "queue" | "history" | "stats";
@@ -265,11 +266,8 @@ export default function Jobs() {
         </div>
       </header>
 
-      {tab !== "queue" && (
-        <p className="page-placeholder">
-          {tab === "history" ? "Job history" : "Print stats"} arrive with the job engine (next session).
-        </p>
-      )}
+      {tab === "history" && <JobsHistory notify={addToast} />}
+      {tab === "stats" && <JobsStats />}
 
       {tab === "queue" && (
         <main className="jobs-main">

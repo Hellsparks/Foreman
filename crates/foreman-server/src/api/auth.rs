@@ -460,7 +460,8 @@ pub struct NetworkBody {
     allow_lan: bool,
 }
 
-/// `PUT /api/settings/network` — "Let other devices connect" (applies on next start).
+/// `PUT /api/settings/network` — "Let other devices connect". Stores the setting, then
+/// re-evaluates the bind host and moves the listener in place (no restart).
 pub async fn put_network(
     State(state): State<AppState>,
     Extension(ctx): Extension<AuthCtx>,

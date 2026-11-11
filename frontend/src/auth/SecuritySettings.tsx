@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type ApiKey, type NetworkSettings } from "../api/client";
+import { api, request, type ApiKey, type NetworkSettings } from "../api/client";
 import Button from "../ui/Button";
 import { useAuth } from "./AuthGate";
 import { useRoute } from "../desktop/route";
@@ -23,6 +23,7 @@ export default function SecuritySettings() {
   const [secret, setSecret] = useState<{ name: string; value: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [net, setNet] = useState<NetworkSettings | null>(null);
+  const [slicerPrint, setSlicerPrint] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const [serverName, setServerName] = useState("");
   const [savedName, setSavedName] = useState("");
@@ -31,6 +32,9 @@ export default function SecuritySettings() {
   useEffect(() => {
     api.listApiKeys().then(setKeys).catch((e) => setError(errText(e)));
     api.getNetwork().then(setNet).catch(() => {});
+    request<{ allow_slicer_print: boolean }>("GET", "/api/settings/library")
+      .then((v) => setSlicerPrint(v.allow_slicer_print))
+      .catch(() => {});
     api
       .serverInfo()
       .then((i) => {
@@ -219,6 +223,33 @@ export default function SecuritySettings() {
             </div>
           ))}
         </div>
+      )}
+
+      {slicerPrint != null && (
+        <label className="auth__check security__row" style={{ marginTop: "var(--fw-space-3)" }}>
+          <input
+            type="checkbox"
+            checked={slicerPrint}
+            onChange={async (e) => {
+              const want = e.target.checked;
+              try {
+                const v = await request<{ allow_slicer_print: boolean }>("PUT", "/api/settings/library", {
+                  allow_slicer_print: want,
+                });
+                setSlicerPrint(v.allow_slicer_print);
+              } catch (err) {
+                setError(errText(err));
+              }
+            }}
+          />
+          <span style={{ flex: 1 }}>
+            Allow print from slicer
+            <span className="auth__hint" style={{ display: "block" }}>
+              When on, a slicer&apos;s &ldquo;Upload and print&rdquo; adds the file to the fleet queue. When off, the file
+              only lands in the Library&apos;s Slicer inbox.
+            </span>
+          </span>
+        </label>
       )}
 
       {net?.desktop_mode && (

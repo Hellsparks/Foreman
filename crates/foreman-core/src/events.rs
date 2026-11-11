@@ -38,6 +38,18 @@ pub enum PrinterState {
     Offline,
 }
 
+/// How the last print ended, as the firmware reported it (job engine, 3.6).
+/// Set while the printer sits in its post-print state; cleared when a new print
+/// starts or the printer is reset to standby.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum PrintEnd {
+    Complete,
+    Cancelled,
+    Error,
+}
+
 /// Temperature reading for one heater.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -109,6 +121,17 @@ pub struct PrinterStatus {
     /// Active HMS error codes (Bambu).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hms_codes: Vec<HmsCode>,
+    /// How the last print ended (Klipper `complete`/`cancelled`/`error`,
+    /// Bambu `FINISH`/`FAILED`). None while printing or when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub print_end: Option<PrintEnd>,
+    /// Firmware message for the last print (Klipper `print_stats.message`,
+    /// Bambu `print_error` code), used as the job's error text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub print_message: Option<String>,
+    /// Filament extruded by the current/last print, mm (Klipper `print_stats.filament_used`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filament_used_mm: Option<f64>,
 }
 
 /// What triggered a connection event.
@@ -362,6 +385,7 @@ mod tests {
                 fans: None,
                 ams_trays: Vec::new(),
                 hms_codes: Vec::new(),
+                ..Default::default()
             },
         }
     }

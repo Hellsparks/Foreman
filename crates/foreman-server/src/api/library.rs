@@ -25,6 +25,9 @@ use crate::{auth::AuthCtx, state::AppState};
 pub const SLICER_INBOX: &str = "Slicer inbox";
 pub const SETTING_TRASH_DAYS: &str = "library.trash_days";
 pub const DEFAULT_TRASH_DAYS: i64 = 30;
+/// "Allow print from slicer": when off (default), a slicer's "upload and print"
+/// only stores the file; nothing is queued or started.
+pub const SETTING_ALLOW_SLICER_PRINT: &str = "library.allow_slicer_print";
 /// The OctoPrint release whose upload API we mirror (`/api/version`).
 const OCTOPRINT_COMPAT: &str = "1.10.3";
 
@@ -64,6 +67,14 @@ pub async fn trash_days(state: &AppState) -> i64 {
         .flatten()
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_TRASH_DAYS)
+}
+
+pub async fn allow_slicer_print(state: &AppState) -> bool {
+    repo::setting::get(&state.foreman_db.pool, SETTING_ALLOW_SLICER_PRINT)
+        .await
+        .ok()
+        .flatten()
+        .is_some_and(|v| v == "true")
 }
 
 // ---------------------------------------------------------------------------
@@ -341,30 +352,49 @@ pub async fn restore_many(
 
 #[derive(Deserialize)]
 pub struct LibrarySettings {
-    trash_days: i64,
+    trash_days: Option<i64>,
+    allow_slicer_print: Option<bool>,
+}
+
+async fn settings_json(state: &AppState) -> serde_json::Value {
+    json!({
+        "trash_days": trash_days(state).await,
+        "allow_slicer_print": allow_slicer_print(state).await,
+    })
 }
 
 /// `GET /api/settings/library`
 pub async fn get_settings(State(state): State<AppState>) -> Json<serde_json::Value> {
-    Json(json!({ "trash_days": trash_days(&state).await }))
+    Json(settings_json(&state).await)
 }
 
-/// `PUT /api/settings/library {trash_days}` (1–365).
+/// `PUT /api/settings/library {trash_days?, allow_slicer_print?}` (trash_days 1–365).
 pub async fn put_settings(
     State(state): State<AppState>,
     Json(body): Json<LibrarySettings>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    if !(1..=365).contains(&body.trash_days) {
-        return Err(bad("trash_days must be 1–365"));
+    if let Some(days) = body.trash_days {
+        if !(1..=365).contains(&days) {
+            return Err(bad("trash_days must be 1–365"));
+        }
+        repo::setting::set(
+            &state.foreman_db.pool,
+            SETTING_TRASH_DAYS,
+            &days.to_string(),
+        )
+        .await
+        .map_err(ApiError::from)?;
     }
-    repo::setting::set(
-        &state.foreman_db.pool,
-        SETTING_TRASH_DAYS,
-        &body.trash_days.to_string(),
-    )
-    .await
-    .map_err(ApiError::from)?;
-    Ok(Json(json!({ "trash_days": body.trash_days })))
+    if let Some(allow) = body.allow_slicer_print {
+        repo::setting::set(
+            &state.foreman_db.pool,
+            SETTING_ALLOW_SLICER_PRINT,
+            if allow { "true" } else { "false" },
+        )
+        .await
+        .map_err(ApiError::from)?;
+    }
+    Ok(Json(settings_json(&state).await))
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +435,13 @@ pub async fn octoprint_upload(
     let sub = field("path").unwrap_or_default();
     let folder = format!("{SLICER_INBOX}/{}", sub.trim_matches('/'));
     let entries = store_files(&state, folder.trim_end_matches('/'), files).await?;
-    let print = field("print").is_some_and(|v| v == "true");
+    let asked_print = field("print").is_some_and(|v| v == "true");
+    let print = asked_print && allow_slicer_print(&state).await;
+    if asked_print && !print {
+        info!(
+            "slicer asked to print; \"Allow print from slicer\" is off, so the file is only stored"
+        );
+    }
     let plate = field("plateindex");
     for e in &entries {
         info!(path = %e.path, user = %ctx.username, print, plate = plate.as_deref().unwrap_or("-"), "slicer upload");

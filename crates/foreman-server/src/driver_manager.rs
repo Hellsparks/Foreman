@@ -881,11 +881,22 @@ impl DriverManager {
 
     /// Get cached capabilities for a printer.
     pub async fn get_capabilities(&self, printer_id: i64) -> Option<PrinterCapabilities> {
-        self.capabilities_cache
+        let mut caps = self
+            .capabilities_cache
             .read()
             .await
             .get(&printer_id)
-            .cloned()
+            .cloned()?;
+        // The cache is a snapshot from connect time. Moonraker's [spoolman] link
+        // changes at runtime (Spoolman starts later, Moonraker restarts), and the job
+        // engine picks the usage reporter from it, so read those fields live.
+        if let Some(driver) = self.get_driver(printer_id).await {
+            if let Ok(live) = driver.probe_capabilities().await {
+                caps.spoolman_connected = live.spoolman_connected;
+                caps.spoolman_spool_id = live.spoolman_spool_id;
+            }
+        }
+        Some(caps)
     }
 
     /// Return the first webcam snapshot URL for a printer (from cached capabilities).
@@ -1072,12 +1083,15 @@ mod tests {
     /// Mock driver that records commands it receives.
     struct MockDriver {
         commands: tokio::sync::Mutex<Vec<String>>,
+        /// Live `spoolman_connected` (changes after connect, like Moonraker's).
+        spoolman: std::sync::Mutex<Option<bool>>,
     }
 
     impl MockDriver {
         fn new() -> Self {
             Self {
                 commands: tokio::sync::Mutex::new(Vec::new()),
+                spoolman: std::sync::Mutex::new(None),
             }
         }
     }
@@ -1091,7 +1105,12 @@ mod tests {
             Ok(())
         }
         async fn probe_capabilities(&self) -> Result<PrinterCapabilities, AppError> {
-            Ok(PrinterCapabilities::default())
+            let connected = *self.spoolman.lock().unwrap_or_else(|p| p.into_inner());
+            Ok(PrinterCapabilities {
+                spoolman_connected: connected,
+                spoolman_spool_id: connected.filter(|c| *c).map(|_| 1),
+                ..Default::default()
+            })
         }
         async fn send_command(&self, cmd: PrinterCommand) -> Result<(), AppError> {
             self.commands.lock().await.push(format!("{cmd:?}"));
@@ -1129,6 +1148,7 @@ mod tests {
             fans: None,
             ams_trays: vec![],
             hms_codes: vec![],
+            ..Default::default()
         }
     }
 
@@ -1280,6 +1300,30 @@ mod tests {
         );
 
         (mgr, mock, tmp)
+    }
+
+    /// Regression (session 25, live on HellV0): Moonraker connected to Spoolman
+    /// after Foreman cached the capabilities; the job engine must see the live link.
+    #[tokio::test]
+    async fn spoolman_link_is_read_live_not_from_the_connect_snapshot() {
+        let (mgr, mock, _tmp) = setup_with_mock().await;
+        mgr.capabilities_cache.write().await.insert(
+            1,
+            PrinterCapabilities {
+                bed_size: Some((120.0, 120.0)),
+                spoolman_connected: Some(false),
+                ..Default::default()
+            },
+        );
+        *mock.spoolman.lock().unwrap_or_else(|p| p.into_inner()) = Some(true);
+        let caps = mgr.get_capabilities(1).await.expect("caps");
+        assert_eq!(caps.spoolman_connected, Some(true));
+        assert_eq!(caps.spoolman_spool_id, Some(1));
+        assert_eq!(
+            caps.bed_size,
+            Some((120.0, 120.0)),
+            "other cached fields kept"
+        );
     }
 
     #[tokio::test]

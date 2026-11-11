@@ -342,6 +342,7 @@ mod tests {
             return_after_secs: 60,
             plate_clear: true,
             auto_start_from_queue: true,
+            usage_reporter: Default::default(),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }

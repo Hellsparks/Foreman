@@ -36,6 +36,15 @@ pub struct PrinterCapabilities {
     pub camera_type: Option<String>,
     /// Printer model string derived from serial prefix (Bambu).
     pub printer_model: Option<String>,
+    /// Moonraker's `[spoolman]` link: Some(true) when Moonraker reports it is
+    /// connected to a Spoolman server (it then reports filament use itself).
+    /// None when the component is not configured or unknown.
+    #[serde(default)]
+    pub spoolman_connected: Option<bool>,
+    /// Moonraker's active spool id (`server.spoolman.get_spool_id`).
+    #[serde(default)]
+    #[ts(type = "number | null")]
+    pub spoolman_spool_id: Option<i64>,
 }
 
 /// A webcam discovered via the firmware API.

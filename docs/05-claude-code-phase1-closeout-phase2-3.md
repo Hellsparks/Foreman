@@ -116,7 +116,7 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 - [x] Login → server-side sessions (hashed): browser HttpOnly SameSite=Strict cookie, other clients bearer token (`return_token`). Remember me 30 d, else 12 h. Logout. 5 failed tries per IP → 60 s pause.
 - [x] API keys (create / list / revoke in Settings → Security, shown once, stored hashed, `X-Api-Key`).
 - [x] Every `/api/*` and `/ws/*` route protected; open: `GET /api/health`, `GET /api/info`, `/api/auth/setup`, `/api/auth/login`.
-- [x] Bind rule: no admin → 127.0.0.1 only (logged). Desktop: localhost unless "Let other devices connect" (needs admin, applies on restart).
+- [x] Bind rule: Desktop: localhost unless "Let other devices connect" (needs admin; applies without a restart). Headless: the configured host (default `0.0.0.0`), with only health/info/setup answering before setup. *(Superseded the original "no admin → 127.0.0.1 only" rule; see the corrections log.)*
 - [x] `foreman-server reset-admin` CLI.
 - [x] Spoolman API (7912) stays unauthenticated — logged at startup.
 - [x] Frontend Setup + Sign-in screens (Connect.dc.html), sign-in on 401, Settings → Security (log out, API keys, LAN toggle). Audit user = admin username.
@@ -236,10 +236,11 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 - [x] Scheduler reacts to events (idle, plate cleared, job added). Auto-start only after **plate cleared** confirmation.
 
 ### 3.6 Job engine (W7)
-- [ ] Detect start/end/cancel/error per driver → job record → filament deduction → Attention item.
-- [ ] `usage_reporter = moonraker | foreman` per printer: deduct exactly once (Moonraker `[spoolman]` reports itself).
-- [ ] Outcome rating (good / failed + reason) from Attention or job history.
-- [ ] Job history + basic stats endpoints (filters: printer, material, spool, outcome).
+- [x] Detect start/end/cancel/error per driver → job record → filament deduction → Attention item. *(session 25)*
+- [x] `usage_reporter = moonraker | foreman` per printer: deduct exactly once (Moonraker `[spoolman]` reports itself). *(session 25; `auto` default)*
+- [x] Outcome rating (good / failed + reason) from Attention or job history. *(session 25)*
+- [x] Job history + basic stats endpoints (filters: printer, material, spool, outcome). *(session 25, + History and Stats tabs)*
+- [x] Real print on HellV0 to close Phase 3 (owner, session 25: one cancel + two simulated jobs; see log).
 
 **Phase 3 done =** upload from OrcaSlicer → Library → Send → prints on a mock printer → job recorded, filament deducted once, Attention asks to clear the plate, next fleet-queue job starts after "Plate cleared".
 
@@ -276,6 +277,28 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 25 — 2026-11-11 (3.6 job engine + History + Stats)
+
+- **LAN by default (owner, 2026-11-11):** the default `host` is now `0.0.0.0`; a wildcard host binds two sockets, `0.0.0.0` and `[::]` (v6-only), like loopback does (`127.0.0.1` + `[::1]`). `FOREMAN__HOST` / `config.toml` still override it. The no-admin gate is unchanged (only health, info and setup answer; 403 `setup_required` otherwise), now tested against a real `0.0.0.0` listener over IPv4 and IPv6. Desktop Mode A is unchanged: loopback until an admin exists and "Let other devices connect" is on; the toggle stores `network.allow_lan` and moves the listener in place. `/api/info` addresses and the mDNS announcement already follow the wildcard bind (LAN IPs, `host.local`, Tailscale IP + MagicDNS name). README gained headless / systemd / firewall notes.
+
+- **Step 0, slicer gate:** there was **no** "Allow print from slicer" setting; session 24 made `print=true` always add the file to the fleet queue. Restored as `library.allow_slicer_print` (default **off**), in `GET/PUT /api/settings/library` and as a checkbox under Settings → Security (next to API keys). Off: the file only lands in the Slicer inbox. Test covers off → nothing queued, on → fleet item with source `slicer`.
+- **End states.** `PrinterStatus` gained `print_end` (`complete | cancelled | error`), `print_message` and `filament_used_mm`. Klipper: `print_stats.state` complete / cancelled / error (kept until the next print or `standby`), `message`, `filament_used`. Moonraker status updates that change state or end now bypass the 2/s throttle, so no start/end is lost. Bambu: `FINISH` = complete; `FAILED` with `print_error` 0x0300400C = cancelled (also when the code arrives after the state), any other `FAILED` = error with the code as the message. The session 24 bug (Klipper cancel marked the queue item *done*) is fixed: cancel → queue item `cancelled`, job outcome `cancelled`.
+- **Job table** (`0010_jobs.sql`): opened when Foreman sends the start (queue dispatch or Print now, with the Library file and per-tool plan) or when a printer starts a print by itself (file name only, no plan). Closed once (`WHERE end_state='running'`). Duration is wall clock start → end. `outcome`: NULL until rated for a clean finish; cancel → `cancelled`; error → `failed` with the printer's message. A printer still printing after a restart, or back from offline, re-attaches to its running job; a print that ended while Foreman was down is closed on the first status Foreman sees. A job Foreman started that never runs (idle 120 s, never seen printing) is closed as an error.
+- **Deduction once:** `deduct_state none → pending` is a conditional update; only the winner deducts, then `done` (or `skipped` for Moonraker reporters). A crash between pending and done never deducts again (under-count preferred over double). Used grams = planned for a full print; for cancel/error, planned × (filament_used_mm ÷ planned mm), else × progress. Deduction goes through spoolman-rs `use_weight` on the built-in Spoolman DB and broadcasts the spool update to its websocket clients.
+- **Reporter:** per printer `usage_reporter = auto | moonraker | foreman` (Settings → printer). `auto` = Moonraker when `server.spoolman.status` says `spoolman_connected: true` (also tracked via `notify_spoolman_status_changed` / `notify_active_spool_set`), else Foreman. The reporter is fixed on the job when it opens.
+- **Which spool:** there is no "Load spool" flow yet (W8), so Foreman deducts from the spool the file names: per-tool `spool_id` from a `… (#ID) - Spoolman` preset, else the file's `suggested_spool_id` for single-tool files. Moonraker's active spool is recorded on the job when it has one. A tool with no spool records its grams but deducts nothing.
+- **HellV0 today:** its `[spoolman]` points at `http://localhost:32000` and reports `spoolman_connected: false`, so `auto` resolves to **Foreman** for it (read-only check of `/server/spoolman/status`).
+- **Attention:** `attention_item.job_id` links the "clear the plate" item to its job; the Fleet strip shows **✓ Good / ✖ Failed** (+ reason chips: adhesion, spaghetti, layer shift, clog, warping, other) next to **Plate cleared**. Title says finished / cancelled / stopped with an error.
+- **API:** `GET /api/jobs` (printer_id, from, to, material, spool_id, outcome = good|failed|cancelled|unrated|running, q, limit, offset), `GET/PATCH/DELETE /api/jobs/{id}`, `GET /api/jobs/stats?from&to` (default 7 days): hours, jobs, good/failed/cancelled/unrated, success rate = 1 − failed ÷ (jobs − cancelled − running), grams, per printer (hours, jobs, failure rate, utilization % of the period), by material, by spool. Plain SQL with SQLite `json_each`; no new deps. Job changes broadcast the `job` topic.
+- **Real printer (HellV0, owner present; Foreman never sent a start command itself):**
+  - Job #1 `Cylinder_PLA_4m31s.gcode`, Print now, cancelled by the owner after 76 s in heat-up → `cancelled`, 0 mm extruded → 0 g, spool unchanged, plate item "print cancelled". Moonraker history agrees (cancelled, filament_used 0).
+  - The owner pointed HellV0's `[spoolman]` at Foreman (`http://10.0.0.10:7912`); ufw on the dev PC dropped it (timeout) until `sudo ufw allow from 10.0.0.0/24 to any port 7912 proto tcp`. Spool #1 (Clas Ohlson PLA Grey, 500 g left) created in the built-in Spoolman and set active in Mainsail.
+  - **Bug found live and fixed:** `DriverManager` cached capabilities 2 s after connect, so the job engine still saw `spoolman_connected=false` after Moonraker linked → it would have picked Foreman *and* Moonraker would report (double deduction). `get_capabilities` now reads the spoolman fields live from the driver (regression test).
+  - Jobs #2 and #3: a simulated file (Orca metadata kept; body = `M109 S200`, `G1 E30`, no homing) → both `complete`, `usage_reporter=moonraker`, `deduct_state=skipped`, Foreman deducted 0; spool #1 rose by +0.089 g per run (Moonraker), matching 30 mm of PLA. Job #3 was started by "Start next now" from a printer-queue item (the owner had added the file 6 times; leftovers removed). Plate item raised after each end and cleared by the owner; job #3 rated Good via `PATCH /api/jobs/3`.
+  - Stats after: 3 jobs, 1 good / 1 cancelled / 1 unrated, success 100 %, 0.18 g PLA on spool #1 (2 jobs; a 0 g job no longer counts toward a spool/material — fixed).
+  - Not exercised on hardware: Foreman-side deduction of a non-zero amount (HellV0 now reports via Moonraker); covered by the mock and live-spoolman-rs tests.
+- **UI:** Jobs → History (search, outcome segment incl. "Not rated", printer, material, spool, date range; thumbnail, file, printer, finished, time, grams + spool, outcome; inspector with facts, outcome + reason, delete record) and Stats (7 d / 30 d / 90 d / 1 y; KPIs; utilization; filament by material and by spool). Not built from the reference: material cost (needs spool prices) and "Reprint → Send panel" (links to the Library).
 
 ### Session 24 — 2026-11-11 (3.5 queues + scheduler + Jobs queue board)
 
@@ -336,7 +359,7 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 ### Session 20b — 2026-11-09 (2.9b connect screen + Mode B)
 
 - **Branch base:** `phase2-connect` is stacked on `phase2-auth` (PR #3 not merged yet); its PR shows the auth commits until #3 lands.
-- **Listener moves without a restart** (replaces the 20a "applies on restart" note): the bind host is a `watch` value; creating the admin, the LAN toggle and a rename re-evaluate the bind rule and re-bind the listener in place (drivers and open connections untouched). A headless server configured for `0.0.0.0` therefore goes on the LAN right after setup. The default `host` is still `127.0.0.1`, so a headless server needs `FOREMAN__HOST=0.0.0.0` to be reachable/announced.
+- **Listener moves without a restart** (replaces the 20a "applies on restart" note): the bind host is a `watch` value; creating the admin, the LAN toggle and a rename re-evaluate the bind rule and re-bind the listener in place (drivers and open connections untouched). A headless server configured for `0.0.0.0` therefore goes on the LAN right after setup. *(Since session 25 the default `host` is `0.0.0.0`; see below.)*
 - **mDNS** via `mdns-sd`, announced only when not bound to loopback, re-announced on rename. Container/VM bridges (`docker*`, `br-*`, `veth*`, `virbr*`, …) are left out of the announced and reported addresses. MagicDNS name comes from `tailscale status --json` at startup (skipped when the CLI is missing).
 - **`/api/info` `addresses`** are objects `{ address: "host:port", kind: lan_ip | lan_name | tailscale_ip | tailscale_name | loopback }` so the app can label routes.
 - **Desktop calls the server directly** (CORS is already permissive) with `Authorization: Bearer`. `<img src>`/`<a href>` and WebSockets can't send headers, so `?token=` is accepted on `/ws/*` and on `GET /api/printers/{id}/snapshot` and `/files/download` only (REST still refuses it).
@@ -353,7 +376,7 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 - **No `Secure` cookie flag:** the server speaks plain HTTP on the LAN today; `Secure` would break sign-in. Revisit with TLS / remote access. CSRF is covered by `SameSite=Strict`.
 - **Tauri uses the cookie, not a bearer token:** the webview loads the frontend same-origin (Vite proxy in dev), so the HttpOnly cookie works and no token has to be kept in JS-readable storage. The bearer path (`return_token: true` on login/setup, `Authorization: Bearer`) is implemented and tested for other clients; the desktop app switches to it in 2.9b when it talks to a remote server.
 - **API keys can't manage auth:** an `X-Api-Key` request can use the API but can't list/create/revoke keys or change the network setting (403) — a leaked slicer key can't mint more keys.
-- **"Let other devices connect"** is stored as setting `network.allow_lan` and applies on next start (the listener is bound once). Settings shows "Restart Foreman to apply". Likewise a headless server set to `0.0.0.0` keeps 127.0.0.1 until restarted after setup (logged).
+- **"Let other devices connect"** is stored as setting `network.allow_lan`. *(Superseded: it now applies without a restart, and a headless server binds its configured host before setup.)*
 - **Spoolman API (7912) stays open** as instructed; a startup log line says so.
 - **`GET /api/info`** also gets `server_id` (random UUID, setting `server.id`) and `name` (setting or hostname) for the 2.9b server picker.
 - **Step 0 clean-up:** `openprinttag.rs` hand-rolled SHA-1 replaced by `Uuid::new_v5` (new test pins Python `uuid.uuid5` reference values, passed before and after); `api/tag.rs` local hex module replaced by the `hex` crate.

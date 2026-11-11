@@ -73,6 +73,21 @@ const MIGRATIONS: &[&str] = &[
        from_fleet INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, \
        error TEXT, updated_at TEXT NOT NULL)",
     "CREATE INDEX IF NOT EXISTS ix_queue_item_status ON queue_item (status)",
+    // 0010: job engine (3.6, see migrations/0010_jobs.sql).
+    "CREATE TABLE IF NOT EXISTS job (\
+       id INTEGER PRIMARY KEY NOT NULL, \
+       printer_id INTEGER REFERENCES printer(id) ON DELETE SET NULL, \
+       printer_name TEXT NOT NULL, file_id INTEGER, file_name TEXT NOT NULL, \
+       queue_item_id INTEGER, started_at TEXT NOT NULL, ended_at TEXT, duration_secs INTEGER, \
+       end_state TEXT NOT NULL DEFAULT 'running', outcome TEXT, fail_reason TEXT, error TEXT, \
+       usage_reporter TEXT NOT NULL DEFAULT 'foreman', grams_planned REAL, grams_used REAL, \
+       grams_deducted REAL NOT NULL DEFAULT 0, material TEXT, \
+       tools_json TEXT NOT NULL DEFAULT '[]', deduct_state TEXT NOT NULL DEFAULT 'none', \
+       thumb_url TEXT)",
+    "CREATE INDEX IF NOT EXISTS ix_job_printer ON job (printer_id)",
+    "CREATE INDEX IF NOT EXISTS ix_job_started ON job (started_at)",
+    "ALTER TABLE printer ADD COLUMN usage_reporter TEXT NOT NULL DEFAULT 'auto'",
+    "ALTER TABLE attention_item ADD COLUMN job_id INTEGER",
 ];
 
 /// Foreman-native database handle.

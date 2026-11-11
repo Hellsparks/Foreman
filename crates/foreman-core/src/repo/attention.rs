@@ -20,6 +20,7 @@ struct AttentionRow {
     kind: String,
     title: String,
     body: Option<String>,
+    job_id: Option<i64>,
     created_at: String,
 }
 
@@ -31,6 +32,7 @@ impl AttentionRow {
             kind: self.kind,
             title: self.title,
             body: self.body,
+            job_id: self.job_id,
             created_at: self.created_at.parse().unwrap_or_else(|_| Utc::now()),
         }
     }
@@ -43,7 +45,7 @@ impl AttentionRow {
 /// List all active (not-yet-cleared) attention items, newest first.
 pub async fn list_active(pool: &SqlitePool) -> Result<Vec<AttentionItem>, AppError> {
     let rows: Vec<AttentionRow> = sqlx::query_as(
-        "SELECT id, printer_id, kind, title, body, created_at \
+        "SELECT id, printer_id, kind, title, body, job_id, created_at \
          FROM attention_item \
          WHERE cleared_at IS NULL \
          ORDER BY id DESC",
@@ -62,7 +64,7 @@ pub async fn get_active_by_printer_kind(
     kind: &str,
 ) -> Result<Option<AttentionItem>, AppError> {
     let row: Option<AttentionRow> = sqlx::query_as(
-        "SELECT id, printer_id, kind, title, body, created_at \
+        "SELECT id, printer_id, kind, title, body, job_id, created_at \
          FROM attention_item \
          WHERE printer_id = ? AND kind = ? AND cleared_at IS NULL \
          LIMIT 1",
@@ -100,7 +102,7 @@ pub async fn raise(
     .last_insert_rowid();
 
     let row: AttentionRow = sqlx::query_as(
-        "SELECT id, printer_id, kind, title, body, created_at \
+        "SELECT id, printer_id, kind, title, body, job_id, created_at \
          FROM attention_item WHERE id = ?",
     )
     .bind(id)
@@ -109,6 +111,17 @@ pub async fn raise(
     .map_err(|e| AppError::Database(e.to_string()))?;
 
     Ok(row.into_domain())
+}
+
+/// Link an attention item to a job (the "print finished" item → its job).
+pub async fn set_job(pool: &SqlitePool, id: i64, job_id: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE attention_item SET job_id = ? WHERE id = ?")
+        .bind(job_id)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
 }
 
 /// Mark a single attention item as cleared.

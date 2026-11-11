@@ -4,6 +4,7 @@ mod auth;
 mod auth_api_tests;
 pub mod config;
 mod driver_manager;
+mod job_engine;
 mod net;
 mod scheduler;
 #[cfg(test)]
@@ -223,6 +224,7 @@ pub async fn serve_with(
         Arc::clone(&tx),
     );
 
+    let spoolman = Arc::new(std::sync::OnceLock::new());
     let scheduler = scheduler::Scheduler::new(
         foreman_db.pool.clone(),
         Arc::clone(&tx),
@@ -230,6 +232,7 @@ pub async fn serve_with(
             pool: foreman_db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
+            spoolman: Arc::clone(&spoolman),
         }),
     );
     scheduler.spawn();
@@ -269,7 +272,7 @@ pub async fn serve_with(
 
     let app = build_router(app_state.clone());
 
-    spawn_spoolman(&cfg).await;
+    spawn_spoolman(&cfg, &spoolman).await;
 
     let mut ready = ready;
     let handle = LocalHandle {
@@ -346,8 +349,8 @@ pub async fn serve_with(
     Ok(())
 }
 
-/// Listeners for `host`, dual-stack so `localhost` works whichever family a client
-/// resolves first: `0.0.0.0`/`::` → one `[::]` socket that also takes IPv4;
+/// Listeners for `host`, dual-stack so a client works whichever family it resolves
+/// first: wildcard (`0.0.0.0`/`::`) → `0.0.0.0` plus `[::]` (v6-only, best effort);
 /// loopback → `127.0.0.1` plus `::1` (best effort); anything else as given.
 async fn bind_listeners(
     host: &str,
@@ -363,15 +366,15 @@ async fn bind_listeners(
     let v4 = |ip: Ipv4Addr| SocketAddr::from((ip, port));
     let mut out = Vec::new();
     if ip.is_unspecified() {
-        match bind_with_retry(v6(Ipv6Addr::UNSPECIFIED), false).await {
+        // Two sockets, `0.0.0.0` and `[::]` (v6-only), like loopback: clearer in
+        // `ss` and works where dual-stack sockets are disabled.
+        out.push((
+            v4(Ipv4Addr::UNSPECIFIED),
+            bind_with_retry(v4(Ipv4Addr::UNSPECIFIED), true).await?,
+        ));
+        match bind_with_retry(v6(Ipv6Addr::UNSPECIFIED), true).await {
             Ok(l) => out.push((v6(Ipv6Addr::UNSPECIFIED), l)),
-            Err(e) => {
-                warn!("dual-stack [::] bind failed ({e}); IPv4 only");
-                out.push((
-                    v4(Ipv4Addr::UNSPECIFIED),
-                    bind_with_retry(v4(Ipv4Addr::UNSPECIFIED), true).await?,
-                ));
-            }
+            Err(e) => warn!("[::] bind failed ({e}); IPv4 only"),
         }
     } else if ip.is_loopback() {
         out.push((
@@ -494,7 +497,7 @@ pub async fn dev_token_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
 }
 
 /// The Spoolman-compatible API on its own port (default 7912).
-async fn spawn_spoolman(cfg: &config::ServerConfig) {
+async fn spawn_spoolman(cfg: &config::ServerConfig, shared: &std::sync::OnceLock<SpoolmanState>) {
     if !cfg.spoolman_enabled {
         return;
     }
@@ -513,6 +516,8 @@ async fn spawn_spoolman(cfg: &config::ServerConfig) {
                         warn!("could not create Foreman default extra fields: {e}");
                     }
                     let state = SpoolmanState::new(db, spoolman_cfg.clone());
+                    // The job engine deducts filament through the same DB + events.
+                    let _ = shared.set(state.clone());
                     let spoolman_router =
                         spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
                     match tokio::net::TcpListener::bind(spoolman_addr).await {
@@ -626,6 +631,15 @@ fn build_router(app_state: AppState) -> Router {
         .route(
             "/api/printers/{id}/plate-cleared",
             post(api::queue::plate_cleared),
+        )
+        // Jobs (3.6): history + stats
+        .route("/api/jobs", get(api::jobs::list))
+        .route("/api/jobs/stats", get(api::jobs::stats))
+        .route(
+            "/api/jobs/{id}",
+            get(api::jobs::get)
+                .patch(api::jobs::rate)
+                .delete(api::jobs::delete),
         )
         // Locations (printer G-code storage) + transfers
         .route("/api/locations", get(api::storage::locations))

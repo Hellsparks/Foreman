@@ -1,6 +1,7 @@
 pub mod attention;
 pub mod auth;
 pub mod health;
+pub mod jobs;
 pub mod library;
 pub mod printer_commands;
 pub mod printer_paths;

@@ -2,6 +2,7 @@
 import type { AmsTray } from "./AmsTray";
 import type { FanSpeeds } from "./FanSpeeds";
 import type { HmsCode } from "./HmsCode";
+import type { PrintEnd } from "./PrintEnd";
 import type { PrinterState } from "./PrinterState";
 import type { TempReading } from "./TempReading";
 
@@ -56,4 +57,18 @@ ams_trays: Array<AmsTray>,
 /**
  * Active HMS error codes (Bambu).
  */
-hms_codes: Array<HmsCode>, };
+hms_codes: Array<HmsCode>, 
+/**
+ * How the last print ended (Klipper `complete`/`cancelled`/`error`,
+ * Bambu `FINISH`/`FAILED`). None while printing or when unknown.
+ */
+print_end: PrintEnd | null, 
+/**
+ * Firmware message for the last print (Klipper `print_stats.message`,
+ * Bambu `print_error` code), used as the job's error text.
+ */
+print_message: string | null, 
+/**
+ * Filament extruded by the current/last print, mm (Klipper `print_stats.filament_used`).
+ */
+filament_used_mm: number | null, };
