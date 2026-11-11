@@ -172,7 +172,7 @@ async fn template_copies_plates_into_the_library_and_reports_problems() {
         let e = w.state.library.get(id).await.expect("entry");
         assert!(e.path.starts_with("Templates/Chess set/"), "{}", e.path);
     }
-    assert_eq!(v["files"][0]["tools"][0]["grams"], 30.0);
+    assert_eq!(v["files"][0]["slots"][0]["grams"], 30.0);
 
     // A slot no plate uses is reported, but the draft still saves.
     let mut body = v["template"].clone();
@@ -407,11 +407,78 @@ async fn finished_jobs_mark_the_right_plate_and_close_the_project() {
         .as_str()
         .is_some_and(|t| t.contains("Pawns finished on HellV0"))));
 
-    // One more copy reopens it.
+    // A finished project is a read-only record: no more copies, no queueing…
+    let pawns = pawns.expect("p");
+    let (s, v) = call(
+        &w.app,
+        "PATCH",
+        &format!("/api/project-plates/{pawns}"),
+        &w.auth,
+        Some(json!({ "copies": 2 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(
+        v["error"].as_str().is_some_and(|e| e.contains("read-only")),
+        "{v}"
+    );
+    let (s, _) = call(
+        &w.app,
+        "POST",
+        &format!("/api/projects/{id}/print-remaining"),
+        &w.auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = call(
+        &w.app,
+        "PUT",
+        &format!("/api/projects/{id}/slots/PRIMARY"),
+        &w.auth,
+        Some(json!({ "spool_id": null })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    // …but its totals stay readable, and it can be archived.
     let (s, p) = call(
         &w.app,
         "PATCH",
-        &format!("/api/project-plates/{}", pawns.expect("p")),
+        &format!("/api/projects/{id}"),
+        &w.auth,
+        Some(json!({ "status": "archived" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    assert_eq!(p["status"], "archived");
+    assert_eq!(p["totals"]["printed"], 2);
+    let (_, list) = call(&w.app, "GET", "/api/projects", &w.auth, None).await;
+    assert_eq!(list[0]["status"], "archived");
+    assert_eq!(list[0]["totals"]["printed"], 2);
+    let (s, _) = call(
+        &w.app,
+        "PATCH",
+        &format!("/api/projects/{id}"),
+        &w.auth,
+        Some(json!({ "name": "X" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "archived is read-only too");
+
+    // Reopen, then one more copy.
+    let (_, p) = call(
+        &w.app,
+        "PATCH",
+        &format!("/api/projects/{id}"),
+        &w.auth,
+        Some(json!({ "status": "active" })),
+    )
+    .await;
+    assert_eq!(p["status"], "active", "stays open after reopening");
+    let (s, p) = call(
+        &w.app,
+        "PATCH",
+        &format!("/api/project-plates/{pawns}"),
         &w.auth,
         Some(json!({ "copies": 2 })),
     )
@@ -517,4 +584,276 @@ async fn copies_never_drop_below_printed_or_printing() {
     let (_, v) = set(4).await;
     assert_eq!(v["plates"][0]["counts"]["remaining"], 2);
     assert_eq!(v["totals"]["prints"], 4 + 3);
+}
+
+// ---------------------------------------------------------------------------
+// 5.2: loose files, shared colour slots, manual swaps
+// ---------------------------------------------------------------------------
+
+/// Three loose files: two PLA teal (share a slot), one PETG black.
+async fn loose_files(state: &AppState) -> [i64; 3] {
+    let mut ids = [0; 3];
+    for (i, (name, body)) in [
+        ("housing_top.gcode", "; filament used [g] = 64.00\n; filament_type = PLA\n; filament_colour = #1F8A8A\nG1 X1 E1\n"),
+        ("benchy.gcode", "; filament used [g] = 12.00\n; filament_type = PLA\n; filament_colour = #1f8a8a\nG1 X1 E1\n"),
+        ("cable_clip.gcode", "; filament used [g] = 22.00\n; filament_type = PETG\n; filament_colour = #000000\nG1 X1 E1\n"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let tmp = state.library.tmp_dir().join(name);
+        std::fs::write(&tmp, body).expect("seed");
+        ids[i] = state.library.add_file("", name, &tmp).await.expect("add").id;
+    }
+    ids
+}
+
+/// The real PrusaSlicer 2.9.7 M600 file (three colours by hand).
+async fn m600_file(state: &AppState) -> i64 {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../foreman-core/tests/fixtures/library/prusaslicer_2.9.7_m600.gcode");
+    let tmp = state.library.tmp_dir().join("sign.gcode");
+    std::fs::copy(src, &tmp).expect("copy");
+    state
+        .library
+        .add_file("", "sign.gcode", &tmp)
+        .await
+        .expect("add")
+        .id
+}
+
+#[tokio::test]
+async fn loose_files_share_a_slot_and_queue_per_print() {
+    let (_d, app, state, auth) = setup().await;
+    let [housing, benchy, clip] = loose_files(&state).await;
+    let sm = state.spoolman.get().expect("sm");
+    let teal = add_spool(sm, "PLA", "1F8A8A", 1000.0).await;
+    let black = add_spool(sm, "PETG", "000000", 800.0).await;
+
+    // Spool options for the shared slot: PLA first, as sliced.
+    let (s, opts) = call(
+        &app,
+        "POST",
+        "/api/projects/spool-options",
+        &auth,
+        Some(json!([{ "key": "PLA TEAL", "need": 152.0, "materials": ["PLA"], "hex": "#1F8A8A" }])),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{opts}");
+    assert_eq!(opts[0]["options"][0]["spool"]["id"], teal);
+    assert_eq!(opts[0]["options"][0]["material_ok"], true);
+    let petg = opts[0]["options"]
+        .as_array()
+        .expect("o")
+        .iter()
+        .find(|o| o["spool"]["id"] == black)
+        .cloned()
+        .expect("b");
+    assert_eq!(petg["material_ok"], false);
+
+    let body = json!({
+        "sets": 1,
+        "files": [
+            { "file_id": housing, "copies": 2 },
+            { "file_id": benchy, "copies": 1 },
+            { "file_id": clip, "copies": 3 }
+        ],
+        "slots": [
+            { "key": "PLA TEAL", "hex": "#1F8A8A", "spool_id": teal,
+              "members": [{ "file_id": housing, "slot": 0 }, { "file_id": benchy, "slot": 0 }] },
+            { "key": "PETG BLACK", "hex": "000000", "spool_id": black,
+              "members": [{ "file_id": clip, "slot": 0 }] }
+        ],
+        "queue_all": true
+    });
+    let (s, p) = call(&app, "POST", "/api/projects/from-files", &auth, Some(body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    assert_eq!(p["name"], "housing top + 2 more");
+    assert_eq!(p["template_id"], Value::Null);
+    assert_eq!(p["totals"]["prints"], 6);
+    assert_eq!(
+        p["totals"]["queued"], 6,
+        "queue_all: one fleet item per print"
+    );
+    assert_eq!(p["plates"][0]["counts"]["copies"], 2);
+    assert_eq!(
+        p["plates"][2]["tools"],
+        json!([{ "tool": 0, "slot": "PETG BLACK" }])
+    );
+    assert_eq!(p["slots"][0]["need"], 64.0 * 2.0 + 12.0);
+    assert_eq!(p["slots"][1]["need"], 66.0);
+    assert_eq!(p["slots"][0]["reserved"], 140.0);
+    assert_eq!(p["slots"][1]["reserved"], 66.0);
+    let items = repo::queue::list_waiting(&state.foreman_db.pool, None)
+        .await
+        .expect("q");
+    assert_eq!(items.len(), 6);
+
+    // Copies floor holds on loose-file plates too.
+    let housing_plate = p["plates"][0]["id"].as_i64().expect("id");
+    let mine: Vec<_> = items
+        .iter()
+        .filter(|i| i.project_plate_id == Some(housing_plate))
+        .collect();
+    repo::queue::transition(
+        &state.foreman_db.pool,
+        mine[0].id,
+        QueueStatus::Waiting,
+        QueueStatus::Printing,
+        None,
+    )
+    .await
+    .expect("t");
+    let (s, _) = call(
+        &app,
+        "PATCH",
+        &format!("/api/project-plates/{housing_plate}"),
+        &auth,
+        Some(json!({ "copies": 0 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, v) = call(
+        &app,
+        "PATCH",
+        &format!("/api/project-plates/{housing_plate}"),
+        &auth,
+        Some(json!({ "copies": 1 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["plates"][0]["counts"]["copies"], 1);
+    assert_eq!(v["plates"][0]["counts"]["queued"], 0);
+}
+
+#[tokio::test]
+async fn loose_file_groups_are_checked() {
+    let (_d, app, state, auth) = setup().await;
+    let [housing, benchy, _] = loose_files(&state).await;
+    let files = json!([{ "file_id": housing, "copies": 1 }, { "file_id": benchy, "copies": 1 }]);
+    let post = |slots: Value| {
+        let app = app.clone();
+        let auth = auth.clone();
+        let files = files.clone();
+        async move {
+            call(
+                &app,
+                "POST",
+                "/api/projects/from-files",
+                &auth,
+                Some(json!({ "sets": 1, "files": files, "slots": slots })),
+            )
+            .await
+        }
+    };
+    // Split: each file its own slot (same colour, different spools) is fine.
+    let (s, v) = post(json!([
+        { "key": "TEAL A", "members": [{ "file_id": housing, "slot": 0 }] },
+        { "key": "TEAL B", "members": [{ "file_id": benchy, "slot": 0 }] }
+    ]))
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["slots"].as_array().map(Vec::len), Some(2));
+    // A filament left out of every slot.
+    let (s, v) =
+        post(json!([{ "key": "TEAL", "members": [{ "file_id": housing, "slot": 0 }] }])).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(
+        v["error"]
+            .as_str()
+            .is_some_and(|e| e.contains("no colour slot")),
+        "{v}"
+    );
+    // The same filament in two slots.
+    let (s, _) = post(json!([
+        { "key": "A", "members": [{ "file_id": housing, "slot": 0 }, { "file_id": benchy, "slot": 0 }] },
+        { "key": "B", "members": [{ "file_id": benchy, "slot": 0 }] }
+    ]))
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    // A slot index the file doesn't have.
+    let (s, _) = post(json!([
+        { "key": "A", "members": [{ "file_id": housing, "slot": 0 }, { "file_id": benchy, "slot": 0 }, { "file_id": benchy, "slot": 3 }] }
+    ]))
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn manual_swap_files_need_confirmation_to_queue() {
+    let (_d, app, state, auth) = setup().await;
+    let sign = m600_file(&state).await;
+    let meta = state.library.meta(sign).await.expect("m").expect("meta");
+    assert_eq!(meta.slot_kind, foreman_core::domain::SlotKind::Change);
+    assert_eq!(meta.slots.len(), 3);
+
+    // Queue and Send both refuse until the swaps are accepted.
+    let (s, v) = call(
+        &app,
+        "POST",
+        "/api/queue",
+        &auth,
+        Some(json!({ "file_id": sign, "printer_id": null })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["code"], "manual_swaps");
+    assert_eq!(v["colours"], 3);
+    let (s, v) = call(
+        &app,
+        "POST",
+        "/api/send",
+        &auth,
+        Some(json!({ "file_id": sign, "mode": "fleet_queue" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let (s, v) = call(
+        &app,
+        "POST",
+        "/api/queue",
+        &auth,
+        Some(json!({ "file_id": sign, "printer_id": null, "accept_manual_swaps": true })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    // A project with it: one colour slot per colour; queue_all holds back until accepted.
+    let slots: Vec<Value> = (0..3)
+        .map(|i| json!({ "key": format!("COLOUR {}", i + 1), "members": [{ "file_id": sign, "slot": i }] }))
+        .collect();
+    let (s, p) = call(
+        &app,
+        "POST",
+        "/api/projects/from-files",
+        &auth,
+        Some(json!({ "sets": 1, "files": [{ "file_id": sign, "copies": 1 }], "slots": slots, "queue_all": true })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    assert_eq!(
+        p["totals"]["queued"], 0,
+        "not queued without accepting swaps"
+    );
+    assert_eq!(p["plates"][0]["file"]["slot_kind"], "change");
+    let id = p["id"].as_i64().expect("id");
+    let (s, v) = call(
+        &app,
+        "POST",
+        &format!("/api/projects/{id}/print-remaining"),
+        &auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let (s, v) = call(
+        &app,
+        "POST",
+        &format!("/api/projects/{id}/print-remaining"),
+        &auth,
+        Some(json!({ "accept_manual_swaps": true })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["added"], 1);
 }

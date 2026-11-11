@@ -12,8 +12,8 @@ export type { QueueBoard, QueueCard, QueueItem, QueueLane, QueuePositions, Start
 export const queue = {
   board: () => request<QueueBoard>("GET", "/api/queue"),
   /** `printer_id` null = fleet queue. */
-  add: (file_id: number, printer_id: number | null) =>
-    request<QueuePositions>("POST", "/api/queue", { file_id, printer_id }),
+  add: (file_id: number, printer_id: number | null, accept_manual_swaps = false) =>
+    request<QueuePositions>("POST", "/api/queue", { file_id, printer_id, accept_manual_swaps }),
   move: (id: number, printer_id: number | null, index: number) =>
     request<QueuePositions>("POST", `/api/queue/${id}/move`, { printer_id, index }),
   remove: (id: number) => request<{ removed: "deleted" | "cancelled" }>("DELETE", `/api/queue/${id}`),

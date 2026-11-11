@@ -107,6 +107,9 @@ pub struct AddBody {
     pub file_id: i64,
     #[serde(default)]
     pub printer_id: Option<i64>,
+    /// The file swaps filament by hand (M600); queue it anyway.
+    #[serde(default)]
+    pub accept_manual_swaps: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -344,6 +347,20 @@ pub async fn add(
     Extension(ctx): Extension<AuthCtx>,
     Json(body): Json<AddBody>,
 ) -> Result<impl IntoResponse, ApiErr> {
+    if !body.accept_manual_swaps {
+        if let Some(n) = crate::projects::manual_swap_colours(&state, body.file_id).await {
+            let name = state
+                .library
+                .get(body.file_id)
+                .await
+                .map(|e| e.name)
+                .unwrap_or_default();
+            return Err((
+                StatusCode::CONFLICT,
+                Json(crate::projects::manual_swaps_body(&name, n)),
+            ));
+        }
+    }
     let p = enqueue(
         &state,
         body.file_id,

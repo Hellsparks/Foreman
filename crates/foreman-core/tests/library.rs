@@ -8,7 +8,7 @@ use std::{
 
 use foreman_core::{
     db::ForemanDb,
-    domain::LibraryEntryKind,
+    domain::{LibraryEntryKind, SlotKind},
     library::{parse_path, LibraryStore},
 };
 
@@ -174,6 +174,101 @@ fn bambu_3mf() {
     assert_eq!(t.grams, Some(78.49));
     assert_eq!(t.mm, Some(25_900.0));
     assert!(p.thumbnail.expect("plate png").starts_with(b"\x89PNG"));
+}
+
+// ---------------------------------------------------------------------------
+// Filament slots per kind (5.2). Real PrusaSlicer 2.9.7 / Bambu Studio 2.9.1 output
+// sliced from the CLI (see doc 05, session 30).
+// ---------------------------------------------------------------------------
+
+#[test]
+fn slots_colour_change_m600() {
+    // One extruder, PLA #3B3B3B, `;COLOR_CHANGE,T0,#FFFFFF` + M600 and
+    // `;COLOR_CHANGE,T0,#1F8A8A` + M600: three colours in sequence.
+    let m = parse_path(&fixture("prusaslicer_2.9.7_m600.gcode")).meta;
+    assert_eq!(m.parse_status, "ok", "{:?}", m.parse_error);
+    assert_eq!(m.slot_kind, SlotKind::Change);
+    let s = &m.slots;
+    assert_eq!(s.len(), 3);
+    assert_eq!(
+        s.iter().map(|x| x.colour.as_deref()).collect::<Vec<_>>(),
+        [Some("#3B3B3B"), Some("#FFFFFF"), Some("#1F8A8A")]
+    );
+    assert!(s
+        .iter()
+        .all(|x| x.material.as_deref() == Some("PLA") && x.tool == 0));
+    assert_eq!(s[2].label, "Colour 3");
+    let g: f64 = s.iter().filter_map(|x| x.grams).sum();
+    assert!((g - 4.46).abs() < 0.03, "grams split, total kept: {g}");
+    // Cube 20 mm, changes at 6.2 and 14.2 mm: every colour got some filament.
+    assert!(s.iter().all(|x| x.grams.unwrap_or(0.0) > 0.5), "{s:?}");
+}
+
+#[test]
+fn slots_mmu_two_colours() {
+    let m = parse_path(&fixture("prusaslicer_2.9.7_mmu2.gcode")).meta;
+    assert_eq!(
+        m.slot_kind,
+        SlotKind::Ams,
+        "single_extruder_multi_material = 1"
+    );
+    let s = &m.slots;
+    assert_eq!(s.len(), 2);
+    assert_eq!((s[0].index, s[1].index), (0, 1));
+    assert_eq!(s[0].colour.as_deref(), Some("#C52C18"));
+    assert_eq!(s[1].colour.as_deref(), Some("#FFFFFF"));
+    assert_eq!((s[0].grams, s[1].grams), (Some(11.71), Some(11.56)));
+    assert_eq!(s[1].label, "AMS 2");
+}
+
+#[test]
+fn slots_toolchanger_two_tools() {
+    let m = parse_path(&fixture("prusaslicer_2.9.7_2tool.gcode")).meta;
+    assert_eq!(m.slot_kind, SlotKind::Tool);
+    let s = &m.slots;
+    assert_eq!(s.len(), 2);
+    assert_eq!(s[1].label, "T1");
+    assert_eq!(s[1].material.as_deref(), Some("PETG"));
+    assert_eq!((s[0].grams, s[1].grams), (Some(4.48), Some(4.53)));
+}
+
+#[test]
+fn slots_single_tool_and_bambu_ams() {
+    let m = parse_path(&fixture("prusaslicer_2.9.7.gcode")).meta;
+    assert_eq!(m.slot_kind, SlotKind::Tool);
+    assert_eq!(m.slots.len(), 1);
+    assert_eq!(m.slots[0].label, "T0");
+
+    // Bambu 3MF: AMS-fed; plate 1 uses filament 1 (tray_info_idx GFL99).
+    let dir = tempfile::TempDir::new().expect("dir");
+    let path = dir.path().join("knob.gcode.3mf");
+    let f = fs::File::create(&path).expect("create");
+    let mut zip = zip::ZipWriter::new(f);
+    let opts = zip::write::SimpleFileOptions::default();
+    for (name, bytes) in [
+        (
+            "Metadata/slice_info.config",
+            fs::read(fixture("bambustudio_2.9_slice_info_2plates.config")).expect("read"),
+        ),
+        (
+            "Metadata/plate_1.gcode",
+            fs::read(fixture("bambustudio_02.08_plate_1.gcode")).expect("read"),
+        ),
+    ] {
+        zip.start_file(name, opts).expect("start");
+        zip.write_all(&bytes).expect("write");
+    }
+    zip.finish().expect("finish");
+    let m = parse_path(&path).meta;
+    assert_eq!(m.slot_kind, SlotKind::Ams);
+    assert_eq!(m.slots.len(), 1);
+    let s = &m.slots[0];
+    assert_eq!(
+        (s.label.as_str(), s.material.as_deref(), s.colour.as_deref()),
+        ("AMS 1", Some("PLA"), Some("#C52C18"))
+    );
+    assert_eq!(s.tray.as_deref(), Some("GFL99"));
+    assert_eq!(s.grams, Some(9.63));
 }
 
 #[test]

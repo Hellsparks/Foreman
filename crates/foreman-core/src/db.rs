@@ -120,6 +120,9 @@ const MIGRATIONS: &[&str] = &[
        at TEXT NOT NULL, text TEXT NOT NULL)",
     "ALTER TABLE queue_item ADD COLUMN project_plate_id INTEGER",
     "ALTER TABLE job ADD COLUMN project_plate_id INTEGER",
+    // 0013: filament slots per file (5.2, see migrations/0013_slots.sql).
+    "ALTER TABLE file_meta ADD COLUMN slot_kind TEXT",
+    "ALTER TABLE file_meta ADD COLUMN slots_json TEXT",
 ];
 
 /// Foreman-native database handle.

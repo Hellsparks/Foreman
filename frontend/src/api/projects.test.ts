@@ -31,7 +31,7 @@ describe("template editing", () => {
 
 describe("progress counts prints", () => {
   it("summarises", () => {
-    expect(progressText({ prints: 8, printed: 3, printing: 1, queued: 2, remaining: 2, secs_used: 0, grams_used: 0 })).toBe(
+    expect(progressText({ prints: 8, printed: 3, printing: 1, queued: 2, remaining: 2, secs_used: 0, grams_used: 0, cost_used: null })).toBe(
       "3 of 8 prints done · 1 printing · 2 queued · 2 not started",
     );
   });

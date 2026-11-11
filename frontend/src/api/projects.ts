@@ -1,5 +1,11 @@
 /** Templates and projects (task 5.1, W9). */
-import { request } from "./client";
+import { ApiError, request } from "./client";
+import type { CreateFromFiles } from "./types/CreateFromFiles";
+import type { FilamentSlot } from "./types/FilamentSlot";
+import type { FileSlotGroup } from "./types/FileSlotGroup";
+import type { SlotKind } from "./types/SlotKind";
+import type { SlotNeed } from "./types/SlotNeed";
+import type { SlotOptions } from "./types/SlotOptions";
 import type { CreateProject } from "./types/CreateProject";
 import type { LivePrint } from "./types/LivePrint";
 import type { PlateCounts } from "./types/PlateCounts";
@@ -20,6 +26,12 @@ import type { ToolSlot } from "./types/ToolSlot";
 import type { UpdateProject } from "./types/UpdateProject";
 
 export type {
+  CreateFromFiles,
+  FilamentSlot,
+  FileSlotGroup,
+  SlotKind,
+  SlotNeed,
+  SlotOptions,
   CreateProject,
   LivePrint,
   PlateCounts,
@@ -54,7 +66,10 @@ export const projectsApi = {
   get: (id: number) => request<ProjectView>("GET", `/api/projects/${id}`),
   create: (b: CreateProject) => request<ProjectView>("POST", "/api/projects", b),
   update: (id: number, b: UpdateProject) => request<ProjectView>("PATCH", `/api/projects/${id}`, b),
-  printRemaining: (id: number) => request<{ added: number }>("POST", `/api/projects/${id}/print-remaining`),
+  printRemaining: (id: number, acceptManualSwaps = false) =>
+    request<{ added: number }>("POST", `/api/projects/${id}/print-remaining`, { accept_manual_swaps: acceptManualSwaps }),
+  fromFiles: (b: CreateFromFiles) => request<ProjectView>("POST", "/api/projects/from-files", b),
+  spoolOptions: (needs: SlotNeed[]) => request<SlotOptions[]>("POST", "/api/projects/spool-options", needs),
   setSlot: (id: number, key: string, spool_id: number | null) =>
     request<ProjectView>("PUT", `/api/projects/${id}/slots/${encodeURIComponent(key)}`, { spool_id }),
   setCopies: (plateId: number, copies: number) =>
@@ -145,4 +160,16 @@ export function fitText(o: SpoolOption, need: number): { tone: "ok" | "warn" | "
   if (!o.material_ok) return { tone: "warn", text: `⚠ fits · ${o.spool.material ?? "unknown material"}, plates want another` };
   if (o.colour_distance != null && o.colour_distance > 60) return { tone: "warn", text: `⚠ fits · colour differs · ${Math.round(o.free - need)} g spare` };
   return { tone: "ok", text: `✓ fits · ${Math.round(o.free - need)} g spare` };
+}
+
+/** The server refused because the file swaps filament by hand (M600). */
+export function isManualSwaps(e: unknown): e is ApiError {
+  return e instanceof ApiError && e.code === "manual_swaps";
+}
+
+/** "Colour change · 3 colours by hand (M600)" etc. */
+export function kindLabel(kind: SlotKind | null | undefined, n: number): string {
+  if (kind === "change") return `Colour change · ${n} colours swapped by hand (M600)`;
+  if (kind === "ams") return n > 1 ? `AMS / MMU · ${n} filaments` : "AMS / MMU · 1 filament";
+  return n > 1 ? `${n} tools` : "single tool";
 }

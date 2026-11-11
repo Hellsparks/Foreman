@@ -119,16 +119,47 @@ a{color:var(--fw-info)}a:hover{color:var(--fw-text)}
 <a href="{{c.href}}" style="display: flex; gap: 8px; align-items: center; min-height: 36px; text-decoration: none; color: var(--fw-text); font-size: 13px"><span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: {{c.fg}}; width: 16px">{{c.sym}}</span>{{c.label}}</a>
 </sc-for>
 </section>
-<section aria-label="Add plates" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
-<h2 style="margin: 0 0 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Library · Chess set folder</h2>
-<sc-for list="{{library}}" as="f" hint-placeholder-count="4">
-<div draggable="true" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px; border: 1px solid var(--fw-border); background: var(--fw-surface)"><span aria-hidden="true" style="color: var(--fw-muted); cursor: grab">⋮⋮</span><span style="flex: 1; font-size: 13px">{{f.file}}</span><button type="button" onClick="{{f.add}}" disabled="{{f.added}}" style="min-height: 36px; padding: 0 10px; border: 1px solid var(--fw-muted); background: transparent; border-radius: 2px; cursor: pointer; font-size: 12px">{{f.label}}</button></div>
-</sc-for>
-<span style="font-size: 12px; color: var(--fw-muted)">Drag onto Plates, or press Add.</span>
+<section aria-label="Add plates" style="border: 1px solid var(--fw-border); background: var(--fw-raised); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--fw-muted)">Plates</h2>
+<span style="font-size: 12px; color: var(--fw-muted)">{{addedNote}}</span>
+<button type="button" onClick="{{openPicker}}" style="min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold">Add plates from Library…</button>
 </section>
 </aside>
 </div>
 </div>
+
+<sc-if value="{{pickerOpen}}" hint-placeholder-val="{{ false }}">
+<div role="dialog" aria-modal="true" aria-label="Add plates from Library" style="position: absolute; inset: 0; z-index: 20; background: #0008; display: flex; align-items: center; justify-content: center; padding: 32px">
+<div style="width: 100%; max-width: 1040px; max-height: 100%; display: flex; flex-direction: column; background: var(--fw-background); border: 1px solid var(--fw-muted); box-shadow: var(--fw-shadow-overlay)">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--fw-border)">
+<b style="flex: 0 0 auto; font-size: 16px">Add plates from Library</b>
+<nav aria-label="Breadcrumb" style="flex: 1 1 200px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; color: var(--fw-muted)">Library / Chess set</nav>
+<label style="flex: 1 1 260px; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border: 1px solid var(--fw-muted); background: var(--fw-raised); box-sizing: border-box">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="color: var(--fw-muted)"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+<input type="search" value="{{pq}}" onInput="{{setPq}}" placeholder="Search this folder" style="flex: 1; min-width: 0; border: 0; background: transparent; font-size: 13px">
+</label>
+<button type="button" onClick="{{closePicker}}" aria-label="Close" style="width: 40px; height: 40px; border: 1px solid var(--fw-border); background: var(--fw-raised); cursor: pointer; border-radius: 2px">✕</button>
+</div>
+<div style="flex: 1; overflow: auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-content: start">
+<sc-for list="{{picks}}" as="f" hint-placeholder-count="6">
+<button type="button" role="checkbox" aria-checked="{{f.on}}" onClick="{{f.toggle}}" style="display: flex; flex-direction: column; gap: 8px; padding: 10px; text-align: left; cursor: pointer; background: var(--fw-raised); border: 1px solid {{f.border}}; outline: {{f.outline}}">
+<span style="position: relative; display: block"><img src="{{f.thumb}}" alt="" style="width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--fw-surface); border: 1px solid var(--fw-border)">
+<span aria-hidden="true" style="position: absolute; top: 6px; left: 6px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 13px; background: {{f.tickBg}}; color: {{f.tickFg}}; border: 1px solid var(--fw-muted)">{{f.tick}}</span></span>
+<span style="font-weight: bold; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{f.file}}</span>
+<span style="font-size: 12px; color: var(--fw-muted)">{{f.meta}}</span>
+<span style="font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; color: {{f.stateFg}}">{{f.state}}</span>
+</button>
+</sc-for>
+<sc-if value="{{noPicks}}" hint-placeholder-val="{{ false }}"><p style="grid-column: 1 / -1; margin: 0; padding: 24px; text-align: center; color: var(--fw-muted)">Nothing matches “{{pq}}”.</p></sc-if>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--fw-border)">
+<span style="flex: 1; font-size: 13px; color: var(--fw-muted)">{{pickNote}}</span>
+<button type="button" onClick="{{closePicker}}" style="min-width: 120px; min-height: 44px; padding: 0 16px; border: 1px solid var(--fw-muted); background: transparent; color: var(--fw-text); border-radius: 2px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{addPicked}}" disabled="{{addBlocked}}" style="min-width: 150px; min-height: 44px; padding: 0 16px; border: 1px solid transparent; background: var(--fw-accent-hover); color: var(--fw-on-accent); border-radius: 2px; cursor: pointer; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: bold; opacity: {{addOpacity}}">{{addLabel}}</button>
+</div>
+</div>
+</div>
+</sc-if>
 
 <div role="status" aria-live="polite" style="position: absolute; right: 24px; bottom: 24px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 360px; max-width: calc(100% - 48px)">
 <sc-for list="{{toasts}}" as="t" hint-placeholder-count="0">
@@ -216,8 +247,20 @@ class Component extends DCLogic {
     const noSlot = s.plates.filter(p => !s.slots.some(sl => s.map[sl.key + ':' + p.id]));
     const unused = s.slots.filter(sl => !s.plates.some(p => s.map[sl.key + ':' + p.id]));
     const LIB = [['frame.3mf', 'Board frame', '1 h 50 m'], ['pawns_dark.3mf', 'Pawns (dark)', '2 h 18 m'], ['pawns.3mf', 'Pawns', '2 h 02 m'], ['felt_jig.gcode', 'Felt cutting jig', '20 m']];
-    const library = LIB.map(([file, name, meta]) => { const added = s.plates.some(p => p.file === file); return { file, added, label: added ? 'Added' : 'Add',
-      add: () => this.bump({ plates: [...s.plates, { id: file, name, file, meta }] }, 'Added ' + name + ' as plate ' + (s.plates.length + 1), { plates: s.plates }) }; });
+    const q = (s.pq || '').trim().toLowerCase();
+    const picks = LIB.filter(([file, name]) => !q || (file + ' ' + name).toLowerCase().includes(q)).map(([file, name, meta]) => {
+      const added = s.plates.some(p => p.file === file);
+      const on = !added && !!(s.psel || {})[file];
+      return { file, meta: name + ' · ' + meta, thumb: this.thumbOf(name, '#1f8a8a'),
+        on: on ? 'true' : 'false', tick: added ? '✓' : on ? '✓' : '',
+        tickBg: added ? 'var(--fw-success-bg)' : on ? 'var(--fw-accent-hover)' : 'var(--fw-raised)',
+        tickFg: added ? 'var(--fw-success)' : on ? 'var(--fw-on-accent)' : 'var(--fw-muted)',
+        state: added ? 'Already a plate' : on ? 'Selected' : '',
+        stateFg: added ? 'var(--fw-success)' : 'var(--fw-muted)',
+        border: on ? 'var(--fw-focus)' : 'var(--fw-border)', outline: on ? '1px solid var(--fw-focus)' : 'none',
+        toggle: () => { if (added) return; const ps = { ...(this.state.psel || {}) }; if (ps[file]) delete ps[file]; else ps[file] = true; this.setState({ psel: ps }); } };
+    });
+    const selected = LIB.filter(([file]) => (s.psel || {})[file] && !s.plates.some(p => p.file === file));
     const checks = [
       [!!s.name.trim(), 'Has a name', '#basics'],
       [s.plates.length > 0, s.plates.length + ' plate' + (s.plates.length === 1 ? '' : 's') + ' · ' + s.plates.reduce((a, p) => a + (p.qty || 1), 0) + ' prints per set', '#plates'],
@@ -228,6 +271,18 @@ class Component extends DCLogic {
     const required = checks.slice(0, 4).filter(c => c.sym === '✓').length;
     return {
       scheme: this.props.scheme ?? 'fieldwork', mode: this.props.mode ?? 'dark',
+      pickerOpen: !!s.pickerOpen, pq: s.pq || '', picks, noPicks: picks.length === 0,
+      addedNote: s.plates.length + ' plate' + (s.plates.length === 1 ? '' : 's') + ' in this template',
+      setPq: (e) => this.setState({ pq: e.target.value }),
+      openPicker: () => this.setState({ pickerOpen: true, pq: '', psel: {} }),
+      closePicker: () => this.setState({ pickerOpen: false, psel: {} }),
+      pickNote: selected.length ? selected.length + ' selected' : 'Pick one or more files',
+      addLabel: selected.length ? 'Add ' + selected.length + ' plate' + (selected.length === 1 ? '' : 's') : 'Add plates',
+      addBlocked: selected.length === 0, addOpacity: selected.length ? '1' : '.45',
+      addPicked: () => { if (!selected.length) return;
+        const added = selected.map(([file, name, meta]) => ({ id: file, name, file, meta }));
+        this.bump({ plates: [...this.state.plates, ...added], pickerOpen: false, psel: {} },
+          'Added ' + added.length + ' plate' + (added.length === 1 ? '' : 's'), { plates: this.state.plates }); },
       name: s.name, setName: (e) => this.bump({ name: e.target.value }),
       savedNote: s.edits ? 'Draft saved · just now' : 'All changes saved',
       plates, plateCount: s.plates.length, printsPerSet: s.plates.reduce((a, p) => a + (p.qty || 1), 0) + ' prints per set', slots,
@@ -236,7 +291,6 @@ class Component extends DCLogic {
       orphanText: [noSlot.length ? noSlot.map(p => p.name).join(', ') + ' has no slot' : '', unused.length ? 'slot ' + unused.map(u => u.key).join(', ') + ' is not used by any plate' : ''].filter(Boolean).join('; ') + '.',
       hasThumb: !!s.thumb, noThumb: !s.thumb, thumbSrc: this.thumbOf('chess pawns', '#1f8a8a'), thumbText: s.thumb ? 'Pawns · plate thumbnail' : 'No thumbnail', useThumb: () => this.bump({ thumb: true }),
       checks, doneCount: required + ' of 4',
-      library,
       toasts: s.toasts.map(t => ({ text: t.text, undo: () => this.setState({ ...t.undoState, toasts: [] }) }))
     };
   }

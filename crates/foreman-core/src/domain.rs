@@ -352,6 +352,10 @@ pub struct LibraryEntry {
     pub print_time_secs: Option<i64>,
     /// Parsed per-tool filament use, for grid cards.
     pub tools: Vec<ToolUsage>,
+    /// tool | ams | change (null until parsed).
+    pub slot_kind: Option<SlotKind>,
+    /// Filaments the file needs (5.2).
+    pub slots: Vec<FilamentSlot>,
 }
 
 /// Filament use for one tool / extruder / AMS slot.
@@ -369,6 +373,83 @@ pub struct ToolUsage {
     /// From a preset named like `Vendor Name (#ID) - Spoolman`.
     #[ts(type = "number | null")]
     pub spool_id: Option<i64>,
+}
+
+/// How a file's filaments reach the nozzle (W9 slot model).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum SlotKind {
+    /// One slot per physical tool / extruder (single-tool files too).
+    #[default]
+    Tool,
+    /// One extruder fed by an AMS / MMU: one slot per filament (tray).
+    Ams,
+    /// One extruder, several filaments in sequence (M600 / colour change):
+    /// the user swaps spools by hand during the print.
+    Change,
+}
+
+impl SlotKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Tool => "tool",
+            Self::Ams => "ams",
+            Self::Change => "change",
+        }
+    }
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "ams" => Self::Ams,
+            "change" => Self::Change,
+            _ => Self::Tool,
+        }
+    }
+}
+
+/// One filament a sliced file needs: a tool, an AMS tray, or one colour of a
+/// colour-change print. `index` is what project plates map to colour slots.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FilamentSlot {
+    /// Tool index (tool / ams) or colour order (change), from 0.
+    pub index: u32,
+    /// Extruder / filament id (0-based) that prints it.
+    pub tool: u32,
+    /// "T0", "AMS 2", "Colour 1".
+    pub label: String,
+    pub material: Option<String>,
+    /// `#RRGGBB`.
+    pub colour: Option<String>,
+    pub grams: Option<f64>,
+    pub mm: Option<f64>,
+    /// Slicer filament preset.
+    pub preset: Option<String>,
+    #[ts(type = "number | null")]
+    pub spool_id: Option<i64>,
+    /// Bambu `tray_info_idx` (filament preset id, e.g. `GFA00`); the AMS tray
+    /// itself is chosen when the print is sent.
+    pub tray: Option<String>,
+}
+
+/// Slots from per-tool facts, for files parsed before slots existed.
+pub fn slots_from_tools(tools: &[ToolUsage]) -> Vec<FilamentSlot> {
+    tools
+        .iter()
+        .filter(|t| t.grams.map(|g| g > 0.0).unwrap_or(true))
+        .map(|t| FilamentSlot {
+            index: t.index,
+            tool: t.index,
+            label: format!("T{}", t.index),
+            material: t.material.clone(),
+            colour: t.colour.clone(),
+            grams: t.grams,
+            mm: t.mm,
+            preset: t.preset.clone(),
+            spool_id: t.spool_id,
+            tray: None,
+        })
+        .collect()
 }
 
 /// One sliced plate of a 3MF project.
@@ -408,6 +489,23 @@ pub struct FileMeta {
     pub suggested_spool_id: Option<i64>,
     pub tools: Vec<ToolUsage>,
     pub plates: Vec<PlateSummary>,
+    /// tool | ams | change.
+    #[serde(default)]
+    pub slot_kind: SlotKind,
+    /// The filaments this file needs (see [`FilamentSlot`]).
+    #[serde(default)]
+    pub slots: Vec<FilamentSlot>,
+}
+
+impl FileMeta {
+    /// The file's filament slots (falls back to its tools for old rows).
+    pub fn filament_slots(&self) -> Vec<FilamentSlot> {
+        if self.slots.is_empty() {
+            slots_from_tools(&self.tools)
+        } else {
+            self.slots.clone()
+        }
+    }
 }
 
 /// `GET /api/library/files/{id}`.

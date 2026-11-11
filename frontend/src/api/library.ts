@@ -122,6 +122,14 @@ export const send = {
   /** Compatibility check: returns per-printer verdicts for a library file. */
   check: (fileId: number) => request<CompatResult[]>("GET", `/api/send/check/${fileId}`),
   /** Send a file to a printer (print_now, queue, fleet_queue). */
-  send: (body: { file_id: number; printer_id?: number; mode: string; plate_confirm?: boolean; dry_run?: boolean }) =>
+  send: (body: {
+    file_id: number;
+    printer_id?: number;
+    mode: string;
+    plate_confirm?: boolean;
+    dry_run?: boolean;
+    /** The file swaps filament by hand (M600); send it anyway. */
+    accept_manual_swaps?: boolean;
+  }) =>
     request<SendResult>("POST", "/api/send", body),
 };

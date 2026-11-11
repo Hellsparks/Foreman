@@ -1,7 +1,8 @@
 /** Project list. Reference: docs/ui-ref/Projects.dc.html lines 47–71. */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { progressText, projectsApi, type ProjectSummary } from "../api/projects";
+import { hours, progressText, projectsApi, type ProjectSummary } from "../api/projects";
+import { money } from "../api/inventory";
 import { useEventStream } from "../hooks/useEventStream";
 import { Dot } from "./Thumb";
 
@@ -20,7 +21,7 @@ export function dueLabel(p: { due_date: string | null; status: string; closed_at
 export default function ProjectList() {
   const nav = useNavigate();
   const [rows, setRows] = useState<ProjectSummary[] | null>(null);
-  const [filter, setFilter] = useState<"active" | "done" | "archived">("active");
+  const [filter, setFilter] = useState<"active" | "archived">("active");
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
     projectsApi.list().then(
@@ -33,8 +34,10 @@ export default function ProjectList() {
   }, []);
   useEffect(load, [load]);
   useEventStream(load, TOPICS);
-  const shown = (rows ?? []).filter((p) => p.status === filter);
-  const count = (s: string) => (rows ?? []).filter((p) => p.status === s).length;
+  // Finished (done) and archived projects are read-only records under Archived.
+  const isActive = (p: ProjectSummary) => p.status === "active";
+  const shown = (rows ?? []).filter((p) => (filter === "active") === isActive(p));
+  const count = (f: "active" | "archived") => (rows ?? []).filter((p) => (f === "active") === isActive(p)).length;
 
   return (
     <div className="prj">
@@ -54,7 +57,6 @@ export default function ProjectList() {
         {(
           [
             ["active", "Active"],
-            ["done", "Done"],
             ["archived", "Archived"],
           ] as const
         ).map(([id, label]) => (
@@ -94,6 +96,17 @@ export default function ProjectList() {
                   <span className="prj-bar__queued" style={{ width: `${pct(t.queued)}%` }} />
                 </span>
                 <span className="prj-muted">{progressText(t)}</span>
+                {!isActive(p) && (
+                  <span className="prj-muted">
+                    {[
+                      t.secs_used ? hours(t.secs_used) : null,
+                      t.grams_used ? `${Math.round(t.grams_used)} g` : null,
+                      t.cost_used != null && p.currency ? money(t.cost_used, p.currency) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "No print records"}
+                  </span>
+                )}
                 <span className="prj-swatches">
                   {p.swatches.map((h, i) => (
                     <Dot key={i} hex={h} />

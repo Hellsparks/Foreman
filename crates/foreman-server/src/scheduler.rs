@@ -64,6 +64,12 @@ pub trait SchedEnv: Send + Sync + 'static {
     async fn start(&self, printer_id: i64, name: &str) -> Result<(), AppError>;
     /// Take `grams` off a Spoolman spool (Foreman-reported usage, 3.6).
     async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError>;
+    /// Clear Moonraker's active spool (its `[spoolman]` link) on a printer, so it
+    /// stops counting extrusion against one spool. A Moonraker server call, not a
+    /// printer command.
+    async fn release_active_spool(&self, _printer_id: i64) -> Result<(), AppError> {
+        Ok(())
+    }
     /// Thumbnail URL of a Library file, if it has one.
     async fn thumb_url(&self, _file_id: i64) -> Option<String> {
         None
@@ -130,6 +136,10 @@ impl SchedEnv for LiveEnv {
             .get()
             .ok_or_else(|| AppError::Internal("Spoolman is not running".into()))?;
         spoolman_deduct(sm, spool_id, grams).await
+    }
+
+    async fn release_active_spool(&self, printer_id: i64) -> Result<(), AppError> {
+        crate::spools::set_slot(&self.drivers, printer_id, 0, None).await
     }
 
     async fn thumb_url(&self, file_id: i64) -> Option<String> {

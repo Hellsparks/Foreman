@@ -33,6 +33,8 @@ struct Mock {
     fail_upload: bool,
     caps: HashMap<i64, PrinterCapabilities>,
     deductions: Vec<(i64, f64)>,
+    /// Printers whose Moonraker active spool was released.
+    released: Vec<i64>,
 }
 
 struct MockEnv {
@@ -93,6 +95,10 @@ impl SchedEnv for MockEnv {
     }
     async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
         self.lock().deductions.push((spool_id, grams));
+        Ok(())
+    }
+    async fn release_active_spool(&self, printer_id: i64) -> Result<(), AppError> {
+        self.lock().released.push(printer_id);
         Ok(())
     }
 }
@@ -770,6 +776,67 @@ mod jobs {
         s2.on_status(1, &st(PrinterState::Idle, Some(PrintEnd::Complete)))
             .await;
         assert_eq!(r.deductions().len(), 1);
+    }
+
+    /// 5.2: a two-colour file (AMS slots 0 and 1) on a Moonraker printer whose
+    /// [spoolman] link is live: Foreman deducts each slot from its own spool, and
+    /// Moonraker's single active spool is released instead of reporting.
+    #[tokio::test]
+    async fn multi_slot_job_is_deducted_per_slot_never_by_moonraker() {
+        use foreman_core::domain::{FilamentSlot, SlotKind};
+        let r = rig(None).await;
+        r.env.lock().caps.insert(
+            1,
+            PrinterCapabilities {
+                spoolman_connected: Some(true),
+                spoolman_spool_id: Some(42),
+                ..Default::default()
+            },
+        );
+        let slot = |i: u32, g: f64, spool: i64| FilamentSlot {
+            index: i,
+            tool: i,
+            label: format!("AMS {}", i + 1),
+            material: Some("PLA".into()),
+            grams: Some(g),
+            spool_id: Some(spool),
+            ..Default::default()
+        };
+        let mut f = spool_file();
+        f.slot_kind = SlotKind::Ams;
+        f.slots = vec![slot(0, 11.71, 7), slot(1, 11.56, 8)];
+        r.file(10, f);
+        r.env.set_state(2, PrinterState::Offline);
+        r.add(10, Some(1)).await;
+        assert_eq!(r.tick().await, 1);
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.usage_reporter, "foreman", "never the Moonraker path");
+        assert_eq!(j.tools.len(), 2);
+        assert_eq!(
+            j.tools.iter().map(|t| t.spool_id).collect::<Vec<_>>(),
+            [Some(7), Some(8)],
+            "Moonraker's active #42 is not pinned on a slot"
+        );
+        assert_eq!(r.deductions(), vec![(7, 11.71), (8, 11.56)]);
+        assert_eq!(r.env.lock().released, vec![1]);
+
+        // An old row that still says "moonraker" is deducted by Foreman too.
+        let mut tools = j.tools.clone();
+        for t in tools.iter_mut() {
+            t.grams_deducted = 0.0;
+        }
+        sqlx::query("UPDATE job SET deduct_state = 'none' WHERE id = ?")
+            .bind(j.id)
+            .execute(&r.pool)
+            .await
+            .expect("reset");
+        job_engine::deduct_once(&r.pool, r.env.as_ref(), j.id, "moonraker", tools)
+            .await
+            .expect("deduct");
+        assert_eq!(r.deductions().len(), 4);
     }
 
     #[tokio::test]

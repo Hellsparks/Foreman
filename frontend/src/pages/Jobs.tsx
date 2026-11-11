@@ -172,7 +172,8 @@ export default function Jobs() {
         addToast(`Removed ${c.item.file_name}`, () => {
           void (async () => {
             try {
-              const p = await queue.add(c.item.file_id, lane);
+              // Undo puts back what was already accepted (manual swaps included).
+              const p = await queue.add(c.item.file_id, lane, true);
               if (c.item.status === "waiting") await queue.move(p.item_id, lane, Math.max(idx, 0));
               await load();
             } catch (e) {

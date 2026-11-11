@@ -8,6 +8,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   fitText,
   hours,
+  isManualSwaps,
+  kindLabel,
   plateStatus,
   progressText,
   projectsApi,
@@ -17,6 +19,7 @@ import {
 import { useEventStream } from "../hooks/useEventStream";
 import { dueLabel } from "./ProjectList";
 import Thumb, { Dot } from "./Thumb";
+import { money } from "../api/inventory";
 
 const TOPICS = ["queue", "job", "spool"];
 
@@ -37,6 +40,7 @@ export default function ProjectDetail() {
   const [editName, setEditName] = useState<string | null>(null);
   const [swap, setSwap] = useState<string | null>(null);
   const [plan, setPlan] = useState<ProjectPlan | null>(null);
+  const [swapAsk, setSwapAsk] = useState<string | null>(null);
 
   const load = useCallback(() => {
     projectsApi.get(pid).then(
@@ -77,7 +81,8 @@ export default function ProjectDetail() {
 
   if (!p) return <div className="prj">{error ? <p className="prj-note prj-note--bad">{error}</p> : <p className="prj-muted">Loading…</p>}</div>;
   const t = p.totals;
-  const ro = p.status === "archived";
+  // Finished and archived projects are read-only records; Reopen to change them.
+  const ro = p.status !== "active";
   const pct = (n: number) => (t.prints ? (n / t.prints) * 100 : 0);
   const due = dueLabel(p);
   const hex = (key: string) => {
@@ -144,8 +149,13 @@ export default function ProjectDetail() {
             disabled={busy || t.remaining === 0}
             onClick={() =>
               void run(async () => {
-                const r = await projectsApi.printRemaining(pid);
-                setToast(`${r.added} print${r.added === 1 ? "" : "s"} added to the fleet queue`);
+                try {
+                  const r = await projectsApi.printRemaining(pid);
+                  setToast(`${r.added} print${r.added === 1 ? "" : "s"} added to the fleet queue`);
+                } catch (e) {
+                  if (isManualSwaps(e)) setSwapAsk(e.message);
+                  else throw e;
+                }
               })
             }
           >
@@ -159,15 +169,53 @@ export default function ProjectDetail() {
           onClick={() =>
             void run(
               () => projectsApi.update(pid, { name: null, due_date: null, status: ro ? "active" : "archived" }),
-              ro ? "Unarchived" : "Project archived · find it under Archived",
+              ro ? "Reopened" : "Project archived · find it under Archived",
             ).then(() => !ro && nav("/projects"))
           }
         >
-          {ro ? "Unarchive" : "Archive"}
+          {ro ? "Reopen" : "Archive"}
         </button>
+        {p.status === "done" && (
+          <button
+            type="button"
+            className="prj-btn"
+            disabled={busy}
+            onClick={() => void run(() => projectsApi.update(pid, { name: null, due_date: null, status: "archived" }), "Archived")}
+          >
+            Archive
+          </button>
+        )}
       </div>
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
       {toast && <p className="prj-note prj-note--ok" role="status">{toast}</p>}
+      {ro && (
+        <p className="prj-note">
+          {p.status === "done" ? "✓ Every print is done." : "Archived."} This is a read-only record
+          {p.closed_at ? ` since ${new Date(p.closed_at).toLocaleDateString()}` : ""}. Reopen it to add copies or queue prints.
+        </p>
+      )}
+      {swapAsk && (
+        <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <span style={{ flex: "1 1 300px" }}>⚠ {swapAsk}</span>
+          <button
+            type="button"
+            className="prj-btn prj-btn--small"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const r = await projectsApi.printRemaining(pid, true);
+                setSwapAsk(null);
+                setToast(`${r.added} print${r.added === 1 ? "" : "s"} added to the fleet queue`);
+              })
+            }
+          >
+            Queue anyway
+          </button>
+          <button type="button" className="prj-btn prj-btn--small" onClick={() => setSwapAsk(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       <div>
         <div className="prj-bar" aria-hidden="true" style={{ height: 14 }}>
@@ -177,6 +225,7 @@ export default function ProjectDetail() {
         </div>
         <p className="prj-sub" style={{ marginTop: 6 }}>
           {progressText(t)} · {hours(t.secs_used)} printed of ~{hours(planned)} · {Math.round(t.grams_used)} g used
+          {t.cost_used != null && p.currency ? ` · ${money(t.cost_used, p.currency)}` : ""}
           {p.status === "done" ? " · ✓ closed" : ""}
         </p>
       </div>
@@ -200,8 +249,10 @@ export default function ProjectDetail() {
                   <b>{pl.name}</b>
                   <br />
                   <span className="prj-muted">
-                    {hours(pl.file.print_time_secs)} · {Math.round(g)} g{c.copies > 1 ? ` each · ${c.printed} of ${c.copies} printed` : ""}
+                    {hours(pl.file.print_time_secs)} · {Math.round(g)} g{c.copies > 1 ? ` each · ${c.printed} of ${c.copies} printed` : ""} ·{" "}
+                    {kindLabel(pl.file.slot_kind, pl.file.slots.length)}
                   </span>
+                  {pl.file.slot_kind === "change" && <span className="prj-flag">⚠ manual swaps (M600)</span>}
                   <span className="pd-plate__slots">
                     {[...new Set(pl.tools.map((x) => x.slot))].map((k) => (
                       <span key={k} className="pd-slotchip" title={k}>
