@@ -633,13 +633,12 @@ impl MoonrakerDriver {
             }
         }
 
-        // Extruder count from configfile.
+        // Extruder count + nozzle diameter from configfile.
         if let Some(configfile) = status.get("configfile") {
             if let Some(settings) = configfile.get("settings").and_then(|v| v.as_object()) {
                 let mut ext_count: u32 = 0;
                 for key in settings.keys() {
                     if key == "extruder" || key.starts_with("extruder") {
-                        // Count keys like "extruder", "extruder1", etc.
                         let suffix = &key["extruder".len()..];
                         if suffix.is_empty() || suffix.chars().all(|c| c.is_ascii_digit()) {
                             ext_count += 1;
@@ -648,6 +647,16 @@ impl MoonrakerDriver {
                 }
                 if ext_count > 0 {
                     c.extruder_count = ext_count;
+                }
+                // Nozzle diameter from the primary extruder.
+                if let Some(nozzle) = settings
+                    .get("extruder")
+                    .and_then(|e| e.get("nozzle_diameter"))
+                    .and_then(|v| v.as_f64())
+                {
+                    if nozzle > 0.0 {
+                        c.nozzle_diameter = Some(nozzle);
+                    }
                 }
             }
         }
