@@ -272,6 +272,9 @@ pub async fn serve_with(
             if let Err(e) = state.library.rebuild_index().await {
                 warn!("library index rebuild failed: {e}");
             }
+            if let Err(e) = state.library.reparse_missing_slots().await {
+                warn!("library slot re-parse failed: {e}");
+            }
             let mut interval = tokio::time::interval(Duration::from_secs(24 * 3600));
             loop {
                 interval.tick().await;

@@ -371,6 +371,63 @@ pub struct ToolUsage {
     pub spool_id: Option<i64>,
 }
 
+/// How a file's filaments reach the nozzle (W9 slot model).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum SlotKind {
+    /// One slot per physical tool / extruder (single-tool files too).
+    #[default]
+    Tool,
+    /// One extruder fed by an AMS / MMU: one slot per filament (tray).
+    Ams,
+    /// One extruder, several filaments in sequence (M600 / colour change):
+    /// the user swaps spools by hand during the print.
+    Change,
+}
+
+impl SlotKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Tool => "tool",
+            Self::Ams => "ams",
+            Self::Change => "change",
+        }
+    }
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "ams" => Self::Ams,
+            "change" => Self::Change,
+            _ => Self::Tool,
+        }
+    }
+}
+
+/// One filament a sliced file needs: a tool, an AMS tray, or one colour of a
+/// colour-change print. `index` is what project plates map to colour slots.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FilamentSlot {
+    /// Tool index (tool / ams) or colour order (change), from 0.
+    pub index: u32,
+    /// Extruder / filament id (0-based) that prints it.
+    pub tool: u32,
+    /// "T0", "AMS 2", "Colour 1".
+    pub label: String,
+    pub material: Option<String>,
+    /// `#RRGGBB`.
+    pub colour: Option<String>,
+    pub grams: Option<f64>,
+    pub mm: Option<f64>,
+    /// Slicer filament preset.
+    pub preset: Option<String>,
+    #[ts(type = "number | null")]
+    pub spool_id: Option<i64>,
+    /// Bambu `tray_info_idx` (filament preset id, e.g. `GFA00`); the AMS tray
+    /// itself is chosen when the print is sent.
+    pub tray: Option<String>,
+}
+
 /// One sliced plate of a 3MF project.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -408,6 +465,12 @@ pub struct FileMeta {
     pub suggested_spool_id: Option<i64>,
     pub tools: Vec<ToolUsage>,
     pub plates: Vec<PlateSummary>,
+    /// tool | ams | change.
+    #[serde(default)]
+    pub slot_kind: SlotKind,
+    /// The filaments this file needs (see [`FilamentSlot`]).
+    #[serde(default)]
+    pub slots: Vec<FilamentSlot>,
 }
 
 /// `GET /api/library/files/{id}`.

@@ -18,7 +18,7 @@ use tracing::{info, warn};
 
 use super::parse::{parse_path, Parsed};
 use crate::{
-    domain::{FileMeta, LibraryEntry, LibraryEntryKind, LibraryFileDetails},
+    domain::{FileMeta, LibraryEntry, LibraryEntryKind, LibraryFileDetails, SlotKind},
     error::AppError,
 };
 
@@ -299,6 +299,17 @@ impl LibraryStore {
             suggested_spool_id: r.try_get("suggested_spool_id").map_err(db)?,
             tools: serde_json::from_str(&tools).unwrap_or_default(),
             plates: serde_json::from_str(&plates).unwrap_or_default(),
+            slot_kind: SlotKind::parse(
+                r.try_get::<Option<String>, _>("slot_kind")
+                    .map_err(db)?
+                    .as_deref()
+                    .unwrap_or("tool"),
+            ),
+            slots: r
+                .try_get::<Option<String>, _>("slots_json")
+                .map_err(db)?
+                .and_then(|j| serde_json::from_str(&j).ok())
+                .unwrap_or_default(),
         }))
     }
 
@@ -414,8 +425,8 @@ impl LibraryStore {
             "INSERT OR REPLACE INTO file_meta (entry_id, format, parse_status, parse_error, slicer, \
              slicer_version, printer_model, printer_settings_id, printer_model_id, nozzle_diameter, \
              print_time_secs, layer_count, bed_width, bed_depth, filament_settings_id, \
-             suggested_spool_id, tools_json, plates_json, thumb_file, parsed_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             suggested_spool_id, tools_json, plates_json, thumb_file, parsed_at, slot_kind, \
+             slots_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(id)
         .bind(&m.format)
@@ -437,6 +448,8 @@ impl LibraryStore {
         .bind(serde_json::to_string(&m.plates).unwrap_or_else(|_| "[]".into()))
         .bind(thumb_file)
         .bind(now())
+        .bind(m.slot_kind.as_str())
+        .bind(serde_json::to_string(&m.slots).unwrap_or_else(|_| "[]".into()))
         .execute(&self.pool)
         .await
         .map_err(db)?;
@@ -779,6 +792,31 @@ impl LibraryStore {
             self.reparse(id, &abs).await?;
         }
         Ok(())
+    }
+
+    /// Re-parse live files whose facts predate filament slots (5.2). Returns how many.
+    pub async fn reparse_missing_slots(&self) -> Result<usize, AppError> {
+        let ids: Vec<i64> = sqlx::query_scalar(
+            "SELECT m.entry_id FROM file_meta m JOIN library_entry e ON e.id = m.entry_id \
+             WHERE m.slots_json IS NULL AND e.deleted_at IS NULL",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(db)?;
+        let mut n = 0;
+        for id in ids {
+            match self.file_path(id).await {
+                Ok(abs) => {
+                    self.reparse(id, &abs).await?;
+                    n += 1;
+                }
+                Err(e) => warn!(id, "library: re-parse for slots: {e}"),
+            }
+        }
+        if n > 0 {
+            info!(files = n, "library: re-parsed files for filament slots");
+        }
+        Ok(n)
     }
 
     /// Absolute path of a live file (for download / thumbnails / parsing).

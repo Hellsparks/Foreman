@@ -84,15 +84,32 @@ pub async fn job_started(
         Some(s) => s.printer.name.clone(),
         None => repo::printer::get(pool, printer_id).await?.name,
     };
-    let reporter = snap.as_ref().map(resolve_reporter).unwrap_or("foreman");
+    let mut reporter = snap.as_ref().map(resolve_reporter).unwrap_or("foreman");
     let file_id = file_id.or(queue_item.map(|q| q.file_id));
     let meta = match file_id {
         Some(id) => env.file_meta(id).await.ok(),
         None => None,
     };
+    // One job tool per filament slot (5.2): a tool, an AMS tray, or one colour of a
+    // colour-change print. Files parsed before slots fall back to their tools.
     let mut tools: Vec<JobTool> = meta
         .as_ref()
         .map(|m| {
+            if !m.slots.is_empty() {
+                return m
+                    .slots
+                    .iter()
+                    .map(|s| JobTool {
+                        index: s.index,
+                        material: s.material.clone(),
+                        colour: s.colour.clone(),
+                        grams_planned: s.grams,
+                        grams_used: None,
+                        grams_deducted: 0.0,
+                        spool_id: s.spool_id,
+                    })
+                    .collect();
+            }
             m.tools
                 .iter()
                 .map(|t| JobTool {
@@ -113,11 +130,44 @@ pub async fn job_started(
             t.spool_id = m.suggested_spool_id;
         }
     }
+    // A project print draws each slot from the project's spool for it.
+    if let Some(plate) = queue_item.and_then(|q| q.project_plate_id) {
+        match crate::projects::plate_spools(pool).await {
+            Ok(map) => {
+                if let Some(m) = map.get(&plate) {
+                    for t in tools.iter_mut() {
+                        if let Some(sp) = m.get(&t.index) {
+                            t.spool_id = Some(*sp);
+                        }
+                    }
+                }
+            }
+            Err(e) => warn!(printer_id, "project slot spools: {e}"),
+        }
+    }
+    // Moonraker's [spoolman] link tracks one active spool, so it can't report a
+    // job that uses several. Foreman deducts per slot instead, and Moonraker's
+    // active spool is released so the same filament isn't counted twice.
+    let multi = is_multi_slot(&tools);
+    if multi && reporter == "moonraker" {
+        reporter = "foreman";
+        match env.release_active_spool(printer_id).await {
+            Ok(()) => info!(
+                printer_id,
+                "multi-filament job: Foreman deducts per slot; Moonraker active spool released"
+            ),
+            Err(e) => warn!(
+                printer_id,
+                "multi-filament job: could not release Moonraker's active spool: {e}"
+            ),
+        }
+    }
     // Moonraker's active spool (recorded for history; it reports use itself).
     if let Some(active) = snap
         .as_ref()
         .and_then(|s| s.caps.as_ref())
         .and_then(|c| c.spoolman_spool_id)
+        .filter(|_| !multi)
     {
         match tools.first_mut() {
             Some(t) if t.spool_id.is_none() => t.spool_id = Some(active),
@@ -153,6 +203,15 @@ pub async fn job_started(
     info!(job = job.id, printer_id, file = %job.file_name, reporter, "job started");
     emit(bus, printer_id, "started", job.id);
     Ok(job)
+}
+
+/// More than one slot prints (unknown use counts as printing).
+pub fn is_multi_slot(tools: &[JobTool]) -> bool {
+    tools
+        .iter()
+        .filter(|t| t.grams_planned.map(|g| g > 0.0).unwrap_or(true))
+        .count()
+        > 1
 }
 
 /// How the print ended: the firmware's own end state when it reports one, else
@@ -269,7 +328,14 @@ pub async fn deduct_once(
         );
         return Ok(());
     }
-    if reporter != "foreman" {
+    if reporter != "foreman" && is_multi_slot(&tools) {
+        // Never left to Moonraker: it tracks one spool. (job_started already
+        // switches these to Foreman; this guards rows written before 5.2.)
+        warn!(
+            job = job_id,
+            reporter, "multi-filament job: deducting per slot in Foreman instead"
+        );
+    } else if reporter != "foreman" {
         info!(
             job = job_id,
             reporter, "filament use reported by the printer; Foreman does not deduct"

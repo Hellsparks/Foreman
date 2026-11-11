@@ -1,7 +1,8 @@
 //! Print-file facts: `.gcode` (Orca, Prusa, Bambu Studio, Cura), `.bgcode`, `.3mf`.
 //!
 //! Text G-code is read as a head (header, thumbnails, Bambu config block) plus a tail
-//! (footer stats, Orca/Prusa config block); the body is never parsed.
+//! (footer stats, Orca/Prusa config block). The body is streamed once for filament
+//! slots only (colour changes, extrusion per colour, AMS tool changes; see `slots`).
 
 use std::{
     collections::HashMap,
@@ -12,6 +13,7 @@ use std::{
 
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 
+use super::slots::{self, BodyScan};
 use crate::domain::{FileMeta, PlateSummary, ToolUsage};
 
 const HEAD_BYTES: usize = 1 << 20;
@@ -94,13 +96,27 @@ fn parse_gcode_file(path: &Path) -> Result<Parsed, String> {
         f.read_exact(&mut tail).map_err(|e| e.to_string())?;
         scan.feed(&String::from_utf8_lossy(&tail), true);
     }
-    Ok(scan.finish())
+    // Body pass for slots.
+    f.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
+    let mut body = BodyScan::default();
+    let mut buf = vec![0u8; 256 << 10];
+    loop {
+        let n = f.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        body.feed(&buf[..n]);
+    }
+    body.finish();
+    Ok(scan.finish(Some(&body)))
 }
 
-/// Head + tail of a non-seekable stream (a G-code inside a 3MF).
-fn head_tail<R: Read>(mut r: R) -> io::Result<(Vec<u8>, Vec<u8>)> {
+/// Head + tail of a non-seekable stream (a G-code inside a 3MF); every byte also
+/// goes through `body`.
+fn head_tail<R: Read>(mut r: R, body: &mut BodyScan) -> io::Result<(Vec<u8>, Vec<u8>)> {
     let mut head = Vec::with_capacity(HEAD_BYTES);
     (&mut r).take(HEAD_BYTES as u64).read_to_end(&mut head)?;
+    body.feed(&head);
     let mut tail: Vec<u8> = Vec::new();
     let mut buf = vec![0u8; 64 << 10];
     loop {
@@ -108,6 +124,7 @@ fn head_tail<R: Read>(mut r: R) -> io::Result<(Vec<u8>, Vec<u8>)> {
         if n == 0 {
             break;
         }
+        body.feed(&buf[..n]);
         tail.extend_from_slice(&buf[..n]);
         if tail.len() > 2 * TAIL_BYTES {
             tail.drain(..tail.len() - TAIL_BYTES);
@@ -208,8 +225,11 @@ impl Scan {
         }
     }
 
-    fn finish(self) -> Parsed {
+    fn finish(self, body: Option<&BodyScan>) -> Parsed {
         let mut meta = meta_from_maps(&self.kv, &self.colon);
+        let (kind, slots) = slots::build(&meta.tools, body, semm(&self.kv), false, &[]);
+        meta.slot_kind = kind;
+        meta.slots = slots;
         if let Some((name, version)) = self.slicer {
             meta.slicer = Some(name);
             meta.slicer_version = version;
@@ -426,6 +446,12 @@ fn meta_from_maps(kv: &HashMap<String, String>, colon: &HashMap<String, String>)
     }
 }
 
+/// `single_extruder_multi_material = 1` (MMU / AMS) in the config block.
+fn semm(kv: &HashMap<String, String>) -> bool {
+    kv.get("single_extruder_multi_material")
+        .is_some_and(|v| unquote(v).trim() == "1")
+}
+
 /// Tools that actually print (unknown usage counts as used).
 fn used(tools: &[ToolUsage]) -> impl Iterator<Item = &ToolUsage> {
     tools
@@ -483,6 +509,10 @@ fn parse_bgcode_file(path: &Path) -> Result<Parsed, String> {
         de.digest(&buf[..n]);
     }
     let mut meta = meta_from_maps(&kv, &HashMap::new());
+    // The body is compressed G-code blocks; slots come from the metadata only.
+    let (kind, slots) = slots::build(&meta.tools, None, semm(&kv), false, &[]);
+    meta.slot_kind = kind;
+    meta.slots = slots;
     if let Some(producer) = kv.get("Producer") {
         let mut parts = producer.split_whitespace();
         meta.slicer = parts.next().map(str::to_owned);
@@ -541,15 +571,19 @@ pub(crate) fn parse_3mf<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<
         .filter_map(|n| plate_number(n, "Metadata/plate_", ".gcode").map(|i| (i, n)))
         .collect();
     plate_gcodes.sort();
+    let mut body = BodyScan::default();
+    let mut semm_3mf = false;
     let mut meta = if let Some((_, name)) = plate_gcodes.first() {
         let entry = zip.by_name(name).map_err(|e| e.to_string())?;
-        let (head, tail) = head_tail(entry).map_err(|e| e.to_string())?;
+        let (head, tail) = head_tail(entry, &mut body).map_err(|e| e.to_string())?;
+        body.finish();
         let mut scan = Scan::default();
         scan.feed(&String::from_utf8_lossy(&head), false);
         if !tail.is_empty() {
             scan.feed(&String::from_utf8_lossy(&tail), true);
         }
-        scan.finish().meta
+        semm_3mf = semm(&scan.kv);
+        scan.finish(Some(&body)).meta
     } else if let Some(json) = read_entry(zip, "Metadata/project_settings.config", 8 << 20) {
         meta_from_project_settings(&json)
     } else {
@@ -593,6 +627,16 @@ pub(crate) fn parse_3mf<R: Read + Seek>(zip: &mut zip::ZipArchive<R>) -> Result<
         }
         meta.plates = slice_info.plates.clone();
     }
+    // Slots from the final tools (slice_info wins); body scan when a plate G-code exists.
+    let (kind, slots) = slots::build(
+        &meta.tools,
+        (!plate_gcodes.is_empty()).then_some(&body),
+        semm_3mf,
+        !slice_info.plates.is_empty(),
+        slice_info.trays.first().map(Vec::as_slice).unwrap_or(&[]),
+    );
+    meta.slot_kind = kind;
+    meta.slots = slots;
     if meta.slicer.is_none() && slice_info.client_version.is_some() {
         meta.slicer = Some("BambuStudio".into());
     }
@@ -676,6 +720,8 @@ fn meta_from_project_settings(json: &[u8]) -> FileMeta {
 
 #[derive(Debug, Default)]
 struct SliceInfo {
+    /// Per plate: (filament id 0-based, `tray_info_idx`).
+    trays: Vec<Vec<(u32, String)>>,
     client_version: Option<String>,
     printer_model_id: Option<String>,
     nozzle: Option<f64>,
@@ -698,6 +744,7 @@ fn parse_slice_info(xml: &str) -> SliceInfo {
         match reader.read_event() {
             Ok(Event::Start(e)) if e.name().as_ref() == "plate" => {
                 plate = Some(PlateSummary::default());
+                info.trays.push(vec![]);
             }
             Ok(Event::End(e)) if e.name().as_ref() == "plate" => {
                 if let Some(p) = plate.take() {
@@ -730,6 +777,12 @@ fn parse_slice_info(xml: &str) -> SliceInfo {
                     }
                     ("filament", Some(p)) => {
                         let id: u32 = a.get("id").and_then(|v| v.parse().ok()).unwrap_or(1);
+                        if let (Some(t), Some(trays)) = (
+                            a.get("tray_info_idx").filter(|v| !v.is_empty()),
+                            info.trays.last_mut(),
+                        ) {
+                            trays.push((id.saturating_sub(1), t.clone()));
+                        }
                         p.tools.push(ToolUsage {
                             index: id.saturating_sub(1),
                             material: a.get("type").cloned().filter(|v| !v.is_empty()),
