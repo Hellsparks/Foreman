@@ -13,7 +13,7 @@ Same working rules as doc 04 (fish + Windows-safe commands, fmt/clippy/test befo
 | Printer | Firmware | IP | MAC | Use for |
 |---|---|---|---|---|
 | HellV0 (Voron V0) | Klipper + Moonraker | 10.0.0.177 | 4C:A3:8F:9D:0D:3D | C.2 Moonraker smoke, 2.3 Moonraker driver, 2.4 paths, 2.5 SSH/SFTP |
-| Bambu Lab A1 | Bambu (LAN Only + Developer Mode) | 10.0.0.249 | 24:EC:4A:0C:07:90 | 2.3b Bambu LAN driver, FTPS, camera |
+| Bambu Lab A1 | Bambu (cloud-bound since session 21; was LAN Only + Developer Mode) | 10.0.0.249 | 24:EC:4A:0C:07:90 | 2.3b Bambu LAN driver, 2C Bambu Cloud |
 
 - Both IPs come from DHCP. Ask the owner to reserve them in the router, or the tests break. Put addresses in a gitignored `test-printers.local.toml`, never hard-coded.
 - **HellV0 SSH:** see `test-printers.local.toml` for credentials. Don't put them in code, tests or commits. Once 2.5 works, install the Foreman ed25519 key on HellV0 and switch to key auth.
@@ -131,6 +131,82 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 
 ---
 
+## Phase 2C — Bambu Cloud, the Orca way, several accounts (D11, owner 2026-11-10)
+
+Goal: the owner's and the roommate's Bambu accounts both signed in on one Foreman, their printers on Fleet next to the Klipper printers, printers left cloud-bound (Bambu Handy and remote access keep working). Foreman does what OrcaSlicer does: load Bambu's prebuilt `bambu_networking` plugin and let it handle sign-in, cloud MQTT and command signing. Foreman never holds Bambu's signing key.
+
+**Reference (read, don't copy):** OrcaSlicer `src/slic3r/Utils/BBLNetworkPlugin.*` (loading, function table, ABI series), `BBLPrinterAgent.*` / `BBLCloudServiceAgent.*` (call order), `bambu_networking.hpp` (types, `AVAILABLE_NETWORK_VERSIONS`), `PresetUpdater.cpp` (plugin download, resource `slicer/plugins/cloud`); `ClusterM/open-bamboo-networking` `STATUS.md` + `research/` (per-function behaviour). OBN is AGPL and Orca is AGPL: protocol facts only, no code.
+
+**Architecture**
+```
+foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper (one per account: Rust + glue.cpp) ──▶ libbambu_networking (Bambu's, downloaded)
+```
+- One helper process per Bambu account: the plugin keeps global state and one login per process (Orca therefore holds one account; Foreman holds many).
+- `glue.cpp` only translates: `const char*` ↔ `std::string`, C function pointers ↔ `std::function`, flat structs ↔ `PrintParams`. No logic. Built by `cc` in the helper's `build.rs`. `foreman-server` links no C++.
+- Per-account plugin data dir: `<data_dir>/bambu/accounts/<id>/` (0700). Bambu tokens stay in the plugin's own files there; Foreman's DB never stores them.
+- Plugin files: `<data_dir>/bambu/plugin/<series>/` (`libbambu_networking.so` / `bambu_networking.dll`). Downloaded by the server from Bambu, never shipped in a Foreman package.
+
+### 2C.0 Platform gate + ARM warning
+- [ ] `GET /api/bambu/support` → `{ supported, os, arch, reason }`. Supported = Linux x86_64 and Windows x86_64. Anything else (aarch64/ARM Pi, ARM NAS, Windows on ARM, macOS) → `supported: false`, reason "Bambu Cloud needs an x86_64 (Intel/AMD) server. Bambu only publishes its network plugin for x86_64. Bambu printers in LAN Only + Developer Mode still work."
+- [ ] Server skips every helper/plugin step when unsupported and logs the reason once at startup (`warn`).
+- [ ] Settings → Bambu accounts shows the warning (Fieldwork warning style) and no Add button when unsupported. If accounts exist in the DB (e.g. data moved from an x86 box) also raise one Attention item.
+- [ ] README + Docker notes: glibc base image (not Alpine), x86_64 only for Bambu Cloud.
+
+### 2C.1 Plugin download + version pin
+- [ ] Pin ABI series **02.03.00** (what the owner's working Flatpak Orca uses: `libbambu_networking_02.03.00.so`, stock plugin, cloud-bound A1). Store `{series, version, sha256}` after install.
+- [ ] Download like Orca's `GUI_App::download_plugin` / `get_plugin_url` (checked in Orca `main`): `GET https://api.bambulab.com/v1/iot-service/api/slicer/resource?slicer/plugins/cloud=02.03.00.00` (CN: `api.bambulab.cn`) with header `X-BBL-OS-Type: linux|windows`. Response `{"message":"success","resources":[{"type","version","description","url"}]}` → GET `url` (same header) → zip. HTTPS only, size limit, temp file, then rename.
+- [ ] Unzip safely (reject entries/symlinks outside the target dir, as Orca's `is_path_within_root`). Linux zip holds `libbambu_networking.so`, `libBambuSource.so`, `liblive555.so`, `libagora*.so`; Windows the `.dll` equivalents. Rename the network lib to `libbambu_networking_<series>.so` like Orca.
+- [ ] Startup checks like Orca: `bambu_network_check_debug_consistent(false)` true, `bambu_network_get_version()` first 8 chars == series. Orca's agent setup order: `create_agent(dir)` → `set_config_dir` → `init_log` → `set_cert_file(<resources>/cert, slicer_base64.cer)` → `set_country_code` → `start`; telemetry off (`track_enable(false)`). Find out where `slicer_base64.cer` comes from (Orca ships it in `resources/cert`).
+- [ ] Plugin messages with empty dev_id (`unsigned_studio`, `cert_expired`, `cert_revoked`, `update_studio`, `wait_info`) → Attention item with the text; `unsigned_studio` = plugin refuses this host, tell the user Developer Mode is needed. Not seen on the owner's Orca; handle it anyway.
+- [ ] Optional custom plugin path (advanced; e.g. Open Bamboo Networking). Shown with "not supported by Foreman" note.
+- [ ] Version check after load: `bambu_network_get_version` matches the pinned series, else refuse with a clear message.
+- [ ] Windows: detect a missing VC++ runtime and say so (Tauri installer bundles the redistributable, C.4).
+- [ ] Settings shows plugin version + "Update plugin" (explicit, never automatic during a print).
+
+### 2C.2 Helper crate (`crates/foreman-bambu-helper`)
+- [ ] Binary `foreman-bambu-helper --account-dir <dir> --plugin <path>`; separate binary (not a server self-spawn) so a future x86_64-helper-under-emulation setup stays possible.
+- [ ] `glue.cpp` + `build.rs` (`cc`): load library (`dlopen`/`LoadLibraryW`), resolve the `bambu_network_*` table for the pinned series, expose `extern "C"` wrappers. Missing symbol → clear error, not a crash.
+- [ ] IPC types in `foreman-core::bambu_cloud::ipc` (serde, newline-delimited JSON): requests with `id` (login, logout, list devices, subscribe, send message, start print, version), responses, and pushed events (device message, login state, server connected, error).
+- [ ] Plugin callbacks run on plugin threads → forwarded through a channel to the stdout writer (one writer, no interleaving).
+- [ ] Helper stderr → server `tracing` with redaction (`accessToken`, `refreshToken`, `access_code`, `Bearer`, `password`). Never log tokens, access codes or serials in full.
+- [ ] Workspace: helper builds on Linux x86_64 + Windows x64 in CI; excluded on other targets. Building it needs g++ (Linux) or the MSVC tools (Windows, already required by Rust's MSVC toolchain); note this in README.
+
+### 2C.3 Server: accounts + supervisor
+- [ ] Migration: `bambu_account` (id, label, region `global|cn`, bambu_user_id, display_name, state, created_at, last_seen_at). `printer.bambu_account_id` (nullable) + `printer.bambu_transport` (`lan|cloud`).
+- [ ] Supervisor: one helper per account; start on boot, restart with backoff on crash, stop on account removal; crash of one helper never affects others or the server.
+- [ ] REST: `GET/POST/DELETE /api/bambu/accounts`, `POST /api/bambu/accounts/{id}/login|logout`, `GET /api/bambu/accounts/{id}/devices`, `POST /api/bambu/accounts/{id}/import`.
+- [ ] Sign-in flow: verify what the ABI offers (Orca: Bambu web login → ticket → plugin) and make it work from a browser or phone talking to a headless server. Spike first, log the result before building UI.
+- [ ] Same printer bound to two accounts → import once, user picks the account.
+- [ ] Attention: "Bambu account <label> needs sign-in", "Bambu plugin missing / wrong version", account helper keeps crashing.
+
+### 2C.4 Driver: cloud transport
+- [ ] `BambuDriver` gets a transport: existing LAN MQTT, or cloud via the account's helper. Report merge, AMS, HMS, capabilities reuse the current code unchanged (same `push_status` JSON).
+- [ ] `pushall` on subscribe; `printer.connection` events when the helper or cloud drops.
+- [ ] Commands (pause/resume/stop, temps, light, fan, G-code line) through the helper; the plugin signs. Rejected command (84033543 or similar) → Attention item with the reason.
+- [ ] Fleet card shows a "Cloud" tag and which account.
+
+### 2C.5 Settings UI
+- [ ] Settings → Bambu accounts (doc 02 row "Bambu accounts"): list, Add account, sign-in, Import printers, Sign out, plugin version + Update, ARM warning.
+
+### 2C.6 Printing + files (after 3.4 Send exists)
+- [ ] Send to a cloud printer: Library `.3mf` → helper `start_local_print_with_record` / `start_print` (LAN first, cloud fallback, like Orca's `PrintJob`). Progress → `transfer.*` events.
+- [ ] Printer storage as a Library location through the plugin, if the ABI allows it.
+
+### 2C.7 Tests
+- [ ] Fake helper (Rust test binary speaking the IPC protocol, replaying `fixtures/bambu_a1_reports.json`) for supervisor, driver and REST tests. Runs in CI on every platform.
+- [ ] Before building 2C.4 commands: owner toggles the A1 light from Orca's Device tab (cloud mode, no Developer Mode). Works → the stock plugin signs for third-party hosts; fails → commands drop to read-only, log it here.
+- [ ] Ignored live test against the real plugin + owner's A1: sign in, see status, toggle the light (ask owner first).
+- [ ] Two-account test with the roommate's account (owner arranges).
+
+### Backlog (2C)
+- Camera through `libBambuSource` (LAN MJPEG/RTSPS; remote TUTK) → browser stream.
+- Experimental: x86_64 helper under FEX/box64 on ARM64 (Pi 5 needs a 4 KB page kernel). Not supported until tested on real hardware.
+- User-supplied cert/key signed mode in the native LAN driver (doc 01 status line) as a non-plugin alternative.
+
+**Phase 2C done =** two Bambu accounts signed in on one x86_64 Foreman, both accounts' printers live on Fleet next to HellV0, the A1 still works in Bambu Handy, a light toggle goes through the plugin, killing one helper leaves the other account and the server running, and an ARM build shows the warning instead of the accounts section.
+
+---
+
 ## Phase 3 — Library, Send, queue, jobs (W4, W5, W7)
 
 ### 3.1 File store + parser
@@ -185,14 +261,31 @@ Open: 0.5 Tauri, 0.6 CI, 1.5 compatibility gate (upstream suite, migration test,
 | 23 | 3.3 compatibility + 3.4 Send + slicer upload |
 | 24 | 3.5 queues + scheduler |
 | 25 | 3.6 job engine + history |
+| 26 | 2C.0 platform gate + ARM warning, 2C.1 plugin download, 2C sign-in spike |
+| 27 | 2C.2 helper crate + glue + IPC, fake helper |
+| 28 | 2C.3 accounts + supervisor, 2C.4 cloud transport (status + commands) |
+| 29 | 2C.5 Settings UI, live test on the A1, two-account test |
+| 30 | 2C.6 cloud Send (needs 3.4) |
 | any | C.4 Tauri shell when convenient |
 
 Frontend for each box follows the UI demo; build screens as their APIs land (Fleet + Attention after 20, Printer page after 20, Library + Send after 23, Jobs after 25).
 
-Bambu Cloud (Open Bamboo Networking helper) stays a later phase; see the oversight doc.
+Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the owner; 2C.6 needs 3.4 Send first.
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Plan change — 2026-11-10 (owner): Bambu Cloud the Orca way, several accounts (D11)
+
+- **Why:** the owner and a roommate want both Bambu accounts' printers in one Foreman next to the Klipper printers, without giving up Bambu Handy or remote access. The A1 is cloud-bound, so FTPS :990 is closed and cloud firmware rejects unsigned commands (84033543).
+- **What OrcaSlicer does (checked in Orca `main`):** `BBLCloudServiceAgent` and `BBLPrinterAgent` are thin wrappers over Bambu's proprietary `bambu_networking` plugin, loaded by the singleton `BBLNetworkPlugin` and downloaded from Bambu per ABI series. Signing happens inside the plugin. Because of the singleton and the plugin's global state, Orca holds one Bambu account at a time.
+- **Decision:** Foreman loads the same plugin, one `foreman-bambu-helper` process per account. Exception to the Rust-only rule: one C++ glue file in the helper crate (the plugin's functions take `std::string`/`std::function`, which Rust cannot build portably). Recorded in CLAUDE.md and doc 01 D11.
+- **ARM:** Bambu publishes the plugin for x86_64 only, so Bambu Cloud is off on ARM servers with a warning (2C.0). D1 still allows Pi/NAS servers; on those, Bambu works only in LAN Only + Developer Mode. FEX/box64 is backlog, untested.
+- **Rejected:** a native Rust reimplementation of the cloud protocol (would still need Bambu's signing key, which Foreman will not ship or explain how to obtain); Open Bamboo Networking as the default (same key problem; AGPL). OBN stays possible via the custom plugin path.
+- **Licence:** Bambu's plugin is downloaded by each user's server from Bambu and never redistributed by Foreman. The helper is GPL-3.0-or-later like the rest.
+- **Verified on the owner's PC (2026-11-10):** Flatpak Orca uses Bambu's stock plugin 02.03.00 (plus `libBambuSource`, `liblive555`, `libagora*`), `network_plugin_version = 02.03.00`, and connects to the cloud-bound A1 like Bambu Studio. Orca's `unsigned_studio` dialog ("enable LAN + Developer mode") is a fallback path, not seen here. Open question: do signed commands work from Orca (light toggle test, 2C.7).
+- **Windows on ARM:** Orca requests `X-BBL-OS-Type: windows_arm` for newer series, so Bambu may publish an ARM Windows build. Foreman still treats every ARM host as unsupported (owner's call); revisit if someone needs it.
+- **Session 26 not started** (owner out of credits). Nothing implemented yet; next session starts at 2C.0.
 
 ### Session 22 — 2026-11-10 (3.2 Library browser + transfers + Library UI)
 

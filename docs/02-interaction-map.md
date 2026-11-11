@@ -30,6 +30,7 @@ Live, interactive map (current vs proposed graphs per workflow + decision points
 | Print plates | "All remaining" → fleet queue ordered by due date. |
 | Service | Mark done straight from notification, with Undo. |
 | Import/export | Whole import can be undone (batch). |
+| Bambu accounts (D11, 2026-11-10) | Settings → Bambu accounts: list of signed-in accounts (label, region, state, printer count), Add account → Bambu sign-in, Import printers (discovered list, tick to add), Sign out with light confirm. On ARM servers the section shows one warning ("Bambu Cloud needs an x86_64 server") and no Add button. Expired sign-in → Attention item with a Sign in action. |
 
 ## Surface rules (apply to every screen)
 1. Modal only when the task must block. Never stack dialogs.

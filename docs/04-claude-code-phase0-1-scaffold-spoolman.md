@@ -9,7 +9,7 @@ Give this file to Claude Code in a **new, empty repo**, together with docs 01–
 - **Rule:** if it isn't frontend, it's Rust. Frontend = Vite + React + TypeScript, styled only with Fieldwork (`DESIGN.md`, `tokens.css` from `Hellsparks/Fieldwork-designtemplate`).
 - Architecture (decided): one Rust core, three shells — `foreman-server` (headless, axum), `foreman-desktop` (Tauri 2, embeds the server or connects to a remote one), Tauri mobile later. All data over HTTP + one WebSocket event stream; Tauri IPC only for native features.
 - No Docker self-management, no Python, no Node at runtime.
-- v1 printer drivers: Klipper/Moonraker, OctoPrint, Duet, **Bambu (built last)** — Bambu supports Developer Mode (unsigned MQTT/FTPS) and signed mode for normal firmware (RSA-signed MQTT with a user-supplied cert/key loaded from config, never committed to the repo). Not in this brief.
+- v1 printer drivers: Klipper/Moonraker, OctoPrint, Duet, **Bambu (built last)** — Bambu supports Developer Mode (unsigned MQTT/FTPS) and signed mode for normal firmware (RSA-signed MQTT with a user-supplied cert/key loaded from config, never committed to the repo). Not in this brief. **Update 2026-11-10:** Bambu Cloud via Bambu's own network plugin, several accounts — see doc 01 D11 and doc 05 Phase 2C.
 - Owner's dev machine: CachyOS, KDE, Wayland, NVIDIA, **fish shell**. Second machine: Windows 11.
 
 ## Working rules
