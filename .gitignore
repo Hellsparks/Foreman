@@ -39,3 +39,4 @@ compat-tests/
 
 # dev-check step logs (scripts/dev-check.sh)
 /.dev-logs/
+*.tsbuildinfo

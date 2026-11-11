@@ -418,6 +418,23 @@ export default function Library() {
     }
   };
 
+  const doQueue = async (printerId: number | null) => {
+    if (!sel?.libId || sendBusy) return;
+    setSendBusy(true);
+    try {
+      const r = await send.send({
+        file_id: sel.libId,
+        mode: printerId == null ? "fleet_queue" : "queue",
+        ...(printerId == null ? {} : { printer_id: printerId }),
+      });
+      setNotice(r.message);
+    } catch (e) {
+      setNotice(errText(e));
+    } finally {
+      setSendBusy(false);
+    }
+  };
+
   // ── navigation ───────────────────────────────────────────────────────────
 
   const go = (w: Where) => {
@@ -1279,6 +1296,17 @@ export default function Library() {
                           {c.quick_fix && c.verdict !== "ready" && c.verdict !== "plate" && (
                             <span className="fw-send-fix">{c.quick_fix}</span>
                           )}
+                          {c.verdict !== "too_big" && c.verdict !== "nozzle" && (
+                            <button
+                              type="button"
+                              className="fb-button fb-small"
+                              disabled={sendBusy}
+                              title={`Add to ${c.printer_name}'s queue`}
+                              onClick={() => void doQueue(Number(c.printer_id))}
+                            >
+                              Queue
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -1294,10 +1322,13 @@ export default function Library() {
                     </label>
                   )}
                   <div className="fw-browser-actions">
-                    <button type="button" className="fb-button" disabled title="Queue — coming next session">
-                      Queue
-                    </button>
-                    <button type="button" className="fb-button" disabled title="Fleet queue — coming next session">
+                    <button
+                      type="button"
+                      className="fb-button"
+                      disabled={sendBusy}
+                      title="Add to the fleet queue: the next compatible free printer takes it"
+                      onClick={() => void doQueue(null)}
+                    >
                       Fleet queue
                     </button>
                   </div>

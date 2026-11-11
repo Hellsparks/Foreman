@@ -7,6 +7,8 @@ import {
 import { createPortal } from "react-dom";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { queue } from "../api/queue";
+import { useEventStream } from "../hooks/useEventStream";
 import type { PrinterWithStatus, AttentionItem } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { FirmwareKind } from "../api/types/FirmwareKind";
@@ -121,6 +123,7 @@ function amsChips(
 
 function attentionTone(kind: string): Tone {
   if (kind === "error") return "bad";
+  if (kind === "print_finished") return "warn";
   if (kind === "offline") return "off";
   if (kind === "paused") return "warn";
   return "warn";
@@ -128,10 +131,13 @@ function attentionTone(kind: string): Tone {
 
 function attentionSymbol(kind: string): string {
   if (kind === "error") return "✖";
+  if (kind === "print_finished") return "◐";
   if (kind === "offline") return "○";
   if (kind === "paused") return "‖";
   return "!";
 }
+
+const ATTENTION_TOPICS = ["attention.added", "attention.updated", "attention.cleared"];
 
 // ── Fleet page ───────────────────────────────────────────────────────────────
 
@@ -182,6 +188,10 @@ export default function Fleet() {
     loadPrinters();
     loadAttention();
   }, [loadPrinters, loadAttention]);
+
+  // Live Attention strip (e.g. "clear the plate" when a print finishes).
+  const onAttentionEvent = useCallback(() => void loadAttention(), [loadAttention]);
+  useEventStream(onAttentionEvent, ATTENTION_TOPICS);
 
   // Refresh snapshots every 10 s.
   useEffect(() => {
@@ -270,6 +280,15 @@ export default function Fleet() {
     }
   };
 
+  const plateCleared = async (printerId: number, itemId: number) => {
+    try {
+      await queue.plateCleared(printerId);
+      setAttentionItems((prev) => prev.filter((i) => i.id !== itemId));
+    } catch (e) {
+      console.error("Failed to mark plate cleared:", e);
+    }
+  };
+
   const dismissAttention = async (id: number) => {
     try {
       await api.dismissAttention(id);
@@ -350,7 +369,7 @@ export default function Fleet() {
                   : null;
                 return (
                   <div key={item.id} className="fleet__attn-row">
-                    <StatusChip tone={tone} symbol={sym} word={item.kind === "offline" ? "Offline" : item.kind === "error" ? "Error" : item.kind} />
+                    <StatusChip tone={tone} symbol={sym} word={item.kind === "offline" ? "Offline" : item.kind === "error" ? "Error" : item.kind === "print_finished" ? "Clear plate" : item.kind} />
                     <div className="fleet__attn-text">
                       <div className="fleet__attn-title">{item.title}</div>
                       {item.body && (
@@ -358,6 +377,15 @@ export default function Fleet() {
                       )}
                     </div>
                     <div className="fleet__attn-actions">
+                      {item.kind === "print_finished" && item.printer_id != null && (
+                        <button
+                          type="button"
+                          className="fleet__attn-btn fleet__attn-btn--primary"
+                          onClick={() => void plateCleared(item.printer_id as number, item.id)}
+                        >
+                          Plate cleared
+                        </button>
+                      )}
                       {relatedPrinter && (
                         <button
                           type="button"
