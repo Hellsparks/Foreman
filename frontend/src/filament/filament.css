@@ -238,6 +238,8 @@
   border-bottom: 1px solid var(--fw-border);
 }
 .fil-table td { padding: 0 var(--fw-space-3); border-bottom: 1px solid var(--fw-border); font-size: 13px; }
+.fil-tr { cursor: pointer; }
+.fil-tr:hover { background: var(--fw-surface); }
 .fil-table tr[aria-selected="true"] { background: var(--fw-info-bg); }
 .fil-row-btn {
   display: flex;

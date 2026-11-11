@@ -43,17 +43,18 @@ export default function Filament() {
   const [q, setQ] = useState("");
   const [mat, setMat] = useState("all");
   const [low, setLow] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [sel, setSel] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>("spool");
 
   const load = useCallback(async () => {
     try {
-      setRows(await spools.list());
+      setRows(await spools.list(showArchived));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [showArchived]);
   useEffect(() => void load(), [load]);
   const onSpoolEvent = useCallback(() => void load(), [load]);
   useEventStream(onSpoolEvent, SPOOL_TOPICS);
@@ -145,6 +146,9 @@ export default function Filament() {
               <button type="button" className="fil-seg" aria-pressed={low} onClick={() => setLow(!low)}>
                 Low · under {LOW_GRAMS} g
               </button>
+              <button type="button" className="fil-seg" aria-pressed={showArchived} onClick={() => setShowArchived(!showArchived)}>
+                Show archived
+              </button>
             </div>
             <div className="fil-count">{shown.length} shown</div>
             <div className="fil-table-wrap">
@@ -162,16 +166,26 @@ export default function Filament() {
                     const s = r.spool;
                     const isLow = s.remaining_weight != null && s.remaining_weight < LOW_GRAMS;
                     return (
-                      <tr key={s.id} aria-selected={sel === s.id}>
+                      <tr key={s.id} aria-selected={sel === s.id} className="fil-tr" onClick={() => open(s.id)}>
                         <td>
-                          <button type="button" className="fil-row-btn" onClick={() => open(s.id)}>
+                          <button
+                            type="button"
+                            className="fil-row-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              open(s.id);
+                            }}
+                          >
                             <SpoolSwatch spool={s} size={28} />
                             <span>
                               <b>
                                 #{s.id} {s.name}
                               </b>
                               <br />
-                              <span className="fil-sub">{s.vendor ?? "No vendor"}</span>
+                              <span className="fil-sub">
+                                {s.vendor ?? "No vendor"}
+                                {s.archived ? " · archived" : ""}
+                              </span>
                             </span>
                           </button>
                         </td>
@@ -229,7 +243,17 @@ export default function Filament() {
           ) : mode === "edit" ? (
             <EditSpoolPanel row={cur} onClose={() => setMode("spool")} onSaved={() => void load().then(() => setMode("spool"))} />
           ) : (
-            <SpoolInspector row={cur} onClose={close} onLoad={() => setMode("load")} onEdit={() => setMode("edit")} />
+            <SpoolInspector
+              row={cur}
+              onClose={close}
+              onLoad={() => setMode("load")}
+              onEdit={() => setMode("edit")}
+              onArchive={async (archived) => {
+                await spools.edit(cur.spool.id, { archived, location: null, lot_nr: null, comment: null, price: null });
+                if (archived && !showArchived) close();
+                await load();
+              }}
+            />
           ),
           portal,
         )}
@@ -244,13 +268,31 @@ function SpoolInspector({
   onClose,
   onLoad,
   onEdit,
+  onArchive,
 }: {
   row: SpoolRow;
   onClose: () => void;
   onLoad: () => void;
   onEdit: () => void;
+  onArchive: (archived: boolean) => Promise<void>;
 }) {
   const s = row.spool;
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [archErr, setArchErr] = useState<string | null>(null);
+  useEffect(() => setConfirmArchive(false), [s.id]);
+  const archive = async () => {
+    if (!s.archived && !confirmArchive) {
+      setConfirmArchive(true);
+      return;
+    }
+    setArchErr(null);
+    try {
+      await onArchive(!s.archived);
+      setConfirmArchive(false);
+    } catch (e) {
+      setArchErr(e instanceof Error ? e.message : String(e));
+    }
+  };
   const isLow = s.remaining_weight != null && s.remaining_weight < LOW_GRAMS;
   const colours = s.multi_color_hexes.length > 1 ? s.multi_color_hexes.map((h) => `#${h}`).join(" ") : s.color_hex ? `#${s.color_hex}` : "no colour";
   const facts: [string, string][] = [
@@ -329,7 +371,19 @@ function SpoolInspector({
         <button type="button" className="fil-btn" onClick={onEdit}>
           Edit
         </button>
+        <button
+          type="button"
+          className="fil-btn"
+          style={{ gridColumn: "1 / -1" }}
+          onClick={() => void archive()}
+        >
+          {s.archived ? "Unarchive" : confirmArchive ? `Archive #${s.id}? Click again to confirm` : "Archive"}
+        </button>
       </div>
+      {row.loaded.length > 0 && !s.archived && confirmArchive && (
+        <p className="fil-muted">It stays loaded on {row.loaded.map((l) => `${l.printer_name} ${l.label}`).join(", ")} until you unload it.</p>
+      )}
+      {archErr && <p className="fil-note fil-note--bad" role="alert">{archErr}</p>}
     </div>
   );
 }

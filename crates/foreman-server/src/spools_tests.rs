@@ -772,6 +772,26 @@ async fn edit_spool_fields() {
     assert_eq!(v["location"], "Shelf B1");
     assert_eq!(v["lot_nr"], "L-42");
     assert_eq!(v["comment"], "opened");
+    // Archive with the other fields null: they stay as they were.
+    let (s, v) = call(
+        &app,
+        "PATCH",
+        &format!("/api/spools/{sid}"),
+        &auth,
+        Some(json!({ "archived": true, "location": null, "lot_nr": null, "comment": null, "price": null })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["archived"], true);
+    assert_eq!(v["location"], "Shelf B1");
+    let (_, v) = call(&app, "GET", "/api/spools", &auth, None).await;
+    assert_eq!(
+        v.as_array().map(Vec::len),
+        Some(0),
+        "archived spools hidden by default"
+    );
+    let (_, v) = call(&app, "GET", "/api/spools?archived=true", &auth, None).await;
+    assert_eq!(v[0]["spool"]["archived"], true);
     let (s, _) = call(
         &app,
         "PATCH",
