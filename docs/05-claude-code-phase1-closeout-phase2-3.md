@@ -246,6 +246,9 @@ foreman-server (Rust) ──JSON lines over stdio──▶ foreman-bambu-helper 
 
 ---
 
+### Backlog (Phase 4)
+- [ ] **SpoolmanDB external catalogue (C.3) is still a stub** (`spoolman-rs/src/api/external.rs` returns `[]`). Session 27 skipped "Start from catalogue" in the filament form and the catalogue search in New spool; both say so in the UI. Build the SpoolmanDB fetch + cache, then add the "Start from · optional" section (reference `Filament.dc.html` lines 268–285) and the catalogue step of New spool (lines 451–466).
+
 ## Session plan
 | Session | Boxes |
 |---|---|
@@ -277,6 +280,18 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
+
+### Session 27 — 2026-11-11 (4.2 filament form, materials + modifiers, vendors, new spool)
+
+- **Step 0 (session 26 holds, live on HellV0):** `POST /api/printers/1/spools/load {spool_id:1}` → Moonraker `/server/spoolman/spool_id` = `1` (what Mainsail shows); a 40 g test spool → guard `low_remaining` warning; compat for `Foreman_sim_PLA_30mm_230C.gcode` = `no_spool/empty` with nothing loaded → `ready/exact` with spool #1 loaded (ASA file → `material/mismatch`). Test spool deleted. Setting Moonraker's active spool is a Moonraker server call, not a printer command; nothing else was sent to the printer.
+- **Abrasive rule:** the old `materialUtils.js` `isAbrasiveFilament` only knew CF/GF/AF. The Rust port (`foreman-core::materials`) keeps its tests and adds Metal and Glow, as the brief asks. The rule only ticks the box; the stored `abrasive` flag decides. Guard reads `SpoolFacts.abrasive`; compat's nozzle check now uses the loaded spool's flag and falls back to `is_abrasive_filament` on the file's material string only when no spool is known for that tool (a slicer file has no flag). Filaments made before the flag existed fall back to the same rule.
+- **Modifiers:** the reference stores several modifiers ("pick any"); they go space-separated in `material_modifier` ("CF HF"). Multi-word Marathon modifiers ("Silk BiColor", "Silk TriColor", "Silk Rainbow") are kept whole when split. `material` holds only the base ("PETG").
+- **Vendor website:** Spoolman v0.27.1 vendors have no URL column; it is a vendor extra field `url` ("Website"), created at startup next to the filament defaults.
+- **Clearing fields:** spoolman-rs `update` skips `None`, so an edit could not clear a value or turn single colour into multi-colour (old `color_hex` would stay, which upstream rejects on create). Added `filament::set_colours` (writes all three colour columns, same validation as create) and a whitelisted `clear_columns` for filament and vendor. The Spoolman `/api/v1` PATCH behaviour is unchanged.
+- **Empty spool weight:** a new spool with none given takes the filament's `spool_weight`, else the vendor's `empty_spool_weight` (the server does it; the form shows the prefill and where it came from).
+- **New spool flow:** searches existing filaments first; "+ Create" appears only when nothing matches by name. Labels / NFC from the reference's "What next?" are left out (devices are a later session); "Load onto a printer…" opens the load panel for the first new spool.
+- **TD1:** the button sits on each colour row inside the colour box and is disabled until devices exist.
+- **Live check (owner's Done list, driven through the app in Chromium):** vendor Sunlu (165 g, website) → PETG-CF Black (CF ticked abrasive automatically) → PLA Silk Sunset Gradient (3 colours) → "Save + add spool of it" → 2 spools, empty weight prefilled 165 g. Spoolman `/api/v1`: vendor `empty_spool_weight 165`, `extra.url`; filament 2 `material PETG`, `extra.abrasive "true"`, `material_modifier "CF"`; filament 3 `multi_color_hexes "E2621F,C9C2B0,1F8A8A"`, `longitudinal`; spools 3 and 4 `spool_weight 165`, Shelf A1, lot SUN-2611.
 
 ### Session 25 — 2026-11-11 (3.6 job engine + History + Stats)
 
