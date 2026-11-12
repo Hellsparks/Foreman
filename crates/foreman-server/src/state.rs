@@ -41,4 +41,7 @@ pub struct AppState {
     pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
     /// Server data directory; theme fonts and custom.css are served from it.
     pub data_dir: std::path::PathBuf,
+    /// `FOREMAN__DRIVERS_ENABLED`: false = never connect to printers (setup scans show
+    /// sample printers, added printers stay offline).
+    pub drivers_enabled: bool,
 }

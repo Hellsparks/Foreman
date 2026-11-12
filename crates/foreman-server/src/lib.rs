@@ -9,6 +9,7 @@ mod calibration;
 #[cfg(test)]
 mod calibration_tests;
 pub mod config;
+pub mod discovery;
 mod driver_manager;
 mod exports;
 #[cfg(test)]
@@ -30,6 +31,9 @@ mod projects_tests;
 mod scheduler;
 #[cfg(test)]
 mod scheduler_tests;
+pub mod setup;
+#[cfg(test)]
+mod setup_tests;
 mod spools;
 #[cfg(test)]
 mod spools_tests;
@@ -316,6 +320,7 @@ pub async fn serve_with(
         scheduler,
         spoolman: Arc::clone(&spoolman),
         data_dir: cfg.data_dir.clone(),
+        drivers_enabled: cfg.drivers_enabled,
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -740,6 +745,26 @@ fn build_router(app_state: AppState) -> Router {
             "/api/settings/server",
             get(api::auth::get_server).put(api::auth::put_server),
         )
+        // First-run setup (6.4)
+        .route("/api/setup", get(api::setup::get))
+        .route("/api/setup/step", post(api::setup::step))
+        .route("/api/setup/skip", post(api::setup::skip))
+        .route("/api/setup/restart", post(api::setup::restart))
+        .route("/api/setup/finish", post(api::setup::finish))
+        .route("/api/setup/data/fresh", post(api::setup::data_fresh))
+        .route("/api/setup/data/detect-path", post(api::setup::detect_path))
+        .route(
+            "/api/setup/data/detect-upload",
+            post(api::setup::detect_upload).layer(DefaultBodyLimit::max(api::setup::UPLOAD_LIMIT)),
+        )
+        .route("/api/setup/data/detect-url", post(api::setup::detect_url))
+        .route("/api/setup/data/import", post(api::setup::import))
+        .route("/api/setup/data/discard", post(api::setup::discard))
+        .route("/api/setup/discover", post(api::setup::discover))
+        .route("/api/setup/probe", post(api::setup::probe))
+        .route("/api/setup/printers", post(api::setup::add_printer))
+        .route("/api/setup/slicer-key", post(api::setup::slicer_key))
+        .route("/api/setup/backup", post(api::setup::backup))
         .route("/api/printers", get(api::printers::list_printers))
         // Library
         .route("/api/library", get(api::library::list))

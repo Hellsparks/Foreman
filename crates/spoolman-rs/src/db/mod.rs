@@ -1,5 +1,6 @@
 pub mod extra_field;
 pub mod filament;
+pub mod import;
 pub mod migrations;
 pub mod query;
 pub mod search;

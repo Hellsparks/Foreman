@@ -19,6 +19,7 @@ import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import { everyText, maintenanceApi, type TaskTemplate } from "../api/maintenance";
+import FleetGettingStarted from "../setup/FleetGettingStarted";
 import "./Fleet.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -324,11 +325,13 @@ export default function Fleet() {
       )}
 
       {/* ── Printer grid ─────────────────────────────────────────────────── */}
-      {loading || printers.length === 0 ? (
+      {loading ? (
         <section className="fleet__grid page-fill" aria-label="Printers">
-          <p className={loading ? "fleet__loading" : "fleet__empty"}>
-            {loading ? "Loading printers…" : "No printers registered. Add one to get started."}
-          </p>
+          <p className="fleet__loading">Loading printers…</p>
+        </section>
+      ) : printers.length === 0 ? (
+        <section className="page-fill" aria-label="Getting started">
+          <FleetGettingStarted onAdded={() => void loadPrinters()} />
         </section>
       ) : (
         <section className="fleet__grid page-fill" aria-label="Printers">
@@ -358,7 +361,7 @@ export default function Fleet() {
       )}
 
       {/* Phone: the header's Add printer moves to the end of the list (doc 06 §1). */}
-      {phone && !loading && (
+      {phone && !loading && printers.length > 0 && (
         <button type="button" className="ui-list-add" onClick={() => setShowAddPanel((v) => !v)}>
           {showAddPanel ? "Cancel adding a printer" : "+ Add printer"}
         </button>

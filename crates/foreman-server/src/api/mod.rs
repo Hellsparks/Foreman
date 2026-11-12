@@ -15,6 +15,7 @@ pub mod printers;
 pub mod projects;
 pub mod queue;
 pub mod send;
+pub mod setup;
 pub mod spools;
 pub mod ssh;
 pub mod storage;

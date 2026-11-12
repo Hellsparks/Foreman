@@ -160,7 +160,7 @@ impl MetaSource for NoMeta {
 // Setup
 // ---------------------------------------------------------------------------
 
-async fn spoolman(dir: &tempfile::TempDir) -> spools::Spoolman {
+pub(crate) async fn spoolman(dir: &tempfile::TempDir) -> spools::Spoolman {
     let cfg = SpoolmanConfig {
         db_type: DbType::Sqlite,
         db_host: None,
@@ -238,7 +238,7 @@ pub(crate) async fn setup() -> (tempfile::TempDir, Router, AppState, String) {
     (dir, router, state, token)
 }
 
-async fn login(app: &Router) -> String {
+pub(crate) async fn login(app: &Router) -> String {
     let (_, b) = call(
         app,
         "POST",
