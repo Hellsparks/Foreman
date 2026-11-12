@@ -42,7 +42,9 @@ export default function Attention() {
           ))}
         </div>
       )}
-      {loaded ? <AttentionList items={shown} printerNames={names} onResolved={remove} /> : <p className="attn-empty">Loading…</p>}
+      <div className="attn-page__list page-fill">
+        {loaded ? <AttentionList items={shown} printerNames={names} onResolved={remove} /> : <p className="attn-empty">Loading…</p>}
+      </div>
     </div>
   );
 }

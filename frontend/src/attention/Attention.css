@@ -7,19 +7,17 @@
 }
 
 /* ── Panel (desktop: anchored under the bell) ───────────────────────────── */
-.attn-pop {
-  position: absolute;
-  top: calc(100% + var(--fw-space-2));
-  right: 0;
-  z-index: 30;
+.attn-pop.ui-pop {
   width: 420px;
-  max-width: calc(100vw - 2 * var(--fw-space-4));
-  max-height: 70vh;
+  overflow: hidden;
+}
+.attn-pop__inner {
+  /* 70vh, or less when the room next to the bell is smaller (ui/Popover sets --pop-max). */
+  max-height: min(70vh, var(--pop-max, 70vh));
+  height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--fw-raised);
-  border: var(--fw-border-width) solid var(--fw-border);
-  box-shadow: var(--fw-shadow-overlay);
+  min-height: 0;
 }
 .attn-pop:focus { outline: none; }
 .attn-pop:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
@@ -167,10 +165,24 @@
 
 /* ── Attention page ─────────────────────────────────────────────────────── */
 .attn-page {
-  max-width: 760px;
   display: flex;
   flex-direction: column;
   gap: var(--fw-space-4);
+}
+/* The list region fills the page (doc 06 §9); empty, it is a framed panel with the message inside. */
+.attn-page__list { display: flex; flex-direction: column; }
+.attn-page__list > .attn-empty {
+  flex: 1;
+  padding: var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-border);
+  background: var(--fw-raised);
+  max-width: none;
+}
+/* Cards reflow into columns on wide screens (doc 06 §10). */
+.attn-page__list .attn-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  align-items: start;
 }
 .attn-page__filters {
   display: flex;
@@ -180,16 +192,7 @@
 
 /* ── Phone: the panel is a full-height sheet; the bell is an icon button ── */
 @media (max-width: 759px) {
-  .attn-pop {
-    position: fixed;
-    inset: 0;
-    width: auto;
-    max-width: none;
-    max-height: none;
-    z-index: 40;
-    border: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
+  .attn-pop__inner { max-height: none; }
   .shell .attn-bell .topbar__btn--attention {
     display: inline-flex;
     justify-content: center;

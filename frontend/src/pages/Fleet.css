@@ -6,7 +6,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--fw-space-6);
-  padding-bottom: 48px;
 }
 
 .fleet__header {
@@ -73,7 +72,9 @@
 
 .fleet__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* auto-fit: two printers take the whole width, not two of five tracks (doc 06 §10). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  align-content: start;
   gap: var(--fw-space-4);
 }
 
@@ -91,7 +92,6 @@
   padding: var(--fw-space-4);
   background: var(--fw-raised);
   border: var(--fw-border-width) solid var(--fw-border);
-  overflow: hidden;
 }
 
 .fleet-card--selected {
@@ -248,37 +248,6 @@
 }
 
 /* Card dropdown menu */
-.fleet-card__dropdown {
-  position: absolute;
-  top: 56px;
-  right: 16px;
-  z-index: 5;
-  min-width: 200px;
-  background: var(--fw-raised);
-  border: var(--fw-border-width) solid var(--fw-muted);
-  box-shadow: var(--fw-shadow-overlay);
-  display: flex;
-  flex-direction: column;
-  padding: var(--fw-space-1) 0;
-}
-
-.fleet-card__dropdown-item {
-  min-height: var(--fw-control-h-md);
-  padding: 0 14px;
-  text-align: left;
-  background: none;
-  border: 0;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--fw-text);
-  display: flex;
-  align-items: center;
-  transition: background var(--fw-duration-fast);
-}
-
-.fleet-card__dropdown-item:hover { background: var(--fw-surface); }
-.fleet-card__dropdown-item:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
-
 /* ── Inspector (printer detail panel, rendered via portal) ───────────────── */
 
 .fleet-insp {

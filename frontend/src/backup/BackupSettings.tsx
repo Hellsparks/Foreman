@@ -41,7 +41,7 @@ export default function BackupSettings() {
 
   if (!ov || !draft) {
     return (
-      <section aria-labelledby="backup-heading" style={{ maxWidth: 720, marginTop: "var(--fw-space-8)" }}>
+      <section aria-labelledby="backup-heading">
         <h2 id="backup-heading" className="bk-h2" style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)" }}>
           Backup
         </h2>
@@ -89,7 +89,7 @@ export default function BackupSettings() {
   const last = ov.last;
 
   return (
-    <section aria-labelledby="backup-heading" style={{ maxWidth: 720, marginTop: "var(--fw-space-8)" }}>
+    <section aria-labelledby="backup-heading">
       <h2 id="backup-heading" style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}>
         Backup
       </h2>

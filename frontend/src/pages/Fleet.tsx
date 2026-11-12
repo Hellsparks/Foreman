@@ -14,7 +14,7 @@ import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
-import { StatusChip, ProgressBar, Swatch } from "../ui";
+import { StatusChip, ProgressBar, Swatch, Menu, type MenuItem } from "../ui";
 import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
@@ -210,14 +210,6 @@ export default function Fleet() {
     return () => closeInspector();
   }, [closeInspector]);
 
-  // Close menu on click-outside.
-  useEffect(() => {
-    if (menuFor === null) return;
-    const handler = () => setMenuFor(null);
-    window.addEventListener("click", handler);
-    return () => window.removeEventListener("click", handler);
-  }, [menuFor]);
-
   // Live status merged with REST snapshot.
   const liveStatus = (p: PrinterWithStatus): PrinterStatus | null => {
     return (statuses[p.id] as PrinterStatus | undefined) ?? p.status ?? null;
@@ -332,12 +324,14 @@ export default function Fleet() {
       )}
 
       {/* ── Printer grid ─────────────────────────────────────────────────── */}
-      {loading ? (
-        <p className="fleet__loading">Loading printers…</p>
-      ) : printers.length === 0 ? (
-        <p className="fleet__empty">No printers registered. Add one to get started.</p>
+      {loading || printers.length === 0 ? (
+        <section className="fleet__grid page-fill" aria-label="Printers">
+          <p className={loading ? "fleet__loading" : "fleet__empty"}>
+            {loading ? "Loading printers…" : "No printers registered. Add one to get started."}
+          </p>
+        </section>
       ) : (
-        <section className="fleet__grid" aria-label="Printers">
+        <section className="fleet__grid page-fill" aria-label="Printers">
           {printers.map((p) => {
             const st = liveStatus(p);
             const state = st?.state ?? "offline";
@@ -355,10 +349,7 @@ export default function Fleet() {
                 menuOpen={menuFor === p.id}
                 snapshotTs={ts}
                 onSelect={() => selectPrinter(p.id)}
-                onMenuToggle={(e) => {
-                  e.stopPropagation();
-                  setMenuFor((prev) => (prev === p.id ? null : p.id));
-                }}
+                onMenuToggle={() => setMenuFor((prev) => (prev === p.id ? null : p.id))}
                 onOpenPage={() => navigate(`/printer/${p.id}`)}
               />
             );
@@ -423,7 +414,7 @@ export function PrinterCard({
   menuOpen: boolean;
   snapshotTs: number;
   onSelect: () => void;
-  onMenuToggle: (e: React.MouseEvent) => void;
+  onMenuToggle: () => void;
   onOpenPage: () => void;
 }) {
   const tone = statusTone(state);
@@ -432,6 +423,25 @@ export function PrinterCard({
   const hasProgress = pct > 0 && pct < 100;
   const chips = amsChips(status, printer.firmware, slots);
   const canLoad = slots.some((s) => s.writable);
+  const menuItems: MenuItem[] = [
+    { label: "Open printer page", onSelect: onOpenPage },
+    ...(canLoad ? [{ label: "Load spool…", onSelect: onLoadSpool }] : []),
+    ...(printer.primary_url
+      ? [
+          {
+            label: (
+              <>
+                Open native UI
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" aria-hidden="true">
+                  <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
+                </svg>
+              </>
+            ),
+            onSelect: () => window.open(ensureProtocol(printer.primary_url!), "_blank", "noopener,noreferrer"),
+          },
+        ]
+      : []),
+  ];
   const jobName = status?.filename ?? (state === "offline" ? "Not reachable" : "Ready for next job");
   const sub = jobSubLine(status);
   const isOffline = state === "offline";
@@ -461,19 +471,21 @@ export function PrinterCard({
           </span>
         )}
         <div style={{ flex: 1 }} />
-        <button
-          type="button"
-          className="fleet-card__menu-btn"
-          aria-label={`Actions for ${printer.name}`}
-          aria-expanded={menuOpen}
-          onClick={onMenuToggle}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="5" cy="12" r="2" />
-            <circle cx="12" cy="12" r="2" />
-            <circle cx="19" cy="12" r="2" />
-          </svg>
-        </button>
+        <Menu
+          label={`Actions for ${printer.name}`}
+          open={menuOpen}
+          onOpenChange={(o) => o !== menuOpen && onMenuToggle()}
+          items={menuItems}
+          trigger={(t) => (
+            <button {...t} type="button" className="fleet-card__menu-btn" aria-label={`Actions for ${printer.name}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+          )}
+        />
       </div>
 
       {/* Row 2: status + thumbnail */}
@@ -510,42 +522,6 @@ export function PrinterCard({
         </div>
       )}
 
-      {/* Card menu dropdown */}
-      {menuOpen && (
-        <div
-          className="fleet-card__dropdown"
-          role="group"
-          aria-label={`Actions for ${printer.name}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="fleet-card__dropdown-item"
-            onClick={onOpenPage}
-          >
-            Open printer page
-          </button>
-          {canLoad && (
-            <button type="button" className="fleet-card__dropdown-item" onClick={onLoadSpool}>
-              Load spool…
-            </button>
-          )}
-          {printer.primary_url && (
-            <button
-              type="button"
-              className="fleet-card__dropdown-item"
-              onClick={() => {
-                window.open(ensureProtocol(printer.primary_url!), "_blank", "noopener,noreferrer");
-              }}
-            >
-              Open native UI
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true" style={{ verticalAlign: "-2px", marginLeft: 6 }}>
-                <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
-              </svg>
-            </button>
-          )}
-        </div>
-      )}
     </article>
   );
 }

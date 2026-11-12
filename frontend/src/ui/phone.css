@@ -809,3 +809,7 @@
   /* Service: an empty "Due work" box is not worth a screen of chrome on phone. */
   .shell .svc-sec[aria-label="Due work"]:has(.svc-empty) { display: none; }
 }
+@media (max-width: 759px) {
+  /* Settings is a grid (doc 06 §10): its screen-reader-only header takes no row. */
+  .shell .set-page > .page-header { display: contents; }
+}

@@ -1,5 +1,5 @@
 /* Tools — calibration (5.4). Reference: docs/ui-ref/Tools.dc.html. */
-.tl { display: flex; flex-direction: column; gap: var(--fw-space-4); min-width: 0; max-width: 960px; }
+.tl { display: flex; flex-direction: column; gap: var(--fw-space-4); min-width: 0; }
 .tl-head { display: flex; flex-direction: column; gap: var(--fw-space-3); border-bottom: var(--fw-border-width) solid var(--fw-border); }
 .tl-title { margin: 0; font-size: 32px; line-height: 1.15; letter-spacing: -0.025em; }
 .tl-tabs { display: flex; flex-wrap: wrap; margin-bottom: -1px; }
@@ -11,7 +11,15 @@
   background: var(--fw-background); border-color: var(--fw-border); border-bottom-color: var(--fw-background); font-weight: bold;
 }
 
-.tl-cal { display: flex; flex-direction: column; gap: var(--fw-space-4); }
+/* Calibration steps reflow into 460 px columns (doc 06 §10); the mode cards,
+   notes, swatches and export cards span the row. */
+.tl-cal {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  gap: var(--fw-space-4);
+  align-items: start;
+}
+.tl-cal > :not(.tl-sec) { grid-column: 1 / -1; }
 .tl-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 @media (max-width: 640px) { .tl-modes { grid-template-columns: 1fr; } }
 .tl-mode {
@@ -125,7 +133,7 @@
 .ex-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--fw-space-3); }
 .ex-card { gap: var(--fw-space-2); }
 .ex-grow { flex: 1; }
-.ex-list { max-height: 420px; overflow-y: auto; }
+.ex-list { max-height: 60vh; overflow-y: auto; }
 .ex-check { min-height: 32px; flex: 1 1 260px; }
 .ex-note { flex-basis: 100%; }
 .ex-dot {

@@ -4,6 +4,7 @@ import "./design/tokens.css";
 import "./theme/theme.css";
 import "./ui/ui.css";
 import "./ui/phone.css";
+import "./ui/layout.css";
 import App from "./App";
 import { initUserTheme } from "./theme/userTheme";
 

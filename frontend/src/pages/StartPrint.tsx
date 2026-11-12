@@ -125,7 +125,7 @@ export default function StartPrint() {
           )}
           {rows == null && !error && <p className="sp-note">Loading…</p>}
           {rows && shown.length === 0 && <p className="sp-note">{q ? "No match in this folder." : "No printable files here."}</p>}
-          <ul className="sp-list" role="list">
+          <ul className="sp-list page-fill" role="list">
             {shown.map((e) => (
               <li key={e.id}>
                 <button type="button" className="sp-row" onClick={() => (e.kind === "folder" ? setPath(e.path) : setFile(e))}>
@@ -155,7 +155,7 @@ export default function StartPrint() {
             <>
               {compat == null && !error && <p className="sp-note">Checking printers…</p>}
               {compat && compat.length === 0 && <p className="sp-note">No printers configured.</p>}
-              <ul className="sp-list" role="list">
+              <ul className="sp-list page-fill" role="list">
                 {(compat ?? []).map((c) => {
                   const can = c.verdict === "ready" || c.verdict === "plate";
                   return (

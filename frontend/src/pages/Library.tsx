@@ -23,7 +23,7 @@ import {
 } from "../api/library";
 import { isManualSwaps, kindLabel } from "../api/projects";
 import { EdgePanel, HeaderActions, HeaderSearch, OverflowMenu } from "../ui";
-import { usePhone } from "../hooks/useMediaQuery";
+import { OVERLAY_INSPECTOR_QUERY, usePhone } from "../hooks/useMediaQuery";
 import "./Library.css";
 
 /** Library page — one browser for the Library and each Klipper printer's G-code storage. */
@@ -948,6 +948,38 @@ export default function Library() {
             )}
             <input ref={fileInput} type="file" multiple hidden onChange={(e) => void onUpload(e.target.files)} />
           </div>
+          {/* Desktop: one toolbar (doc 06 §12). While something is picked, the
+              buttons above act on it and the count + Select all / Clear sit here. */}
+          {!phone && pickN > 0 && (
+            <div className="fw-browser-actions fw-browser-pick" role="group" aria-label="Selection">
+              <span className="fw-browser-pick__n" role="status">
+                {pickN} selected{pickElsewhere ? ` in ${[...new Set(pickedList.map((i) => whereLabel(i.where)))].join(", ")}` : ""}
+              </span>
+              {pickElsewhere && !isTrash && (
+                <>
+                  <button type="button" className="fb-button fb-primary" disabled={hereOff} onClick={() => pickedHere("copy")}>
+                    Copy {pickN} here
+                  </button>
+                  <button type="button" className="fb-button" disabled={hereOff} onClick={() => pickedHere("cut")}>
+                    Move here
+                  </button>
+                </>
+              )}
+              <button type="button" className="fb-button" onClick={selectAll}>
+                Select all
+              </button>
+              <button
+                type="button"
+                className="fb-button"
+                onClick={() => {
+                  setPicked(new Map());
+                  setBulkArm(false);
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
         </div>
 
         {phone && (
@@ -993,7 +1025,8 @@ export default function Library() {
         </nav>
         )}
 
-        {pickN > 0 && (
+        {/* Phone: no toolbar is visible, so selection actions are a bottom bar. */}
+        {phone && pickN > 0 && (
           <div className="fw-browser-banner">
             <span>{pickText}</span>
             {pickElsewhere && !isTrash && (
@@ -1253,7 +1286,7 @@ export default function Library() {
           </div>
 
           {sel && (
-            <EdgePanel side="right" label="File details" open onOpenChange={(o) => !o && setSelKey(null)}>
+            <EdgePanel side="right" label="File details" open onOpenChange={(o) => !o && setSelKey(null)} overlayQuery={OVERLAY_INSPECTOR_QUERY}>
             <aside className="fw-file-inspector" aria-label="File inspector">
               {!sel.isDir && (
                 <div>

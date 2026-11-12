@@ -3,7 +3,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--fw-space-2);
-  max-width: 640px;
 }
 .sp-list {
   list-style: none;

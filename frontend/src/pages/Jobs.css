@@ -69,7 +69,8 @@
 .jobs-tab:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -3px; }
 
 .jobs-main {
-  padding: var(--fw-space-4) 0 var(--fw-space-12);
+  /* No bottom padding: the content region reaches the bottom (doc 06 §9). */
+  padding: var(--fw-space-4) 0 0;
   display: flex;
   flex-direction: column;
   gap: var(--fw-space-4);
@@ -84,18 +85,21 @@
 
 .jobs-err { margin: 0; color: var(--fw-danger); font-size: 13px; }
 
-.jobs-board { overflow-x: auto; padding-bottom: var(--fw-space-2); }
+.jobs-board { overflow-x: auto; }
 
 .jobs-lanes {
   display: flex;
+  flex: 1 1 auto;
   gap: var(--fw-space-3);
-  align-items: flex-start;
+  /* Lanes reach the bottom of the page (doc 06 §9). */
+  align-items: stretch;
   min-width: max-content;
 }
 
 .jobs-lane {
-  width: 272px;
-  flex: none;
+  /* Lanes share the width (doc 06 §10); 272 px is the narrowest that fits a card. */
+  flex: 1 1 272px;
+  min-width: 272px;
   background: var(--fw-surface);
   border: var(--fw-border-width) solid var(--fw-border);
   display: flex;
@@ -232,43 +236,11 @@
 .jobs-card__tag { align-self: flex-start; }
 .jobs-card__tag .ui-status-chip { font-size: 11px; padding: 2px 6px; }
 
-.jobs-menu {
-  position: absolute;
-  top: 44px;
-  right: var(--fw-space-2);
-  z-index: 6;
-  width: 220px;
-  background: var(--fw-raised);
-  border: var(--fw-border-width) solid var(--fw-muted);
-  box-shadow: var(--fw-shadow-overlay);
-  display: flex;
-  flex-direction: column;
-  padding: var(--fw-space-1) 0;
-}
-.jobs-menu button {
-  min-height: var(--fw-control-h-md);
-  padding: 0 var(--fw-space-3);
-  text-align: left;
-  background: none;
-  border: 0;
-  color: var(--fw-text);
-  cursor: pointer;
-  font-size: 13px;
-}
-.jobs-menu button:hover { background: var(--fw-button-hover); }
-.jobs-menu button:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
-.jobs-menu .jobs-menu__sub { min-height: var(--fw-control-h-sm); padding-left: var(--fw-space-5); }
-.jobs-menu .jobs-menu__danger { border-top: var(--fw-border-width) solid var(--fw-border); color: var(--fw-danger); }
-.jobs-menu__label {
-  padding: 6px var(--fw-space-3) 2px;
-  font: 11px var(--fw-mono);
-  color: var(--fw-muted);
-}
-
 /* ── History + Stats (docs/ui-ref/Jobs.dc.html lines 105–209) ─────────────── */
 
-.jh-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--fw-space-4); min-width: 0; }
-.jh-main { flex: 1 1 520px; }
+.jh-layout { display: flex; align-items: stretch; gap: var(--fw-space-4); min-width: 0; }
+.jh-main { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; }
+.jh-main > .jh-table-wrap { flex: 1 1 auto; }
 
 .jh-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
@@ -373,8 +345,8 @@
 
 /* Inspector */
 .jh-insp {
-  flex: 1 1 340px;
-  max-width: 440px;
+  flex: 0 0 400px;
+  align-self: flex-start;
   box-sizing: border-box;
   background: var(--fw-surface);
   border: var(--fw-border-width) solid var(--fw-border);

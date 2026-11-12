@@ -3,7 +3,7 @@
  *
  * Desktop: renders its children exactly as before (the existing sidebar or
  * inspector, no wrapper), so desktop layout does not change.
- * Phone (below 760 px): the children move into an overlay panel on the left or
+ * Below `overlayQuery` (phone, or 1200 px for inspectors): the children move into an overlay panel on the left or
  * right edge with a visible grab tab, vertically centred, with a chevron.
  *  - Left = navigation within the page; right = details for the selection.
  *  - Tap or drag the tab to open; drag it back, tap the backdrop or press
@@ -13,7 +13,7 @@
  *  - The grip is 20 × 64 px; the button around it is 44 × 64 px (tap target).
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { usePhone } from "../hooks/useMediaQuery";
+import { PHONE_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 
 interface Props {
   side: "left" | "right";
@@ -26,6 +26,9 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
   /** Show the tab at all (e.g. only while something is selected). Default true. */
   available?: boolean;
+  /** Media query below which this is an overlay panel. Default: the phone
+   *  breakpoint. Inspectors pass OVERLAY_INSPECTOR_QUERY (side by side from 1200 px). */
+  overlayQuery?: string;
   /** Render the children on desktop too (default). False = phone-only panel. */
   desktop?: boolean;
   /** Close when a section, link or `[data-panel-close]` inside is chosen.
@@ -56,11 +59,12 @@ export default function EdgePanel({
   onOpenChange,
   available = true,
   desktop = true,
+  overlayQuery = PHONE_QUERY,
   closeOnSelect,
   children,
 }: Props) {
   const closes = closeOnSelect ?? side === "left";
-  const phone = usePhone();
+  const phone = useMediaQuery(overlayQuery);
   const controlled = openProp !== undefined;
   const [openState, setOpenState] = useState(() => readStored(storageKey));
   const open = controlled ? !!openProp : openState;
