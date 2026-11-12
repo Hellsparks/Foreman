@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { setupApi } from "../api/setup";
 import Rail from "./Rail";
-import TopBar from "./TopBar";
+import TopBar, { IS_TAURI } from "./TopBar";
+import DesktopNotices from "../desktop/DesktopNotices";
 import Inspector from "./Inspector";
 import PhoneNav from "./PhoneNav";
 import { useEventStream } from "../hooks/useEventStream";
@@ -98,6 +99,7 @@ export default function Shell() {
 
       <div className="shell__body">
         <TopBar connectionState={connectionState} />
+        {IS_TAURI && <DesktopNotices />}
 
         <div className="shell__content">
           <main className="shell__work" id="main-content">

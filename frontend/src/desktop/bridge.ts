@@ -54,6 +54,30 @@ export interface LocalStarted {
   setup_code: string | null;
 }
 
+export interface DesktopPrefs {
+  /** Effective "keep running in the background". */
+  keep_running: boolean;
+  /** The stored choice; null = default (on while the built-in server is in use). */
+  keep_running_choice: boolean | null;
+  autostart: boolean;
+  local_in_use: boolean;
+  tray_available: boolean;
+}
+
+export interface AppInfo {
+  version: string;
+  commit: string;
+  app_data_dir: string;
+  server_data_dir: string;
+}
+
+export interface UpdateInfo {
+  version: string;
+  current_version: string;
+  notes: string | null;
+  date: string | null;
+}
+
 export const desktop = {
   loadStore: () => invoke<DesktopStore>("store_load"),
   saveStore: (doc: DesktopStore) => invoke<void>("store_save", { doc }),
@@ -64,4 +88,12 @@ export const desktop = {
   localConfig: () => invoke<LocalConfig>("local_server_config"),
   startLocal: () => invoke<LocalStarted>("start_local_server"),
   localToken: () => invoke<string>("local_token"),
+  prefs: () => invoke<DesktopPrefs>("desktop_prefs"),
+  setKeepRunning: (on: boolean) => invoke<DesktopPrefs>("set_keep_running", { on }),
+  setAutostart: (on: boolean) => invoke<DesktopPrefs>("set_autostart", { on }),
+  appInfo: () => invoke<AppInfo>("app_info"),
+  /** Asks GitHub Releases; null when this is the newest version. */
+  updateCheck: () => invoke<UpdateInfo | null>("update_check"),
+  /** Downloads, stops the built-in server, installs and restarts the app. */
+  updateInstall: () => invoke<void>("update_install"),
 };

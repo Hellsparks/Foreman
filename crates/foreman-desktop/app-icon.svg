@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Foreman mark: an "F" built from three printed layers on an ink tile. -->
+  <rect x="32" y="32" width="960" height="960" rx="208" fill="#1C2119"/>
+  <rect x="304" y="232" width="128" height="560" rx="24" fill="#DA4B27"/>
+  <rect x="304" y="232" width="448" height="128" rx="24" fill="#DA4B27"/>
+  <rect x="304" y="448" width="336" height="112" rx="24" fill="#DA4B27"/>
+  <rect x="304" y="712" width="128" height="80" rx="24" fill="#F57951"/>
+</svg>

@@ -24,6 +24,23 @@
   },
   "bundle": {
     "active": false,
-    "icon": []
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NzZBMTc4QjI3MzRCNDgKUldSSVMzT3llS0YyU01MbUhqc1dSTThvVVQ4L0FaRjNBTlZGSFBVMHNPQjNSVlhZWjAvRmRXb1EK",
+      "endpoints": [
+        "https://github.com/Hellsparks/Foreman/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

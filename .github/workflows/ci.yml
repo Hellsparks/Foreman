@@ -22,10 +22,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # No apt step: clippy and test exclude foreman-desktop (the only crate that
-      # links WebKitGTK), and the runner image already ships libssl-dev +
-      # pkg-config for openssl-sys. Add a Tauri step back only when the desktop
-      # crate is built in CI.
+      # foreman-desktop (Tauri) links WebKitGTK + the tray's appindicator on Linux.
+      # Windows needs nothing extra. Retries ride out flaky Ubuntu mirrors.
+      - name: Install Tauri system libraries (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 &&
+               sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+                 libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev; then
+              exit 0
+            fi
+            echo "apt attempt $attempt failed; retrying in 20s"
+            sleep 20
+          done
+          exit 1
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -38,10 +52,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: clippy
-        run: cargo clippy --workspace --exclude foreman-desktop -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: test
-        run: cargo test --workspace --exclude foreman-desktop
+        run: cargo test --workspace
 
       # 0.4 — Type-gen drift check (Linux only; Windows has the same Rust output)
       - name: type-gen drift check
