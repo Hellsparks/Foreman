@@ -335,6 +335,15 @@ pub async fn revoke_api_key(pool: &SqlitePool, id: i64) -> Result<(), AppError> 
     Ok(())
 }
 
+/// Name of an active key (for audit lines); `None` once revoked.
+pub async fn api_key_name(pool: &SqlitePool, id: i64) -> Result<Option<String>, AppError> {
+    sqlx::query_scalar("SELECT name FROM api_key WHERE id = ? AND revoked_at IS NULL")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .map_err(db_err)
+}
+
 /// The id of the active key matching `key`, marking it used.
 pub async fn check_api_key(pool: &SqlitePool, key: &str) -> Result<Option<i64>, AppError> {
     let id: Option<i64> =

@@ -24,6 +24,9 @@ mod job_engine;
 mod maintenance;
 #[cfg(test)]
 mod maintenance_tests;
+mod mcp;
+#[cfg(test)]
+mod mcp_tests;
 mod net;
 mod projects;
 #[cfg(test)]
@@ -50,7 +53,7 @@ use axum::{
     extract::DefaultBodyLimit,
     middleware,
     routing::{delete, get, get_service, patch, post, put},
-    Router,
+    Extension, Router,
 };
 use foreman_core::{db::ForemanDb, events::ServerEvent, repo};
 use spoolman_rs::{
@@ -723,6 +726,38 @@ fn build_router(app_state: AppState) -> Router {
         get_service(ServeDir::new(&frontend_dist))
     };
 
+    // MCP tools call the same routes in-process, as the calling key (no auth layer).
+    let mcp_svc = mcp::McpService::new(api_routes().with_state(app_state.clone()));
+
+    api_routes()
+        .route(
+            mcp::PATH,
+            post(mcp::handle)
+                .get(mcp::method_not_allowed)
+                .delete(mcp::method_not_allowed),
+        )
+        .layer(Extension(mcp_svc))
+        .fallback_service(static_service)
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth::require_auth,
+        ))
+        .with_state(app_state)
+        .layer(
+            // URIs may carry scoped `?token=`s; never log them.
+            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
+                tracing::debug_span!(
+                    "request",
+                    method = %req.method(),
+                    uri = %auth::redact_token(&req.uri().to_string()),
+                )
+            }),
+        )
+        .layer(CorsLayer::permissive())
+}
+
+/// Every `/api`, `/ws` and `/theme` route (no auth layer, no static files).
+fn api_routes() -> Router<AppState> {
     Router::new()
         .route("/api/health", get(api::health::health))
         // Auth
@@ -1172,23 +1207,9 @@ fn build_router(app_state: AppState) -> Router {
         // Theme assets (public: not under /api): user fonts + unsupported custom.css.
         .route("/theme/custom.css", get(theme_files::custom_css))
         .route("/theme/fonts/{name}", get(theme_files::font))
-        .fallback_service(static_service)
-        .layer(middleware::from_fn_with_state(
-            app_state.clone(),
-            auth::require_auth,
-        ))
-        .with_state(app_state)
-        .layer(
-            // URIs may carry scoped `?token=`s; never log them.
-            TraceLayer::new_for_http().make_span_with(|req: &axum::http::Request<_>| {
-                tracing::debug_span!(
-                    "request",
-                    method = %req.method(),
-                    uri = %auth::redact_token(&req.uri().to_string()),
-                )
-            }),
-        )
-        .layer(CorsLayer::permissive())
+        // MCP access per API key (6.5)
+        .route("/api/settings/mcp", get(api::mcp::get))
+        .route("/api/settings/mcp/keys/{id}", put(api::mcp::put_key))
 }
 
 /// Waits for Ctrl+C (all platforms) or SIGTERM (Unix).

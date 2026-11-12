@@ -4,6 +4,7 @@ pub mod calibration;
 pub mod job;
 pub mod macro_favourite;
 pub mod maintenance;
+pub mod mcp_policy;
 pub mod printer;
 pub mod printer_path;
 pub mod printer_ssh;

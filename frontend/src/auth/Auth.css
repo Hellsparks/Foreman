@@ -440,3 +440,62 @@
   z-index: 1000;
   overflow: auto;
 }
+
+/* Settings → Security → MCP */
+.mcp__label { color: var(--fw-muted); }
+.mcp__url {
+  font-size: var(--fw-type-ui);
+  flex: 1 1 240px;
+  min-width: 0;
+  word-break: break-all;
+  user-select: all;
+}
+.mcp__select { width: auto; max-width: 100%; flex: 0 1 auto; }
+.mcp__snippet {
+  margin-top: 2px;
+  padding: var(--fw-space-3) var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-border);
+  background: var(--fw-raised);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-2);
+  min-width: 0;
+}
+.mcp__snippet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fw-space-2);
+}
+.mcp__snippet pre {
+  margin: 0;
+  font-size: var(--fw-type-label);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}
+.mcp__panel {
+  padding: var(--fw-space-3) var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-border);
+  border-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+}
+.mcp__rate {
+  display: flex;
+  align-items: center;
+  gap: var(--fw-space-2);
+}
+.mcp__rate .auth__input { width: 96px; }
+.mcp__group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-2);
+}
+.mcp__group legend { padding: 0; margin-bottom: var(--fw-space-2); }
+.mcp__tool--off { opacity: 0.5; }
