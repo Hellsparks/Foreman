@@ -22,6 +22,8 @@ import {
   type TransferInfo,
 } from "../api/library";
 import { isManualSwaps, kindLabel } from "../api/projects";
+import { OverflowMenu } from "../ui";
+import { usePhone } from "../hooks/useMediaQuery";
 import "./Library.css";
 
 /** Library page — one browser for the Library and each Klipper printer's G-code storage. */
@@ -216,6 +218,7 @@ const SFTP_POLL_MS = 15_000;
 // ── page ───────────────────────────────────────────────────────────────────
 
 export default function Library() {
+  const phone = usePhone();
   const { statuses } = useOutletContext<ShellContext>();
   const [trail, setTrail] = useState<Where[]>([ROOT]);
   const [cursor, setCursor] = useState(0);
@@ -890,6 +893,24 @@ export default function Library() {
             <input type="search" placeholder="Search this folder…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
           <div className="fw-browser-actions" role="group" aria-label="File actions">
+            {phone ? (
+              <>
+                <button type="button" className="fb-button fb-primary" onClick={() => fileInput.current?.click()} disabled={isTrash}>
+                  Upload
+                </button>
+                <OverflowMenu
+                  label="File actions"
+                  items={[
+                    { label: "Copy", onSelect: () => clipItems(curPick(), "copy"), disabled: !curN || isTrash },
+                    { label: "Cut", onSelect: () => clipItems(curPick(), "cut"), disabled: !curN || isTrash },
+                    { label: bulkDelLabel, onSelect: bulkDel, disabled: !curN, danger: !!curN && !isTrash },
+                    { label: pasteLabel, onSelect: paste, disabled: !clip || isTrash },
+                    { label: "+ Folder", onSelect: () => { setCreating(!creating); setFname(""); setFerr(""); }, disabled: isTrash },
+                  ]}
+                />
+              </>
+            ) : (
+              <>
             <button type="button" className="fb-button" onClick={() => clipItems(curPick(), "copy")} disabled={!curN || isTrash}>
               Copy
             </button>
@@ -923,6 +944,8 @@ export default function Library() {
             <button type="button" className="fb-button fb-primary" onClick={() => fileInput.current?.click()} disabled={isTrash}>
               Upload
             </button>
+              </>
+            )}
             <input ref={fileInput} type="file" multiple hidden onChange={(e) => void onUpload(e.target.files)} />
           </div>
         </div>

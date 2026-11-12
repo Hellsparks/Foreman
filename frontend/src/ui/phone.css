@@ -1,0 +1,261 @@
+/* Phone density (34c). Everything here is inside the phone media query, so
+   desktop is untouched. Spacing, type and small-control sizes come from the
+   token override at the bottom of theme/theme.css; this file only holds what
+   a token cannot do: dropping desktop min-widths, tables as cards, truncation,
+   the "⋯" sheet. Selectors start with .shell (one class more than the page
+   CSS, which loads later) so they win without !important.
+   Keep the breakpoint in sync with hooks/useMediaQuery.ts. */
+
+/* Visually hidden (also used by the short status chip). */
+.ui-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.ui-status-chip__short,
+.ui-overflow-btn {
+  display: none;
+}
+
+.ui-overflow-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--fw-space-4);
+  border: 0;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+  background: transparent;
+  color: var(--fw-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-overflow-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ui-overflow-item--danger { color: var(--fw-danger); }
+.ui-overflow-item:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+
+@media (max-width: 759px) {
+  /* ── Buttons: width is content + padding ─────────────────────────────── */
+  .shell .ui-btn,
+  .shell .ui-btn--small,
+  .shell .fleet__add-btn,
+  .shell .fleet__attention-toggle,
+  .shell .fil-btn--add {
+    min-width: 0;
+  }
+  .shell .ui-btn { padding: 0 var(--fw-space-3); }
+
+  .ui-overflow-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    border: var(--fw-border-width) solid var(--fw-muted);
+    border-radius: var(--fw-radius);
+    background: transparent;
+    color: var(--fw-text);
+    cursor: pointer;
+  }
+  .ui-overflow-btn:hover { background: var(--fw-surface); }
+  .ui-overflow-btn:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+
+  /* Attention actions: no fixed grid; content width, one row. */
+  .shell .fleet__attn-actions {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: center;
+    gap: var(--fw-space-2);
+  }
+  .shell .fleet__attn-btn {
+    width: auto;
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-3);
+  }
+  .shell .fleet__attn-row { align-items: flex-start; gap: var(--fw-space-2) var(--fw-space-3); padding: var(--fw-space-2) var(--fw-space-3); }
+  .shell .fleet__attn-text { flex: 1 1 0; }
+  .shell .fleet__attn-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Printer cards ───────────────────────────────────────────────────── */
+  .shell .fleet-card { min-height: 0; gap: var(--fw-space-2); padding: var(--fw-space-3); }
+  .shell .fleet-card__cam { width: 88px; height: 56px; }
+
+  /* ── Status chips ────────────────────────────────────────────────────── */
+  .shell .ui-status-chip {
+    font-size: 11px;
+    padding: 1px var(--fw-space-2);
+    line-height: 1.4;
+  }
+  .ui-status-chip__long { display: none; }
+  .ui-status-chip__short { display: inline; }
+
+  /* ── Text: names truncate, never wrap mid-word ───────────────────────── */
+  .shell .fil-row-btn b,
+  .shell .fil-row-btn .fil-sub,
+  .shell .jh-file__btn,
+  .shell .fleet-card__job {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shell .jh-file { min-width: 0; gap: var(--fw-space-2); }
+  .shell .jh-file__btn { flex: 1; text-align: left; }
+  .shell .fil-row-btn br { display: none; }
+  .shell .fil-row-btn { min-height: var(--fw-control-h); width: 100%; min-width: 0; }
+  .shell .fil-row-btn > span:last-child { flex: 1; min-width: 0; }
+
+  /* ── Tables become stacked cards ─────────────────────────────────────── */
+  .shell .ph-table,
+  .shell .ph-table tbody,
+  .shell .ph-table tr,
+  .shell .ph-table td {
+    display: block;
+  }
+  .shell .ph-table { min-width: 0; width: 100%; }
+  .shell .ph-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .shell .ph-table tr {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--fw-space-3);
+    padding: var(--fw-space-1) var(--fw-space-3);
+    min-height: var(--fw-control-h);
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+  }
+  /* Two columns: name block left, the two values that matter stacked right. */
+  .shell .ph-grid tr,
+  .shell .ph-hist tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .shell .ph-grid td:first-child { grid-column: 1; grid-row: 1 / span 2; }
+  .shell .ph-grid td:not(:first-child) { grid-column: 2; text-align: right; line-height: 1.25; }
+  .shell .ph-grid td[colspan] { grid-column: 1 / -1; grid-row: auto; text-align: left; }
+  /* The remaining-filament bar becomes a hairline along the card's bottom edge. */
+  .shell .ph-grid .fil-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    border: 0;
+  }
+  .shell .ph-grid .fil-left { margin: 0; }
+  /* History: name over printer on the left, outcome over date on the right. */
+  .shell .ph-hist td:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .shell .ph-hist td:nth-child(2) { grid-column: 1; grid-row: 2; color: var(--fw-muted); }
+  .shell .ph-hist td:nth-child(3) { grid-column: 2; grid-row: 2; text-align: right; }
+  .shell .ph-hist td:nth-child(6) { grid-column: 2; grid-row: 1; text-align: right; }
+  .shell .ph-hist td[colspan] { grid-column: 1 / -1; grid-row: auto; }
+  .shell .ph-table tr:last-child { border-bottom: 0; }
+  .shell .ph-table td {
+    flex: 0 1 auto;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    font-size: 12px;
+    text-align: left;
+  }
+  .shell .ph-table td:first-child { flex: 1 1 100%; font-size: var(--fw-font-size); }
+  .shell .ph-table td:has(> .fil-bar) { flex: 1 1 96px; }
+  .shell .ph-table td[colspan] { flex: 1 1 100%; padding: var(--fw-space-3); }
+  .shell .ph-table .ph-hide { display: none; }
+  .shell .ph-table td:not(:first-child) br,
+  .shell .ph-table td:not(:first-child) .fil-sub { display: none; }
+  .shell .ph-table td.jh-num,
+  .shell .ph-table td.jh-nowrap { white-space: nowrap; }
+  .shell .ph-table td[data-label]::before {
+    content: attr(data-label) " ";
+    color: var(--fw-muted);
+  }
+  .shell .ph-inv td[data-label] { display: flex; align-items: center; gap: var(--fw-space-1); }
+
+  /* Rows: the card is the tap target (44 px), so no extra padding or button height. */
+  .shell .ph-table tr { padding-top: 0; padding-bottom: 0; }
+  .shell .ph-grid .fil-row-btn,
+  .shell .ph-hist .jh-file__btn { min-height: var(--fw-control-h); padding: 0; }
+  .shell .ph-table .fil-row-btn { line-height: 1.25; }
+
+  /* ── Tab bars: one scrolling row, not a wrapped block ────────────────── */
+  .shell .fil-tabs,
+  .shell .tl-tabs,
+  .shell .jobs-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .shell .fil-tab,
+  .shell .tl-tab,
+  .shell .jobs-tab {
+    flex: none;
+    padding: 0 var(--fw-space-4);
+  }
+
+  /* ── Page rhythm ─────────────────────────────────────────────────────── */
+  .shell .fil-main { padding: var(--fw-space-4) 0 var(--fw-space-4); gap: var(--fw-space-3); }
+  .shell .fil-filters { gap: var(--fw-space-1) var(--fw-space-2); }
+  .shell .fil-filters .fil-input { flex-basis: 140px; }
+
+  /* ── Tools list rows: name left, meta right, one line where it fits ──── */
+  .shell .tl-list__row {
+    gap: 0 var(--fw-space-2);
+    padding: var(--fw-space-1) var(--fw-space-3);
+    min-height: 40px;
+  }
+  .shell .tl-list__row > span:not([class]) {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shell .tl-list__row > .tl-small { flex: 0 1 auto; }
+  .shell .tl-list__row > .ex-check { flex: 1 1 100%; min-height: 36px; }
+  .shell .tl-sec { padding: var(--fw-space-3) var(--fw-space-4); gap: var(--fw-space-2); }
+  .shell .tl { gap: var(--fw-space-3); }
+
+  /* ── Printer Config ──────────────────────────────────────────────────── */
+  .shell .printer-config { gap: var(--fw-space-3); padding-bottom: var(--fw-space-4); }
+  .shell .printer-config__bar { padding: var(--fw-space-2) 0; }
+  .shell .printer-config__cols > * { margin-bottom: var(--fw-space-3); }
+  /* These sections carry inline styles (Printer.tsx), so !important is the only way in. */
+  .shell .printer-config__cols > section { padding: var(--fw-space-3) var(--fw-space-4) !important; gap: var(--fw-space-2) !important; }
+  .shell .printer-config__cols > section > h2 { font-size: 16px !important; }
+  .shell .pf-ssh { padding: var(--fw-space-3) var(--fw-space-4); gap: var(--fw-space-2); }
+  .shell .pf-ssh h2,
+  .shell .tl-h2 { font-size: 16px; }
+  .shell .pf-ssh__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Mono strings (keys, hashes, IPs) may break anywhere; names never do. */
+  .shell .pf-ssh__key {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* The page title is already in the header bar; the eyebrow repeats it. */
+  .shell .page-header__eyebrow { display: none; }
+  .shell .page-header { margin-bottom: var(--fw-space-3); }
+
+  /* Stat tiles two-up; tiles are glanceable, not tap targets. */
+  .shell .jh-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fw-space-2); }
+  .shell .jh-kpis > * { padding: var(--fw-space-2) var(--fw-space-3); }
+}

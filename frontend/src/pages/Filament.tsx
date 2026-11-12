@@ -264,13 +264,13 @@ export default function Filament() {
             </div>
             <div className="fil-count">{shown.length} shown</div>
             <div className="fil-table-wrap">
-              <table className="fil-table">
+              <table className="fil-table ph-table ph-grid">
                 <thead>
                   <tr>
                     <th>Spool</th>
                     <th>Material</th>
                     <th style={{ width: 220 }}>Left</th>
-                    <th>Where</th>
+                    <th className="ph-hide">Where</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -328,7 +328,7 @@ export default function Filament() {
                             {isLow ? " · low" : ""}
                           </div>
                         </td>
-                        <td>{whereLabel(s, r.loaded)}</td>
+                        <td className="ph-hide">{whereLabel(s, r.loaded)}</td>
                       </tr>
                     );
                   })}
@@ -468,15 +468,15 @@ function FilamentsTab({
         {rows.length === total ? `${total} filaments` : `${rows.length} of ${total} filaments`}
       </div>
       <div className="fil-table-wrap">
-        <table className="fil-table">
+        <table className="fil-table ph-table ph-grid">
           <thead>
             <tr>
               <th>Filament</th>
               <th>Material</th>
-              <th>Nozzle / bed</th>
-              <th>TD</th>
+              <th className="ph-hide">Nozzle / bed</th>
+              <th className="ph-hide">TD</th>
               <th>Stock</th>
-              <th>Extras</th>
+              <th className="ph-hide">Extras</th>
             </tr>
           </thead>
           <tbody>
@@ -507,15 +507,15 @@ function FilamentsTab({
                     {f.colours.length > 1 ? ` · ${f.colours.length} colours` : ""}
                   </span>
                 </td>
-                <td className="fil-mono">
+                <td className="fil-mono ph-hide">
                   {f.extruder_temp ?? "—"} / {f.bed_temp ?? "—"} °C
                 </td>
-                <td className="fil-mono">{f.hue_td ?? "—"}</td>
+                <td className="fil-mono ph-hide">{f.hue_td ?? "—"}</td>
                 <td>
                   {f.spool_count} spool{f.spool_count === 1 ? "" : "s"}
                   {f.spool_count > 0 ? ` · ${Math.round(f.grams_left)} g` : ""}
                 </td>
-                <td className="fil-sub">
+                <td className="fil-sub ph-hide">
                   <span className="fil-extras">
                     {f.abrasive && <span className="fil-abrasive">⚠ abrasive</span>}
                     {f.url && (
@@ -567,13 +567,13 @@ function VendorsTab({
         </button>
       </div>
       <div className="fil-table-wrap">
-        <table className="fil-table">
+        <table className="fil-table ph-table ph-grid">
           <thead>
             <tr>
               <th>Vendor</th>
-              <th>Empty spool</th>
+              <th className="ph-hide">Empty spool</th>
               <th>Filaments</th>
-              <th>Website</th>
+              <th className="ph-hide">Website</th>
             </tr>
           </thead>
           <tbody>
@@ -599,9 +599,9 @@ function VendorsTab({
                     </span>
                   </button>
                 </td>
-                <td className="fil-mono">{v.empty_spool_weight != null ? `${v.empty_spool_weight} g` : "—"}</td>
+                <td className="fil-mono ph-hide">{v.empty_spool_weight != null ? `${v.empty_spool_weight} g` : "—"}</td>
                 <td>{v.filament_count}</td>
-                <td className="fil-sub">{v.website ? <ExternalLink href={v.website} label={`${v.name} website`} /> : "—"}</td>
+                <td className="fil-sub ph-hide">{v.website ? <ExternalLink href={v.website} label={`${v.name} website`} /> : "—"}</td>
               </tr>
             ))}
             {rows.length === 0 && (

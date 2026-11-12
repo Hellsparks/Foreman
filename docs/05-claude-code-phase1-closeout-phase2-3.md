@@ -283,6 +283,14 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
 
+### Session 34c — 2026-11-12 (phone density)
+
+- **Tokens first:** `theme/theme.css` has a `@media (max-width: 759px)` block: `--fw-space-1..6` → 3/6/10/12/16/18, `--fw-font-size` 13, `--fw-line-height` 1.35. `--fw-control-h` (44), `-md` (40) and **`-sm` (36) are unchanged**: the brief asked for a smaller `-sm`, but that put small taps at 32 px, which conflicts with "keep tap targets". A user theme still overrides these (higher specificity), so compact-rounded keeps its own spacing and gains less from the token step.
+- **`ui/phone.css`** (phone-only, selectors start with `.shell`): button min-widths dropped (120/96 px) and the 148 px Attention grid replaced by content-width buttons; status chips 11 px; names truncate with an ellipsis (mono strings such as the SSH key wrap anywhere); tab bars (Filament, Tools, Jobs) are one scrolling row; History, Spools, Filaments, Vendors and Inventory tables are stacked cards (`.ph-table` + `.ph-hide` on the columns that do not matter; header kept for screen readers); Tools list rows one line; Jobs stats tiles two-up; Config sections tighter (inline styles there need `!important`).
+- **Overflow:** new `ui/OverflowMenu` ("⋯" button + the phone bottom sheet). Fleet Attention shows one primary and at most one secondary; the rest go in the sheet. Library: Upload stays, Copy / Cut / Delete / Paste / + Folder move into the sheet. `StatusChip` takes an optional `short` ("▶ 63%" on a printing Fleet card; full word kept for screen readers). There are no Copy / Star / Download / Rename row buttons in the app today, so no icon-button conversion was needed.
+- **Fixed on the way:** the Printer → Config tab scrolled sideways at 390 px (the SSH public key `<pre>` did not wrap).
+- **Verification:** headless Chromium at 390 px, every page and tab, default and compact-rounded; clips 0, no sideways scroll, Settings → Longest labels "Nothing clips" in both themes; desktop 1400 px screenshots of all 52 views byte-identical before/after.
+
 ### Session 34b — 2026-11-12 (responsive shell for phone)
 
 - **Breakpoint 760 px** (was 430 px). Below it the shell changes shape: rail hidden; bottom tab bar from `PhoneFleet.dc.html` (Fleet · Jobs · Scan accent/centre · Filament · More; More opens a sheet with Library, Projects, Service, Tools, Settings); header = page title + search icon (expands to a full-width field), no Send / Attention / window controls / Ctrl K hint. The inspector becomes a bottom panel below 760 too. `hooks/useMediaQuery.ts` (`usePhone`) holds the breakpoint for the two places that change markup (search placeholder, printer overflow menu); everything else is CSS.

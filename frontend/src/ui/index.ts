@@ -18,3 +18,6 @@ export { ToastStack, useToasts } from "./Toast";
 export type { ToastItem } from "./Toast";
 
 export { default as ExternalLink, safeHref, hostLabel } from "./ExternalLink";
+
+export { default as OverflowMenu } from "./OverflowMenu";
+export type { OverflowItem } from "./OverflowMenu";
