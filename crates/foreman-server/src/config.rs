@@ -170,3 +170,24 @@ impl Default for ServerConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frontend_dir_override_wins() {
+        let cfg = ServerConfig {
+            frontend_dir: Some(PathBuf::from("/opt/foreman/ui")),
+            ..ServerConfig::default()
+        };
+        assert_eq!(cfg.resolve_frontend_dir(), PathBuf::from("/opt/foreman/ui"));
+    }
+
+    #[test]
+    fn frontend_dir_falls_back_to_the_source_tree() {
+        // Test binaries live in target/<profile>/deps, with no frontend/ beside them.
+        let dir = ServerConfig::default().resolve_frontend_dir();
+        assert!(dir.ends_with("frontend/dist"), "{}", dir.display());
+    }
+}

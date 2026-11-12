@@ -235,12 +235,15 @@ jobs:
           - name: windows-x64
             runner: windows-latest
             bundles: nsis
+            cli: \frontend\node_modules\.bin\tauri.cmd
           - name: linux-x86_64
             runner: ubuntu-22.04
             bundles: appimage,deb,rpm
+            cli: /frontend/node_modules/.bin/tauri
           - name: linux-aarch64
             runner: ubuntu-22.04-arm
             bundles: appimage,deb,rpm
+            cli: /frontend/node_modules/.bin/tauri
     env:
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
@@ -303,7 +306,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: crates/foreman-desktop
-          tauriScript: npm --prefix ../../frontend exec -- tauri
+          # The CLI binary itself: given an "npm …" script the action inserts its
+          # own "--" after "build", which hands --bundles to cargo.
+          tauriScript: ${{ github.workspace }}${{ matrix.cli }}
           args: --bundles ${{ matrix.bundles }}
 
       # One naming scheme across platforms (Tauri's rpm/deb names vary with
