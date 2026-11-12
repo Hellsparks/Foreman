@@ -600,3 +600,19 @@
   color: var(--fw-danger);
   font-size: 13px;
 }
+
+@media (max-width: 759px) {
+  .pf-ssh {
+    min-width: 0;
+    padding: var(--fw-space-4);
+  }
+
+  .pf-ssh__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pf-hint,
+  .pf-ssh__key {
+    overflow-wrap: anywhere;
+  }
+}

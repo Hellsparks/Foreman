@@ -609,10 +609,59 @@ body {
 /* ── Edge resize handles (Tauri / KDE Wayland fallback) ──────────────────── */
 /* TODO: startResizeDragging via Tauri API if undecorated resize breaks on KDE Wayland */
 
-/* ── Phone layout (≤ 430 px) ─────────────────────────────────────────────── */
-@media (max-width: 430px) {
+/* Phone bottom nav base (shown by the media query above) */
+.phone-nav {
+  align-items: stretch;
+}
+
+.phone-nav__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--fw-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--fw-duration-fast);
+}
+
+.phone-nav__btn[aria-current="page"] {
+  color: var(--fw-text);
+}
+
+.phone-nav__btn:focus-visible {
+  outline: 2px solid var(--fw-focus);
+  outline-offset: -2px;
+}
+
+/* ── Phone layout (below 760 px) ─────────────────────────────────────────── */
+/* Not the desktop shell squeezed: the rail goes, a bottom tab bar comes (after
+   PhoneFleet.dc.html), the header is page title + search icon only, and the
+   inspector becomes a bottom panel. Keep the breakpoint in sync with
+   hooks/useMediaQuery.ts. */
+
+/* Phone-only pieces are invisible on desktop. */
+.topbar__title,
+.topbar__search-toggle,
+.phone-nav,
+.phone-sheet,
+.phone-sheet__scrim {
+  display: none;
+}
+
+@media (max-width: 759px) {
+  .shell {
+    --shell-bar-h: 64px;
+  }
+
   .rail {
     display: none;
+  }
+
+  .shell__work {
+    padding: var(--fw-space-4) var(--fw-space-4) var(--fw-space-6);
   }
 
   .shell__content {
@@ -631,46 +680,218 @@ body {
     border-top-width: 0;
   }
 
-  .phone-nav {
-    display: flex;
+  /* Header: page title + search icon. No Send, no Attention, no window
+     controls, no keyboard hint (those are desktop). */
+  .topbar {
+    gap: var(--fw-space-3);
+    padding: 0 var(--fw-space-4);
   }
 
-}
+  .topbar__title {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-/* Phone bottom nav (hidden on desktop) */
-.phone-nav {
-  display: none;
-  align-items: stretch;
-  flex-shrink: 0;
-  background: var(--fw-surface);
-  border-top: var(--fw-border-width) solid var(--fw-border);
-}
+  /* The header already shows the section name: the page's own copy of it stays
+     for screen readers only. */
+  .phone-dup-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
-.phone-nav__btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fw-space-1);
-  min-height: 56px;
-  padding: var(--fw-space-2) var(--fw-space-1);
-  background: transparent;
-  border: none;
-  color: var(--fw-muted);
-  font: var(--fw-type-label) / 1 var(--fw-mono);
-  letter-spacing: var(--fw-tracking-label);
-  text-transform: uppercase;
-  text-decoration: none;
-  cursor: pointer;
-  transition: color var(--fw-duration-fast);
-}
+  /* A page that portals its own header (printer) replaces the title. */
+  .topbar__page {
+    flex: 1;
+  }
 
-.phone-nav__btn[aria-current="page"] {
-  color: var(--fw-text);
-}
+  .topbar__page:not(:empty) ~ .topbar__title {
+    display: none;
+  }
 
-.phone-nav__btn:focus-visible {
-  outline: 2px solid var(--fw-focus);
-  outline-offset: -2px;
+  .topbar__via,
+  .topbar__kbd,
+  .topbar__spacer,
+  .topbar__btn,
+  .topbar__wc,
+  .topbar__page .printer-header__fw,
+  .topbar__page .printer-header__via {
+    display: none;
+  }
+
+  .topbar__search-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    border: var(--fw-border-width) solid var(--fw-border);
+    background: var(--fw-raised);
+    color: var(--fw-text);
+    border-radius: var(--fw-radius);
+    cursor: pointer;
+  }
+
+  .topbar__search-toggle:focus-visible {
+    outline: 2px solid var(--fw-focus);
+    outline-offset: 2px;
+  }
+
+  .topbar__search {
+    display: none;
+    max-width: none;
+  }
+
+  /* Search open: the field takes the whole header. */
+  .topbar[data-search-open="true"] .topbar__search {
+    display: flex;
+    flex: 1 1 auto;
+  }
+
+  .topbar[data-search-open="true"] > :not(.topbar__search) {
+    display: none;
+  }
+
+  /* Bottom tab bar */
+  .phone-nav {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    flex-shrink: 0;
+    padding: var(--fw-space-1) var(--fw-space-1) calc(var(--fw-space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--fw-surface);
+    border-top: var(--fw-border-width) solid var(--fw-border);
+  }
+
+  .phone-nav__btn {
+    min-width: 0;
+    gap: 2px;
+    min-height: 56px;
+    padding: 0;
+    border-top: 3px solid transparent;
+    font: 11px / 1.2 var(--fw-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+
+  .phone-nav__btn[aria-current="page"] {
+    font-weight: bold;
+    border-top-color: var(--fw-accent);
+  }
+
+  /* Scan: accent, raised, centre */
+  .phone-nav__btn--scan,
+  .phone-nav__btn--scan[aria-current="page"] {
+    margin: 0 var(--fw-space-1);
+    border-top-color: transparent;
+    border-radius: var(--fw-radius);
+    background: var(--fw-accent-hover);
+    color: var(--fw-on-accent);
+    font-weight: bold;
+  }
+
+  /* More sheet */
+  .phone-sheet__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: var(--fw-text);
+    opacity: 0.35;
+  }
+
+  .phone-sheet {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 21;
+    max-height: 80dvh;
+    background: var(--fw-raised);
+    border-top: var(--fw-border-width) solid var(--fw-border);
+    box-shadow: var(--fw-shadow-overlay);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateY(100%);
+    visibility: hidden;
+    transition: transform var(--fw-duration-expand, 240ms) cubic-bezier(0.2, 0, 0, 1), visibility 0s linear var(--fw-duration-expand, 240ms);
+  }
+
+  .phone-sheet[data-open="true"] {
+    transform: none;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .phone-sheet__head {
+    display: flex;
+    align-items: center;
+    padding: var(--fw-space-2) var(--fw-space-2) var(--fw-space-2) var(--fw-space-4);
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+  }
+
+  .phone-sheet__title {
+    flex: 1;
+    font: var(--fw-type-label) / 1 var(--fw-mono);
+    letter-spacing: var(--fw-tracking-label);
+    text-transform: uppercase;
+    color: var(--fw-muted);
+  }
+
+  .phone-sheet__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    border: 0;
+    background: transparent;
+    color: var(--fw-text);
+    cursor: pointer;
+  }
+
+  .phone-sheet__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+  }
+
+  .phone-sheet__link {
+    display: flex;
+    align-items: center;
+    gap: var(--fw-space-3);
+    min-height: 56px;
+    padding: 0 var(--fw-space-4);
+    color: var(--fw-text);
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+  }
+
+  .phone-sheet__link[aria-current="page"] {
+    background: var(--fw-background);
+    border-left-color: var(--fw-accent);
+    font-weight: bold;
+  }
+
+  .phone-sheet__close:focus-visible,
+  .phone-sheet__link:focus-visible {
+    outline: 2px solid var(--fw-focus);
+    outline-offset: -2px;
+  }
 }

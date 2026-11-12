@@ -142,7 +142,7 @@ export default function Service() {
     <div className="svc">
       <div className="svc-head">
         <div className="svc-head__main">
-          <h1 className="svc-title">Service</h1>
+          <h1 className="svc-title phone-dup-title">Service</h1>
           <p className="svc-sub">
             {ov
               ? `${over} overdue · ${soon} due soon · ${tasks.length} task${tasks.length === 1 ? "" : "s"} across ${printers.length} printer${printers.length === 1 ? "" : "s"}`

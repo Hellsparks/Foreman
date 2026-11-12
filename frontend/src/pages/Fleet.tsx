@@ -378,7 +378,7 @@ export default function Fleet() {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="fleet__header">
         <div>
-          <h1 className="fleet__title">Fleet</h1>
+          <h1 className="fleet__title phone-dup-title">Fleet</h1>
           <p className="fleet__summary">{summaryLine()}</p>
         </div>
         <div className="fleet__header-actions">

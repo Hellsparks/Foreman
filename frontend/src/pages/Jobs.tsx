@@ -244,7 +244,7 @@ export default function Jobs() {
       <header className="jobs-head">
         <div className="jobs-head__row">
           <div className="jobs-head__text">
-            <h1 className="jobs-head__title">Jobs</h1>
+            <h1 className="jobs-head__title phone-dup-title">Jobs</h1>
             <p className="jobs-head__sub">{headline}</p>
           </div>
           <Link to="/library" className="jobs-add">

@@ -43,7 +43,7 @@ export default function ProjectList() {
     <div className="prj">
       <div className="prj-head">
         <div className="prj-head__main">
-          <h1 className="prj-title">Projects</h1>
+          <h1 className="prj-title phone-dup-title">Projects</h1>
           <p className="prj-sub">Due soonest first. Progress counts prints, not plates.</p>
         </div>
         <Link className="prj-btn" to="templates">
