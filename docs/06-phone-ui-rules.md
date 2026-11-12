@@ -58,3 +58,43 @@ At 390 × 844 with content loaded, per page:
 - 44 px tap targets and focus outlines intact
 
 Desktop stays pixel-identical except §3.
+
+---
+
+# Layout rules at every width (session 34e)
+
+These apply at every width, phone and desktop.
+
+## 8. Overlays portal to the body
+- Every popover (card "⋯" menus, dropdowns, combo-box lists, tooltips, confirm popovers, the bell panel) renders through `ui/Popover` (or `ui/Menu`) into the single overlay root `#fw-overlay-root` on `<body>`. Nothing floating lives inside a page container, so no `overflow` or `transform` can clip it.
+- It is `position: fixed` against its trigger, prefers below/end, flips to the other side and alignment when it would leave the viewport (8 px margin), caps its height to the room it has, and repositions on any scroll and on resize.
+- Outside pointer-down or Escape closes it; Escape returns focus to the trigger. Menus move with ↑ ↓ Home End.
+- Bottom sheets ("⋯" on phone, More) portal to the same root.
+- No container gets `overflow: hidden/auto` just to clip rounded corners. `overflow` is only for real scrollers and for clipping images, progress fills and stripes.
+
+## 9. Content regions fill the remaining height
+- The work area is a flex column, and the page fills it. The page's content region (`.page-fill`: the list, grid, table frame or panel) takes the remaining height, so it reaches the bottom of the viewport whatever the item count: 0, 1 or 500.
+- Empty space belongs inside the container, not to the page background. Empty states go inside the container.
+- Pages end on the shell's bottom gutter (32 px desktop). No extra bottom padding goes under the content region.
+
+## 10. Desktop fills the width
+- No page max-widths. Only reading text keeps a measure: paragraphs `max-width: 70ch`.
+- Groups of cards and sections are an auto-fit grid: `repeat(auto-fit, minmax(min(100%, <track>), 1fr))` (`.auto-cols`). They reflow to 1–4 columns, and with few items the items take the row instead of leaving empty tracks.
+- Tables use the full width with proportional columns. A table gets a minimum width only where its columns would otherwise crush (640 px); below that it scrolls inside its own frame.
+- Lanes (Jobs queue) share the width, each at least 272 px.
+
+## 11. Breakpoints (from content, not round numbers)
+| Value | Where | Why |
+|---|---|---|
+| 760 px | phone layout | Below it the rail, the two-icon header and the list rows no longer fit side by side (sessions 34b–d). |
+| 1200 px | list + inspector side by side | Rail 176 + gutters 64 + the narrowest useful list (~560: a three-column table or two 280 px cards) + inspector 400. Below 1200 the inspector is the right edge panel (overlay), the same component as on phone. |
+| 460 px track | form / section columns (Settings, Tools → Calibration, Service printers, Project detail, Attention cards, filament form sections) | A label + control + help column; the printer Config tab's columns. |
+| 300 px track | printer cards (Fleet) | Name, chip, camera thumbnail, temperatures. |
+| 280 px track | project cards | Name, due chip, progress bar. |
+| 272 px | queue lane minimum | One queue card with its thumbnail, name and "⋯". |
+| 160 px track | filament form field rows | A label over a numeric/text field. |
+| 70ch | reading text | Comfortable line length. |
+
+## 12. One toolbar on desktop
+- A page has one toolbar. In the Library on desktop, picking files enables the toolbar's own Copy / Cut / Delete. The count plus Select all and Clear (and Copy here / Move here when the picks are in another folder) appear right-aligned in the same row. There is no second selection bar.
+- On phone no toolbar is visible, so the selection actions are the bottom action bar. Never both.
