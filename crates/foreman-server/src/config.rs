@@ -38,6 +38,12 @@ pub struct ServerConfig {
     #[serde(default = "default_spoolman_enabled")]
     pub spoolman_enabled: bool,
 
+    /// Connect to printers. `false` (`FOREMAN__DRIVERS_ENABLED=false`) starts Foreman
+    /// with every printer offline: no connection, no command, no queue start. For
+    /// looking at a restored backup next to the live server. Default: `true`.
+    #[serde(default = "default_spoolman_enabled")]
+    pub drivers_enabled: bool,
+
     /// Embedded in the desktop app (Mode A): localhost-only unless the admin enables
     /// "Let other devices connect". Set by foreman-desktop, not by config files.
     #[serde(skip)]
@@ -125,6 +131,7 @@ impl Default for ServerConfig {
             db_url: Some(db_url),
             data_dir,
             spoolman_enabled: default_spoolman_enabled(),
+            drivers_enabled: true,
             desktop_mode: false,
         }
     }

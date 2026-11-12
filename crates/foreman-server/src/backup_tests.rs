@@ -86,6 +86,17 @@ async fn live() -> Live {
     .execute(&db.pool)
     .await
     .expect("ssh");
+    // A daily schedule set long ago and never run: its latest slot looks missed.
+    foreman_core::repo::setting::set(
+        &db.pool,
+        backup::SETTING_KEY,
+        &json!({"dir": "/tmp/x", "schedule": "daily", "time": "00:00", "weekday": 7,
+                "retention": 7, "include_library": false, "encrypt": false,
+                "schedule_since": "2020-01-01T00:00:00Z"})
+        .to_string(),
+    )
+    .await
+    .expect("settings");
     db.pool.close().await;
 
     let cfg = sm_config(&sm_dir);
@@ -225,6 +236,20 @@ async fn round_trip_restores_everything_into_a_wiped_data_dir() {
     assert_eq!(
         fs::read(l.data.join("library/Parts/cube.gcode")).expect("gcode"),
         b"G28\nG1 X10\n"
+    );
+    // The restored schedule counts from now: no catch-up backup on first start.
+    let db = ForemanDb::connect(&l.data.join("foreman.db"))
+        .await
+        .expect("db");
+    let raw = foreman_core::repo::setting::get(&db.pool, backup::SETTING_KEY)
+        .await
+        .expect("get")
+        .expect("settings restored");
+    db.pool.close().await;
+    let settings: backup::BackupSettings = serde_json::from_str(&raw).expect("settings");
+    assert!(
+        !backup::is_due(&settings, None, chrono::Local::now()),
+        "restored schedule must not fire at once: {raw}"
     );
     // Nothing left pending: a second start applies nothing.
     assert!(backup::apply_pending(&l.sources())

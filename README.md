@@ -65,6 +65,31 @@ sudo ufw allow in on tailscale0 to any port 9090 proto tcp
 Windows: allow `foreman-server.exe` on Private networks when Windows Defender
 Firewall asks.
 
+## Backup and restore
+
+Settings → Backup: folder, schedule (off / daily / weekly), how many to keep, Library opt-in, passphrase encryption, Run now, Restore.
+Each backup is `foreman-backup-<UTC time>.zip` (or `.zip.age` when encrypted) plus a `.manifest.json` beside it.
+
+**A backup contains `secret.key`**, which decrypts the SSH key and printer passwords stored in Foreman. Keep backups private.
+
+From a terminal (works on Linux and Windows; stop Foreman first for `restore`):
+
+```fish
+foreman-server backup                      # into the saved folder
+foreman-server backup ~/foreman-backups    # into another folder
+foreman-server restore ~/foreman-backups/foreman-backup-20261112-002400Z.zip
+```
+
+`restore` saves the current state as `<data dir>/restore-snapshots/foreman-pre-restore-….zip` first; restore that file to undo.
+
+**By hand, if Foreman will not start at all:**
+
+1. Stop Foreman. If the file ends in `.age`, decrypt it: `age -d -o backup.zip foreman-backup-….zip.age` (age or rage, any OS).
+2. Unzip it somewhere. It holds `manifest.json`, `foreman.db`, `spoolman.db`, `secret.key`, and maybe `config.toml`, `custom.css`, `fonts/`, `themes/`, `library/`.
+3. Into the Foreman data dir (`~/.local/share/foreman` on Linux, `%APPDATA%\foreman` on Windows) copy `foreman.db`, `secret.key` and the rest; delete `foreman.db-wal` and `foreman.db-shm` there first.
+4. Copy `spoolman.db` into the Spoolman data dir (`SPOOLMAN_DIR_DATA`, default `~/.local/share/spoolman` or `%APPDATA%\spoolman`); delete `spoolman.db-wal` / `-shm` there first.
+5. Start Foreman.
+
 ## Linux + NVIDIA notes
 
 WebKitGTK's DMA-BUF renderer can deadlock or freeze on NVIDIA drivers under

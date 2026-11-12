@@ -230,7 +230,11 @@ pub async fn serve_with(
 
     // Driver manager: load printers from DB and spawn drivers.
     let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
-    driver_manager.start_all(&foreman_db.pool).await;
+    if cfg.drivers_enabled {
+        driver_manager.start_all(&foreman_db.pool).await;
+    } else {
+        warn!("printer drivers disabled (FOREMAN__DRIVERS_ENABLED=false): every printer stays offline");
+    }
 
     let http_client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))

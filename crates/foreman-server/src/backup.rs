@@ -952,7 +952,42 @@ pub async fn apply_pending(src: &Sources) -> Result<Option<Applied>, AppError> {
             move_into(&staged.join(d), &target)?;
         }
     }
+    if let Err(e) = reanchor_schedule(&dd.join("foreman.db")).await {
+        tracing::warn!("re-anchor backup schedule after restore: {e}");
+    }
     Ok(Some(Applied { manifest, snapshot }))
+}
+
+/// A restored database carries the schedule and last run from backup time, so the
+/// latest slot looks missed. Count the schedule from now: no catch-up backup (and
+/// prune) the moment a restored server starts, whichever way it was restored.
+async fn reanchor_schedule(db: &Path) -> Result<(), AppError> {
+    let pool = SqlitePool::connect_with(SqliteConnectOptions::new().filename(db))
+        .await
+        .map_err(|e| io_err("open restored db", e))?;
+    let res = async {
+        let raw: Option<String> = sqlx::query_scalar("SELECT value FROM setting WHERE key = ?")
+            .bind(SETTING_KEY)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| io_err("read backup settings", e))?;
+        let Some(mut settings) = raw.and_then(|v| serde_json::from_str::<BackupSettings>(&v).ok())
+        else {
+            return Ok(());
+        };
+        settings.schedule_since = Some(Utc::now().to_rfc3339());
+        let json = serde_json::to_string(&settings).map_err(|e| io_err("settings", e))?;
+        sqlx::query("UPDATE setting SET value = ? WHERE key = ?")
+            .bind(json)
+            .bind(SETTING_KEY)
+            .execute(&pool)
+            .await
+            .map_err(|e| io_err("write backup settings", e))?;
+        Ok(())
+    }
+    .await;
+    pool.close().await;
+    res
 }
 
 /// Replace this process with a fresh copy of itself (same arguments and environment).
