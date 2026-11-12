@@ -164,6 +164,11 @@ const MIGRATIONS: &[&str] = &[
        shrinkage_xy REAL, shrinkage_z REAL, saved_at TEXT NOT NULL, saved_by TEXT NOT NULL)",
     "CREATE INDEX IF NOT EXISTS ix_shrinkage_calibration_filament \
      ON shrinkage_calibration (filament_id)",
+    // 0017: MCP access per API key (6.5, see migrations/0017_mcp.sql).
+    "CREATE TABLE IF NOT EXISTS mcp_key_policy (\
+       api_key_id INTEGER PRIMARY KEY NOT NULL REFERENCES api_key(id) ON DELETE CASCADE, \
+       tools_json TEXT, allow_destructive INTEGER NOT NULL DEFAULT 0, \
+       rate_per_minute INTEGER NOT NULL DEFAULT 60, updated_at TEXT NOT NULL)",
 ];
 
 /// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only

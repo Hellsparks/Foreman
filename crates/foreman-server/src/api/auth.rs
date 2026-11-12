@@ -362,7 +362,7 @@ pub async fn url_token(
 }
 
 /// API keys may not manage keys or network exposure: `Some(403)` for them.
-fn forbid_api_key(ctx: &AuthCtx) -> Option<Response> {
+pub(crate) fn forbid_api_key(ctx: &AuthCtx) -> Option<Response> {
     match ctx.kind {
         AuthKind::Session { .. } => None,
         AuthKind::ApiKey { .. } => Some(err(

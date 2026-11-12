@@ -9,6 +9,7 @@ pub mod inventory;
 pub mod jobs;
 pub mod library;
 pub mod maintenance;
+pub mod mcp;
 pub mod printer_commands;
 pub mod printer_paths;
 pub mod printers;

@@ -3,6 +3,7 @@ import { api, request, type ApiKey, type NetworkSettings } from "../api/client";
 import Button from "../ui/Button";
 import { useAuth } from "./AuthGate";
 import { useRoute } from "../desktop/route";
+import McpSettings from "./McpSettings";
 
 /** SQLite `YYYY-MM-DD HH:MM:SS` (UTC) → local time. */
 function fmtTime(ts: string | null): string {
@@ -224,6 +225,8 @@ export default function SecuritySettings() {
           ))}
         </div>
       )}
+
+      <McpSettings keysVersion={keys.map((k) => k.id).join(",")} />
 
       {slicerPrint != null && (
         <label className="auth__check security__row" style={{ marginTop: "var(--fw-space-3)" }}>
