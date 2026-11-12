@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 foreman-core = { path = "../foreman-core" }
 foreman-server = { path = "../foreman-server" }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -24,3 +24,11 @@ serde_json = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 mdns-sd = { workspace = true }
 thiserror = { workspace = true }
+tokio-util = { workspace = true }
+anyhow = { workspace = true }
+tauri-plugin-autostart = "2.7.0"
+tauri-plugin-updater = "2.14.1"
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tokio = { workspace = true }

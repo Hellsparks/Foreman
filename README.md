@@ -15,6 +15,40 @@ cargo tauri-dev
 opens a window pointing at the Vite dev server.  The embedded Foreman server
 (API + WebSocket) runs on port 9090 inside the same process.
 
+## Desktop app: tray, start with the computer, updates
+
+- **Closing the window** hides Foreman to the tray while **Settings → This app → Keep
+  running in the background** is on (default: on when this computer is the server,
+  off when connected to another server). The built-in server keeps answering on the
+  LAN. The tray menu has *Show Foreman*, the server's status and address, and *Quit
+  Foreman*, which stops the server cleanly (listeners closed, databases closed) before
+  exiting. If the desktop has no tray (some Linux setups without a StatusNotifier
+  host), closing quits.
+- **Start with the computer** (same page, default off) adds an OS login entry:
+  `~/.config/autostart/Foreman.desktop` on Linux, a `Foreman` value under
+  `…\CurrentVersion\Run` on Windows. It is launched with `--autostart`. It only keeps
+  your fleet reachable when *Keep running in the background* is on — then the app
+  starts hidden in the tray with the built-in server running. With it off, the window
+  just opens at login and closing it quits.
+- **Updates** come from GitHub Releases (`releases/latest/download/latest.json`). The
+  app checks on launch and from **Settings → About → Check now**, shows the release
+  notes, and installs only when you press *Install*. The app warns (never blocks)
+  when its version and the server's differ by more than a patch release.
+
+### Updater signing key (maintainer)
+
+Update bundles must be signed; the app only accepts files signed by the key whose
+public half is in `crates/foreman-desktop/tauri.conf.json` (`plugins.updater.pubkey`).
+
+- Private key: `~/.tauri/foreman-updater.key` on the maintainer's machine (no
+  password). **Never commit it.** Keep an offline copy in your password manager — if
+  it is lost, installed apps can never update again (a new key needs a manual reinstall).
+- For release builds (CI), store it as repository secrets:
+  `TAURI_SIGNING_PRIVATE_KEY` = the file's content, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+  = empty. Tauri reads these when `bundle.createUpdaterArtifacts` is on.
+- Regenerate (only if lost/compromised; then update `pubkey`):
+  `npm --prefix frontend exec tauri -- signer generate -w ~/.tauri/foreman-updater.key`
+
 ## Headless server (Pi, NAS, always-on PC)
 
 `foreman-server` listens on **all interfaces** (`0.0.0.0` and `[::]`, port 9090) by
@@ -112,5 +146,6 @@ cargo tauri-dev
 | Rust stable | `rustup update stable` |
 | Node / npm | package manager |
 | tauri-cli 2.x | `cargo install tauri-cli --version "^2"` |
+| tray (Linux) | distro package (Arch: `libayatana-appindicator`; Ubuntu: `libayatana-appindicator3-dev`) |
 | webkit2gtk-4.1 | distro package (Arch: `webkit2gtk-4.1`) |
 | gtk3 | distro package (Arch: `gtk3`) |

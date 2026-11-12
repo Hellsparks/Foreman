@@ -11,8 +11,6 @@
 # stdout: one line per step — STEP  PASS/FAIL  duration  [first error line].
 # Full output of every step: .dev-logs/<step>.log (gitignored).
 # Exit status: non-zero if any step failed.
-#
-# In CI (CI=true) foreman-desktop is excluded from clippy/test, like ci.yml does.
 
 set -u
 
@@ -26,7 +24,7 @@ for arg in "$@"; do
     --printers) PRINTERS=1 ;;
     --keep) KEEP=1 ;;
     -h | --help)
-      sed -n '2,15p' "$0"
+      sed -n '2,13p' "$0"
       exit 0
       ;;
     *)
@@ -48,10 +46,7 @@ case "$(uname -s)" in
 esac
 BIN="$ROOT/target/debug/foreman-server$EXE"
 
-WS_FLAGS=()
-if [ "${CI:-}" = "true" ]; then
-  WS_FLAGS=(--workspace --exclude foreman-desktop)
-fi
+WS_FLAGS=(--workspace)
 
 FAILED=0
 SERVER_PID=""

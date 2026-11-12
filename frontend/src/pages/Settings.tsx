@@ -7,6 +7,8 @@ import BackupSettings from "../backup/BackupSettings";
 import ThemeSettings from "../theme/ThemeSettings";
 import RerunSetup from "../setup/RerunSetup";
 import { EdgePanel } from "../ui";
+import { AboutSettings, AppSettings } from "../desktop/AboutSettings";
+import { IS_TAURI } from "../shell/TopBar";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
 // Used only for the swatch dots; never hardcoded in component logic.
@@ -49,6 +51,8 @@ export default function Settings() {
             ["security-heading", "Security"],
             ["backup-heading", "Backup"],
             ["setup-heading", "Setup"],
+            ...(IS_TAURI ? [["app-heading", "This app"]] : []),
+            ["about-heading", "About"],
           ].map(([id, label]) => (
             <a key={id} href={`#${id}`} className="set-groups__link" onClick={(e) => {
               e.preventDefault();
@@ -231,6 +235,10 @@ export default function Settings() {
       <BackupSettings />
 
       <RerunSetup />
+
+      {IS_TAURI && <AppSettings />}
+
+      <AboutSettings />
 
       <p className="page-placeholder span-all">
         Server config, backup, notifications — coming in phase 7.

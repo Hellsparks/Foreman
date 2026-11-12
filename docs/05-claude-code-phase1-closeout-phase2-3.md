@@ -289,6 +289,19 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
 
+### Session 39 — 2026-11-12 (8.1 desktop app ready to ship)
+
+- **Icons:** one source, `crates/foreman-desktop/app-icon.svg` (an "F" of three printed layers on an ink tile, Fieldwork accent). `tauri icon` generated the desktop set incl. the missing `icon.ico` (16–256 px) and `icon.icns`; mobile folders dropped. `bundle.icon` lists them.
+- **CI:** foreman-desktop is back in clippy (`--all-targets`) and test on Ubuntu and Windows. Only the Ubuntu leg installs `libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev` (10 min timeout, 3 attempts + apt `Acquire::Retries`). `dev-check.sh` no longer excludes the crate in CI. Debug builds don't need `frontend/dist` (no `custom-protocol`), checked by building without it.
+- **Server:** `LocalHandle::stop()` (CancellationToken) ends `serve_with`: Foreman listeners close, Spoolman's listener shuts down gracefully, both pools close (WAL checkpointed, no `-wal` left). `LocalHandle::lan_addresses()` for the tray; `foreman_server::GIT_COMMIT` re-exported.
+- **Tray/background:** close → hide while "keep running" is on (`desktop.json`, default = built-in server in use) and a tray exists; otherwise close quits. Every quit path (tray, close with keep-running off, `ExitRequested`) stops the server first (10 s cap, then abort). When the store's last connection is "This computer" the server is started from Rust at launch, so an autostarted hidden app serves straight away. Tray: Show / status line (refreshed every 3 s) / Quit.
+- **Autostart:** `tauri-plugin-autostart` 2.7 (auto-launch 0.6), entry name `Foreman`, arg `--autostart`. Upstream (not the docs page) says: Linux writes `$HOME/.config/autostart/<name>.desktop`; Windows writes `…\CurrentVersion\Run` in **HKLM when elevated, else HKCU** (+ StartupApproved). The test accepts either hive.
+- **Updater:** `tauri-plugin-updater` 2.14, endpoint `github.com/Hellsparks/Foreman/releases/latest/download/latest.json`, pubkey in `tauri.conf.json`; private key at `~/.tauri/foreman-updater.key` (no password, outside the repo; README says where to keep it). Check/install are Rust commands; install downloads first, then stops the server, then installs + restarts. `createUpdaterArtifacts` is left for the release session. Until a release with `latest.json` exists, "Check now" shows the fetch error.
+- **Version check:** `frontend/src/desktop/versionCompat.ts` — warns when major.minor differ, names the older side; strip under the top bar, never blocks.
+- **Settings:** "This app" (keep running, start with the computer) and "About" (app + server version, commits, app/server data folders, updates with release notes before install, GPL-3.0-or-later notice + source link at the running commit). Added `LICENSE` (GPL-3.0 text) — the workspace declared GPL but the repo had no licence file.
+- **Live check (Linux, KDE Wayland):** scratch data dir, port 9191. Tray menu over D-Bus read `Built-in server: running at 10.0.0.10:9191`; KWin `closeWindow()` → "window hidden", 0 windows, process alive, `/api/health` answered on 10.0.0.10 and Tailscale 100.109.155.109; tray "Quit Foreman" (dbusmenu `clicked`) → `foreman-server stopped`, process exited, 9191/7913 closed. **Not done from a second device:** ufw only admits 9090 from 10.0.0.0/24 + tailscale0, so a container could not reach the test port.
+- **No visual check of Settings → About** in the running app (no way to click inside the webview from here); type-check + logic tests only.
+
 ### Session 38 — 2026-11-12 (6.5 MCP endpoint)
 
 - **Branch:** PR #25 merged (CI green); `phase6-mcp` from main.

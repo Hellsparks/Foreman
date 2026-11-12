@@ -91,11 +91,16 @@ pub async fn serve(cfg: config::ServerConfig) -> anyhow::Result<()> {
     serve_with(cfg, None).await
 }
 
+/// Git commit this binary was built from.
+pub use api::health::GIT_COMMIT;
+
 /// In-process access for the desktop app (Mode A) to the server it embeds.
 #[derive(Clone)]
 pub struct LocalHandle {
     pool: sqlx::SqlitePool,
     auth: Arc<auth::AuthState>,
+    info: Arc<auth::ServerInfo>,
+    stop: tokio_util::sync::CancellationToken,
     pub port: u16,
 }
 
@@ -116,6 +121,33 @@ impl LocalHandle {
         )
         .await?;
         Ok(token)
+    }
+
+    /// Host the HTTP listener is bound to right now (`127.0.0.1` until "Let other
+    /// devices connect", then `0.0.0.0` or the configured host).
+    pub fn bound_host(&self) -> String {
+        self.info.bound_host()
+    }
+
+    /// `ip:port` addresses other devices can use; empty while bound to loopback only.
+    pub fn lan_addresses(&self) -> Vec<String> {
+        let host = self.bound_host();
+        if auth::is_loopback(&host) {
+            return Vec::new();
+        }
+        match host.parse::<std::net::IpAddr>() {
+            Ok(ip) if !ip.is_unspecified() => vec![format!("{ip}:{}", self.port)],
+            _ => net::interface_ips()
+                .into_iter()
+                .map(|(_, ip)| format!("{ip}:{}", self.port))
+                .collect(),
+        }
+    }
+
+    /// Ask the server to stop: listeners close (Foreman and Spoolman), then the
+    /// databases are closed and [`serve_with`] returns.
+    pub fn stop(&self) {
+        self.stop.cancel();
     }
 }
 
@@ -349,7 +381,8 @@ pub async fn serve_with(
 
     let app = build_router(app_state.clone());
 
-    spawn_spoolman(&cfg, &spoolman).await;
+    let stop = tokio_util::sync::CancellationToken::new();
+    spawn_spoolman(&cfg, &spoolman, stop.clone()).await;
 
     if let Some(outcome) = restore_outcome {
         api::backup::report_restore(&app_state, outcome).await;
@@ -360,6 +393,8 @@ pub async fn serve_with(
     let handle = LocalHandle {
         pool: app_state.foreman_db.pool.clone(),
         auth: Arc::clone(&app_state.auth),
+        info: Arc::clone(&app_state.info),
+        stop: stop.clone(),
         port: cfg.port,
     };
 
@@ -420,6 +455,7 @@ pub async fn serve_with(
                 break;
             }
             _ = &mut shutdown => break,
+            _ = stop.cancelled() => break,
             changed = bind_rx.changed() => {
                 if changed.is_err() {
                     break;
@@ -428,6 +464,14 @@ pub async fn serve_with(
         }
     }
 
+    // Listeners are closed; stop Spoolman's too, then close the databases so SQLite
+    // checkpoints its WAL before the process goes away.
+    stop.cancel();
+    app_state.foreman_db.pool.close().await;
+    if let Some(sm) = spoolman.get() {
+        sm.db.pool.close().await;
+    }
+    info!("foreman-server stopped");
     Ok(())
 }
 
@@ -656,7 +700,11 @@ pub async fn restore_cli(cfg: config::ServerConfig, file: PathBuf) -> anyhow::Re
 }
 
 /// The Spoolman-compatible API on its own port (default 7912).
-async fn spawn_spoolman(cfg: &config::ServerConfig, shared: &std::sync::OnceLock<SpoolmanState>) {
+async fn spawn_spoolman(
+    cfg: &config::ServerConfig,
+    shared: &std::sync::OnceLock<SpoolmanState>,
+    stop: tokio_util::sync::CancellationToken,
+) {
     if !cfg.spoolman_enabled {
         return;
     }
@@ -683,8 +731,9 @@ async fn spawn_spoolman(cfg: &config::ServerConfig, shared: &std::sync::OnceLock
                         Ok(spoolman_listener) => {
                             info!(%spoolman_addr, "spoolman-rs API listening");
                             tokio::spawn(async move {
-                                if let Err(e) =
-                                    axum::serve(spoolman_listener, spoolman_router).await
+                                if let Err(e) = axum::serve(spoolman_listener, spoolman_router)
+                                    .with_graceful_shutdown(stop.cancelled_owned())
+                                    .await
                                 {
                                     tracing::error!("spoolman-rs server error: {e}");
                                 }

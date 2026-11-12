@@ -9,6 +9,7 @@ import { desktop, type DesktopStore, type LocalStarted, type SavedServer } from 
 import { ConnectView, EditView, LocalView, LostView, WelcomeView } from "./ConnectViews";
 import { Failover, type FailoverState } from "./failover";
 import { RouteContext } from "./route";
+import { checkForUpdate } from "./updates";
 
 type Msg = { tone: "ok" | "warn" | "bad"; text: string };
 
@@ -33,6 +34,11 @@ export default function DesktopRoot({ children }: { children: ReactNode }) {
     storeRef.current = next;
     setStore(next);
     void desktop.saveStore(next).catch((e) => console.error("saving servers failed", e));
+  }, []);
+
+  // Update check on launch (quiet on failure; Settings → About shows the error).
+  useEffect(() => {
+    void checkForUpdate();
   }, []);
 
   useEffect(() => {
