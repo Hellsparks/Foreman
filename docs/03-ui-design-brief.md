@@ -84,7 +84,7 @@ Tabs: **Live** (webcam large, temps with presets, progress, pause/resume/cancel,
 - **Service**: due/overdue across fleet (task, printer, hours/grams/jobs vs interval), task Inspector (history with notes/photos, Mark done + note, Snooze 10 h, interval editor hours/grams/jobs).
 - **Tools**: Calibration (pick filament + printer → print test via Send panel → enter measurements → result → Apply to filament); Swatches (2 lines of text, live 3D preview, download STL); **Import** page (upload → map fields → preview diff → apply → batch Undo); **Export** (OrcaSlicer, HueForge, CSV, JSON).
 - **Settings**: single-column groups with explicit Save (General, Server & API keys, Backup, Notifications, Appearance with 4×2 theme picker, Printers list, Data).
-- **Setup** pages: Mode (this machine is the server / connect to server) → Data (fresh / import Marathon / existing Spoolman DB) → Printers (discovered list + manual using Config sections) → Features & theme → Fleet with "getting started" attention items.
+- **Setup** pages: Mode (this machine is the server / connect to server) → Data (fresh / existing Spoolman DB; no Marathon import, D10 dropped) → Printers (discovered list + manual using Config sections) → Features & theme → Fleet with "getting started" attention items.
 - **Add printer** page with discovery list.
 - Command palette overlay (desktop) + Search page (phone).
 

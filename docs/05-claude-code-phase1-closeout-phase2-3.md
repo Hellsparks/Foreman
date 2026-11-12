@@ -285,6 +285,11 @@ Bambu Cloud is Phase 2C (D11). Sessions 26–30 can be pulled forward by the own
 ## Corrections log
 (Claude Code: record any place where this brief disagreed with upstream source or reality, and what you did.)
 
+### Session 36 — 2026-11-12 (6.3 Marathon importer: dropped)
+
+- **Scope change (owner):** 6.3 / D10 is dropped. A working importer was drafted (dry run, conflicts, spool re-linking, one-transaction apply, tests) and then thrown away without being merged. The owner was the only Marathon user and nothing in that data is critical. Docs 01 and 03 now mark D10 as dropped. Don't build it again.
+- **Found while drafting:** the owner's Marathon backup stops at migration **037**, not 041 as D10 said. Spoolman id #10 now means a different filament than Marathon recorded. Neither matters any more.
+
 ### Session 35 — 2026-11-12 (6.2 backup + restore)
 
 - **Scope change (owner):** SMB dropped from this session; the destination is a local folder (a share mounted by the owner works). Remote destinations → Backlog (Phase 4).
