@@ -379,7 +379,14 @@ pub async fn serve_with(
         });
     }
 
-    let app = build_router(app_state.clone());
+    let frontend_dist = cfg.resolve_frontend_dir();
+    if !frontend_dist.join("index.html").is_file() {
+        warn!(
+            "web UI not found at {} (set FOREMAN__FRONTEND_DIR); serving the API only",
+            frontend_dist.display()
+        );
+    }
+    let app = build_router(app_state.clone(), frontend_dist);
 
     let stop = tokio_util::sync::CancellationToken::new();
     spawn_spoolman(&cfg, &spoolman, stop.clone()).await;
@@ -759,13 +766,8 @@ async fn spawn_spoolman(
 const UPLOAD_LIMIT: usize = 2 * 1024 * 1024 * 1024;
 
 /// Build the HTTP router (all routes behind [`auth::require_auth`]).
-fn build_router(app_state: AppState) -> Router {
+fn build_router(app_state: AppState, frontend_dist: PathBuf) -> Router {
     // Static file serving for the frontend.
-    let frontend_dist = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|r| r.join("frontend/dist"))
-        .unwrap_or_else(|| PathBuf::from("frontend/dist"));
 
     let spa_fallback = frontend_dist.join("index.html");
 

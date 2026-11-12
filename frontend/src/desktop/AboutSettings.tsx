@@ -87,6 +87,41 @@ export function AppSettings() {
   );
 }
 
+function BetaUpdates() {
+  const [prefs, setPrefs] = useState<DesktopPrefs | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    void desktop.prefs().then(setPrefs).catch((e) => setError(errText(e)));
+  }, []);
+  if (!prefs) return error ? <span className="auth__hint auth__hint--warn">{error}</span> : null;
+  return (
+    <label className="auth__check">
+      <input
+        type="checkbox"
+        checked={prefs.update_channel === "beta"}
+        onChange={(e) =>
+          void desktop
+            .setUpdateChannel(e.target.checked ? "beta" : "stable")
+            .then((next) => {
+              setPrefs(next);
+              setError("");
+            })
+            .catch((err) => setError(errText(err)))
+        }
+      />
+      <span>
+        Beta updates
+        <span className="auth__hint">
+          {" "}
+          Also offer pre-releases (release candidates) before they become a full release. They are tested less. Turning
+          this off never downgrades; you move back to full releases at the next one.
+        </span>
+        {error && <span className="auth__hint auth__hint--warn"> {error}</span>}
+      </span>
+    </label>
+  );
+}
+
 function Updates({ app }: { app: AppInfo }) {
   const u = useUpdate();
   const info = u.status === "available" || u.status === "installing" ? u.info : u.status === "error" ? u.info : undefined;
@@ -124,6 +159,7 @@ function Updates({ app }: { app: AppInfo }) {
           Couldn't {u.info ? "install the update" : "check for updates"}: {u.error}
         </span>
       )}
+      <BetaUpdates />
     </div>
   );
 }

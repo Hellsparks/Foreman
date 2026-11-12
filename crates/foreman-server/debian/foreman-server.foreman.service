@@ -1,0 +1,29 @@
+[Unit]
+Description=Foreman print farm server
+Documentation=https://github.com/Hellsparks/Foreman
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=foreman
+Group=foreman
+# Reachable on the LAN by default; set FOREMAN__HOST=127.0.0.1 in
+# /etc/default/foreman to keep it on this machine.
+Environment=FOREMAN__HOST=0.0.0.0
+Environment=FOREMAN__DATA_DIR=/var/lib/foreman
+Environment=FOREMAN_CONFIG_FILE=/etc/foreman/config.toml
+Environment=HOME=/var/lib/foreman
+EnvironmentFile=-/etc/default/foreman
+ExecStart=/usr/bin/foreman-server
+# Creates /var/lib/foreman owned by the foreman user.
+StateDirectory=foreman
+StateDirectoryMode=0750
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

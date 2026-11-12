@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Foreman",
-  "version": "0.1.0",
   "identifier": "app.foreman.desktop",
   "build": {
     "beforeDevCommand": "npm --prefix ../frontend run dev",
+    "beforeBuildCommand": "npm --prefix ../frontend run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../../frontend/dist"
   },
@@ -23,7 +23,13 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
+    "targets": ["nsis", "appimage", "deb", "rpm"],
+    "createUpdaterArtifacts": true,
+    "publisher": "Foreman Contributors",
+    "license": "GPL-3.0-or-later",
+    "category": "Utility",
+    "shortDescription": "Print farm manager for Klipper, Bambu and Prusa printers",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -34,7 +40,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NzZBMTc4QjI3MzRCNDgKUldSSVMzT3llS0YyU01MbUhqc1dSTThvVVQ4L0FaRjNBTlZGSFBVMHNPQjNSVlhZWjAvRmRXb1EK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEQTc5Q0Y5ODAyMEQ5QTAKUldTZzJTQ0ErWnlublFNZEZhakN2Y3hSaW1oSk1yUFVxSE9GTHZ1NVQzaVgxNWU4L1VvbnhXRFkK",
       "endpoints": [
         "https://github.com/Hellsparks/Foreman/releases/latest/download/latest.json"
       ],

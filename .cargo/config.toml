@@ -28,6 +28,10 @@ check-all = "run -q -p xtask -- dev-check"
 # Usage: cargo compat [--engine sqlite|postgres|mariadb|cockroach]
 compat = "run -p xtask -- compat"
 
+# Release version for the whole workspace + desktop app + frontend (the release
+# workflow runs it with the pushed tag). Usage: cargo set-version 0.4.0-rc.1
+set-version = "run -q -p xtask -- set-version"
+
 # Launch the Tauri desktop shell in dev mode (Vite dev server + embedded server).
 # Requires: cargo install tauri-cli --version "^2"
 tauri-dev = "tauri dev -p foreman-desktop"

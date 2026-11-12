@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    if ! getent group foreman >/dev/null; then
+        groupadd --system foreman
+    fi
+    if ! getent passwd foreman >/dev/null; then
+        useradd --system --gid foreman --home-dir /var/lib/foreman --no-create-home \
+            --shell /usr/sbin/nologin --comment "Foreman print farm server" foreman
+    fi
+    mkdir -p /var/lib/foreman /etc/foreman
+    chown foreman:foreman /var/lib/foreman
+    chmod 0750 /var/lib/foreman
+fi
+
+#DEBHELPER#

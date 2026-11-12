@@ -14,6 +14,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Foreman Contributors"]
 license = "GPL-3.0-or-later"
+repository = "https://github.com/Hellsparks/Foreman"
+homepage = "https://github.com/Hellsparks/Foreman"
 
 [workspace.dependencies]
 # Async runtime
@@ -89,6 +91,10 @@ lto = true
 codegen-units = 1
 strip = true
 
+# Release archives and the .deb (dist + cargo-deb): same settings as release.
+[profile.dist]
+inherits = "release"
+
 # Swatch generator (D8): the CSG / font / polygon crates are ~30x slower
 # unoptimised. Build them optimised in dev and test too so swatches stay < 1 s.
 [profile.dev.package.csgrs]
@@ -105,3 +111,20 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.ttf-parser]
 opt-level = 3
+
+# Release archives for the headless server (dist / cargo-dist). Only
+# foreman-server is distributed this way; the desktop app is built by Tauri and the
+# .deb / Docker image by the release workflow. `dist plan` previews the result.
+[workspace.metadata.dist]
+cargo-dist-version = "0.33.1"
+ci = "github"
+# No installers: dist's shell installer copies only the binary, and the server
+# needs its frontend/ folder beside it. The .deb and Docker image cover installs.
+installers = []
+targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+# .github/workflows/release.yml is hand-written (it also builds the desktop app,
+# the .deb and the Docker image); dist builds the server archives inside it.
+allow-dirty = ["ci"]
+checksum = "sha256"
+# Build only foreman-server (--package), not the Tauri app and its WebKit deps.
+precise-builds = true

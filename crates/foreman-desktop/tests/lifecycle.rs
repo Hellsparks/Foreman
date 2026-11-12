@@ -39,6 +39,7 @@ async fn close_to_tray_keeps_server_quit_stops_it() {
         data_dir: dir.clone(),
         spoolman_enabled: false,
         drivers_enabled: false,
+        frontend_dir: None,
         desktop_mode: true,
     };
 

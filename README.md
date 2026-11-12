@@ -34,20 +34,67 @@ opens a window pointing at the Vite dev server.  The embedded Foreman server
   app checks on launch and from **Settings → About → Check now**, shows the release
   notes, and installs only when you press *Install*. The app warns (never blocks)
   when its version and the server's differ by more than a patch release.
+- **Beta updates** (Settings → About, default off) also offers pre-releases
+  (`v0.4.0-rc.1`), from `beta.json` on the `update-channels` branch. Turning it off
+  never downgrades; the next full release moves you back.
 
 ### Updater signing key (maintainer)
 
 Update bundles must be signed; the app only accepts files signed by the key whose
 public half is in `crates/foreman-desktop/tauri.conf.json` (`plugins.updater.pubkey`).
 
-- Private key: `~/.tauri/foreman-updater.key` on the maintainer's machine (no
-  password). **Never commit it.** Keep an offline copy in your password manager — if
-  it is lost, installed apps can never update again (a new key needs a manual reinstall).
-- For release builds (CI), store it as repository secrets:
-  `TAURI_SIGNING_PRIVATE_KEY` = the file's content, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
-  = empty. Tauri reads these when `bundle.createUpdaterArtifacts` is on.
-- Regenerate (only if lost/compromised; then update `pubkey`):
-  `npm --prefix frontend exec tauri -- signer generate -w ~/.tauri/foreman-updater.key`
+- Private key: `~/.tauri/foreman-updater.key` on the maintainer's machine, encrypted
+  with the passphrase in `~/.tauri/foreman-updater.key.password`. **Never commit
+  either.** Keep an offline copy of both in your password manager — if the key or
+  its passphrase is lost, installed apps can never update again (a new key needs a
+  manual reinstall).
+- Release builds (CI) read them from two repository secrets. Set them once; `gh`
+  reads the value from stdin, so nothing lands in shell history:
+
+  ```
+  gh secret set TAURI_SIGNING_PRIVATE_KEY --repo Hellsparks/Foreman < ~/.tauri/foreman-updater.key
+  gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo Hellsparks/Foreman < ~/.tauri/foreman-updater.key.password
+  ```
+
+  PowerShell: `Get-Content -Raw $HOME\.tauri\foreman-updater.key | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo Hellsparks/Foreman`
+  (same for the password file).
+- Regenerate (only if lost/compromised; then update `pubkey` and both secrets):
+  `npm --prefix frontend exec -- tauri signer generate --ci -f -w ~/.tauri/foreman-updater.key -p <passphrase>`
+
+## Releases (maintainer)
+
+Pushing a tag `v*` runs `.github/workflows/release.yml` and publishes a GitHub Release
+with everything below. A tag with a `-` (`v0.4.0-rc.1`) publishes as a **pre-release**:
+not "latest", so stable installs ignore it; beta-channel installs get it.
+
+The version comes from the tag (`cargo set-version` writes it to the workspace,
+the desktop app and the frontend before building). The release body is the tag's
+annotation (your summary) followed by the commits since the previous tag, the
+downloads table and checksum instructions.
+
+```
+git switch main
+git pull
+git tag -a v0.4.0-rc.1 -m "Summary of this release, shown at the top of the notes and in the app's update dialog."
+git push origin v0.4.0-rc.1
+```
+
+Dry run (builds everything, publishes nothing, uploads a `release-preview` artifact
+with every file, `latest.json` and the body): **Actions → Release → Run workflow**
+with *publish* off, or `gh workflow run release.yml -f version=0.4.0-rc.1`.
+
+| File | What |
+|---|---|
+| `Foreman_<v>_windows_x64-setup.exe` | Windows installer (NSIS) |
+| `Foreman_<v>_linux_{x86_64,aarch64}.AppImage`, `_{amd64,arm64}.deb`, `_{x86_64,aarch64}.rpm` | Linux desktop app |
+| `*.sig`, `latest.json` | Updater signatures and manifest |
+| `foreman-server_<v>_{amd64,arm64}.deb` | Headless server as a systemd service |
+| `foreman-server-{x86_64,aarch64}-unknown-linux-gnu.tar.xz` (+ `.sha256`) | Headless server binary + web UI (built with dist) |
+| `SHA256SUMS` | Checksums of every file |
+| `ghcr.io/hellsparks/foreman:<v>` | Docker image, linux/amd64 + linux/arm64 (`latest` = newest full release) |
+
+The first push creates the GHCR package as private: make it public once under
+GitHub → Packages → foreman → Package settings.
 
 ## Headless server (Pi, NAS, always-on PC)
 
@@ -64,9 +111,33 @@ the `FOREMAN__HOST` environment variable.
 The desktop app's "This computer" mode is different: it stays on localhost until you
 turn on **Settings → Security → Let other devices connect**.
 
-### systemd (Linux)
+### Debian / Ubuntu / Raspberry Pi OS (.deb)
 
-`/etc/systemd/system/foreman.service`:
+```
+sudo apt install ./foreman-server_<version>_arm64.deb    # or _amd64.deb
+journalctl -u foreman                                     # the setup code
+```
+
+The package installs the systemd service `foreman` (enabled and started), running as
+the system user `foreman` with its data in `/var/lib/foreman` and listening on all
+interfaces. Settings go in `/etc/default/foreman` (e.g. `FOREMAN__HOST=127.0.0.1`)
+or `/etc/foreman/config.toml`; then `sudo systemctl restart foreman`.
+`apt purge foreman-server` also deletes `/var/lib/foreman` and the user.
+
+### Docker
+
+```
+docker run -d --name foreman --restart unless-stopped -p 9090:9090 -p 7912:7912 -v foreman-data:/data ghcr.io/hellsparks/foreman:latest
+docker logs foreman    # the setup code
+```
+
+For mDNS discovery by the desktop app, run with `--network host` instead of `-p`.
+
+### Any Linux (archive)
+
+Unpack `foreman-server-<target>.tar.xz` and keep `foreman-server` and its `frontend/`
+folder together (the web UI is served from there, or from `FOREMAN__FRONTEND_DIR`).
+A unit file for a hand install:
 
 ```ini
 [Unit]
@@ -76,7 +147,7 @@ Wants=network-online.target
 
 [Service]
 User=foreman
-ExecStart=/usr/local/bin/foreman-server
+ExecStart=/opt/foreman/foreman-server
 Restart=on-failure
 
 [Install]
