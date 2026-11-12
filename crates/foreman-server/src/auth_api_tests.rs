@@ -86,6 +86,7 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
         library,
         transfers,
         data_dir: dir.path().to_path_buf(),
+        drivers_enabled: false,
     };
     (build_router(state.clone()), state)
 }

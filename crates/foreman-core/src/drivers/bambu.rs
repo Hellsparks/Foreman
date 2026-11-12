@@ -62,7 +62,7 @@ pub struct BambuConfig {
 // ---------------------------------------------------------------------------
 
 /// Derive printer model from serial number prefix.
-fn model_from_serial(serial: &str) -> Option<&'static str> {
+pub fn model_from_serial(serial: &str) -> Option<&'static str> {
     if serial.len() < 3 {
         return None;
     }
@@ -537,6 +537,114 @@ fn ftps_connect_sync(
         .map_err(|e| AppError::Driver(format!("ftps login: {e}")))?;
 
     Ok(ftp)
+}
+
+// ---------------------------------------------------------------------------
+// LAN probes for setup / discovery (read-only: no MQTT, no commands)
+// ---------------------------------------------------------------------------
+
+/// Common names (OID 2.5.4.3) in a DER certificate, in order: issuer first, then subject.
+pub fn der_common_names(der: &[u8]) -> Vec<String> {
+    const CN_OID: [u8; 5] = [0x06, 0x03, 0x55, 0x04, 0x03];
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + CN_OID.len() + 2 <= der.len() {
+        if der[i..i + CN_OID.len()] == CN_OID {
+            let tag = der[i + CN_OID.len()];
+            let len = der[i + CN_OID.len() + 1] as usize;
+            let start = i + CN_OID.len() + 2;
+            if matches!(tag, 0x0C | 0x13 | 0x14 | 0x16) && len < 0x80 && start + len <= der.len() {
+                out.push(String::from_utf8_lossy(&der[start..start + len]).into_owned());
+                i = start + len;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+/// What the printer's MQTT TLS certificate says about it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TlsIdentity {
+    pub issuer_cn: Option<String>,
+    pub subject_cn: Option<String>,
+}
+
+impl TlsIdentity {
+    /// Bambu printers present a certificate issued by "BBL CA" (or a BBL device CA)
+    /// whose subject CN is the serial number.
+    pub fn bambu_serial(&self) -> Option<&str> {
+        let issuer = self.issuer_cn.as_deref()?;
+        if !issuer.contains("BBL") {
+            return None;
+        }
+        self.subject_cn.as_deref().filter(|s| {
+            !s.is_empty() && s.len() <= 32 && s.chars().all(|c| c.is_ascii_alphanumeric())
+        })
+    }
+}
+
+/// TLS handshake with port 8883 to read the certificate (no MQTT session is opened).
+pub async fn probe_tls_identity(host: &str, timeout: Duration) -> Result<TlsIdentity, AppError> {
+    let host = host.to_owned();
+    let run = tokio::task::spawn_blocking(move || -> Result<TlsIdentity, AppError> {
+        use std::net::{TcpStream, ToSocketAddrs};
+        let addr = (host.as_str(), 8883u16)
+            .to_socket_addrs()
+            .map_err(|e| AppError::Driver(format!("resolve {host}: {e}")))?
+            .next()
+            .ok_or_else(|| AppError::Driver(format!("no address for {host}")))?;
+        let tcp = TcpStream::connect_timeout(&addr, timeout)
+            .map_err(|e| AppError::Driver(format!("port 8883: {e}")))?;
+        tcp.set_read_timeout(Some(timeout)).ok();
+        tcp.set_write_timeout(Some(timeout)).ok();
+        let connector = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .danger_accept_invalid_hostnames(true)
+            .build()
+            .map_err(|e| AppError::Driver(format!("tls: {e}")))?;
+        let stream = connector
+            .connect(&host, tcp)
+            .map_err(|e| AppError::Driver(format!("tls handshake: {e}")))?;
+        let der = stream
+            .peer_certificate()
+            .map_err(|e| AppError::Driver(format!("tls cert: {e}")))?
+            .ok_or_else(|| AppError::Driver("no certificate".into()))?
+            .to_der()
+            .map_err(|e| AppError::Driver(format!("tls cert: {e}")))?;
+        let cns = der_common_names(&der);
+        Ok(TlsIdentity {
+            issuer_cn: cns.first().cloned(),
+            subject_cn: cns.get(1).cloned(),
+        })
+    });
+    match tokio::time::timeout(timeout * 2, run).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => Err(AppError::Driver(format!("tls probe task: {e}"))),
+        Err(_) => Err(AppError::Driver("timed out".into())),
+    }
+}
+
+/// Sign in to the printer's FTPS (port 990) with `bblp` + access code, then sign out.
+/// Proves the access code without opening MQTT or sending any command.
+pub async fn check_access_code(
+    host: &str,
+    access_code: &str,
+    timeout: Duration,
+) -> Result<(), AppError> {
+    let host = host.to_owned();
+    let code = access_code.to_owned();
+    let run = tokio::task::spawn_blocking(move || -> Result<(), AppError> {
+        let mut ftp = ftps_connect_sync(&host, &code)?;
+        let _ = ftp.quit();
+        Ok(())
+    });
+    match tokio::time::timeout(timeout, run).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => Err(AppError::Driver(format!("access code check task: {e}"))),
+        Err(_) => Err(AppError::Driver("timed out".into())),
+    }
 }
 
 // ---------------------------------------------------------------------------

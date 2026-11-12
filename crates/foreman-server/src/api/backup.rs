@@ -131,10 +131,19 @@ pub async fn put_settings(
     State(s): State<AppState>,
     Json(b): Json<PutBackupSettings>,
 ) -> ApiResult<Json<BackupOverview>> {
-    let mut next = b.settings;
+    Ok(Json(save_settings(&s, b.settings, b.passphrase).await?))
+}
+
+/// Validate and store backup settings (also used by first-run setup).
+pub async fn save_settings(
+    s: &AppState,
+    settings: BackupSettings,
+    passphrase: Option<String>,
+) -> ApiResult<BackupOverview> {
+    let mut next = settings;
     next.validate()?;
     let pool = &s.foreman_db.pool;
-    if let Some(p) = &b.passphrase {
+    if let Some(p) = &passphrase {
         if p.is_empty() {
             repo::setting::set(pool, svc::SETTING_PASSPHRASE, "").await?;
         } else {
@@ -147,13 +156,13 @@ pub async fn put_settings(
             repo::setting::set(pool, svc::SETTING_PASSPHRASE, &s.secrets.seal(p)?).await?;
         }
     }
-    if next.encrypt && !has_passphrase(&s).await {
+    if next.encrypt && !has_passphrase(s).await {
         return Err(ApiError::new(
             StatusCode::BAD_REQUEST,
             "Encryption is on: enter a passphrase.",
         ));
     }
-    let prev = load_settings(&s).await?;
+    let prev = load_settings(s).await?;
     // Re-anchor the schedule when it changes, so a slot that already passed today
     // does not fire the moment the schedule is saved.
     let changed =
@@ -166,7 +175,7 @@ pub async fn put_settings(
     let json = serde_json::to_string(&next)
         .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     repo::setting::set(pool, svc::SETTING_KEY, &json).await?;
-    Ok(Json(build_overview(&s).await?))
+    Ok(build_overview(s).await?)
 }
 
 #[derive(Debug, Deserialize, TS)]
@@ -184,8 +193,17 @@ pub struct CheckDirResult {
 
 /// Can Foreman create the folder and write a file in it?
 pub async fn check_dir(Json(b): Json<CheckDirRequest>) -> Json<CheckDirResult> {
-    let dir = PathBuf::from(b.dir.trim());
-    let res = tokio::task::spawn_blocking(move || -> Result<String, String> {
+    Json(
+        match check_dir_writable(PathBuf::from(b.dir.trim())).await {
+            Ok(message) => CheckDirResult { ok: true, message },
+            Err(message) => CheckDirResult { ok: false, message },
+        },
+    )
+}
+
+/// Create the folder if needed and prove a file can be written and deleted there.
+pub async fn check_dir_writable(dir: PathBuf) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || -> Result<String, String> {
         if !dir.is_absolute() {
             return Err("Use a full path.".into());
         }
@@ -200,11 +218,7 @@ pub async fn check_dir(Json(b): Json<CheckDirRequest>) -> Json<CheckDirResult> {
         ))
     })
     .await
-    .unwrap_or_else(|e| Err(e.to_string()));
-    Json(match res {
-        Ok(message) => CheckDirResult { ok: true, message },
-        Err(message) => CheckDirResult { ok: false, message },
-    })
+    .unwrap_or_else(|e| Err(e.to_string()))
 }
 
 #[derive(Debug, Default, Deserialize, TS)]

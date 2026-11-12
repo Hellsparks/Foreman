@@ -72,8 +72,13 @@ pub async fn create_printer(
     let pool = &state.foreman_db.pool;
     match foreman_core::repo::printer::create(pool, req).await {
         Ok(printer) => {
-            // Start the driver for the new printer.
-            if let Err(e) = state.driver_manager.start_driver(&printer).await {
+            // Start the driver for the new printer (not with printer connections off).
+            if !state.drivers_enabled {
+                tracing::info!(
+                    printer_id = printer.id,
+                    "printer added; drivers are off, not connecting"
+                );
+            } else if let Err(e) = state.driver_manager.start_driver(&printer).await {
                 tracing::warn!(
                     printer_id = printer.id,
                     "driver start failed (printer created): {e}"
