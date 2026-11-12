@@ -83,3 +83,27 @@ pub async fn swatch_batch(
     let zip = svc::swatch_zip(sm(&s)?, &ids).await?;
     Ok(download(zip, "application/zip", "foreman-swatches.zip"))
 }
+
+/// `GET /api/exports/spools.csv` — every spool for spreadsheets.
+pub async fn spools_csv(State(s): State<AppState>) -> ApiResult<Response> {
+    let (csv, _) = svc::spools_csv(sm(&s)?).await?;
+    let day = chrono::Local::now().format("%Y-%m-%d");
+    Ok(download(
+        csv,
+        "text/csv; charset=utf-8",
+        &format!("foreman-spools-{day}.csv"),
+    ))
+}
+
+/// `GET /api/exports/spoolman.json` — vendors, filaments, spools in Spoolman's API shape.
+pub async fn spoolman_json(State(s): State<AppState>) -> ApiResult<Response> {
+    let v = svc::spoolman_json(sm(&s)?).await?;
+    let text = serde_json::to_vec_pretty(&v)
+        .map_err(|e| ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let day = chrono::Local::now().format("%Y-%m-%d");
+    Ok(download(
+        text,
+        "application/json",
+        &format!("foreman-spoolman-{day}.json"),
+    ))
+}

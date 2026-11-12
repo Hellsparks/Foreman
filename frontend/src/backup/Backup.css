@@ -1,0 +1,56 @@
+/* Settings → Backup (6.2). Tokens only. */
+.bk-warn {
+  padding: var(--fw-space-3) 14px;
+  border: var(--fw-border-width) solid var(--fw-warning);
+  background: var(--fw-warning-bg);
+  margin: 0 0 var(--fw-space-4);
+}
+.bk-danger {
+  padding: var(--fw-space-3) 14px;
+  border: var(--fw-border-width) solid var(--fw-danger);
+  background: var(--fw-danger-bg);
+}
+.bk-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+}
+.bk-field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fw-space-2);
+  align-items: center;
+}
+.bk-field > .auth__input { flex: 1 1 240px; width: auto; }
+.bk-select,
+.bk-small {
+  min-height: var(--fw-control-height);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  background: var(--fw-raised);
+  color: var(--fw-text);
+  padding: 0 var(--fw-space-3);
+  border-radius: var(--fw-radius-control);
+}
+.bk-small { width: 6em; }
+.bk-select:focus-visible,
+.bk-small:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 3px; }
+.bk-actions { display: flex; flex-wrap: wrap; gap: var(--fw-space-2); }
+.bk-entry { flex: 1 1 260px; min-width: 0; }
+.bk-entry b { overflow-wrap: anywhere; }
+.bk-table { border-collapse: collapse; width: 100%; font-size: var(--fw-type-label); }
+.bk-table th,
+.bk-table td {
+  text-align: left;
+  padding: var(--fw-space-1) var(--fw-space-2);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+  overflow-wrap: anywhere;
+}
+.bk-table td.bk-diff { color: var(--fw-warning); }
+.bk-restore {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+  padding: var(--fw-space-3) var(--fw-space-4);
+  border: var(--fw-border-width) solid var(--fw-border);
+  background: var(--fw-raised);
+}

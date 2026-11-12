@@ -61,6 +61,8 @@ russh = { workspace = true }
 russh-sftp = { workspace = true }
 tokio-util = { workspace = true }
 zip = { workspace = true }
+# Passphrase-encrypted backups (age format; `age -d` opens them by hand)
+age = "0.11"
 
 # URL parsing (path failover health checks)
 url = "2"

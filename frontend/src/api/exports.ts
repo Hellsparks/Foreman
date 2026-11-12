@@ -1,5 +1,5 @@
 /** Exports + swatches (task 5.5, W11). */
-import { postBlob, request, saveBlob } from "./client";
+import { getBlob, postBlob, request, saveBlob } from "./client";
 import type { ExportRow } from "./types/ExportRow";
 import type { HueForgeSkip } from "./types/HueForgeSkip";
 import type { OrcaProfileInfo } from "./types/OrcaProfileInfo";
@@ -18,6 +18,16 @@ export const exportsApi = {
   /** `null` = every filament. */
   orca: (ids: number[] | null) => download("/api/exports/orca", { filament_ids: ids }, "foreman-orca-filaments.zip"),
   hueforge: (ids: number[] | null) => download("/api/exports/hueforge", { filament_ids: ids }, "foreman-hueforge.json"),
+  /** Every spool (archived flagged) as CSV. */
+  spoolsCsv: async () => {
+    const { blob, filename } = await getBlob("/api/exports/spools.csv");
+    saveBlob(blob, filename ?? "foreman-spools.csv");
+  },
+  /** Vendors, filaments and spools in Spoolman's API shape. */
+  spoolmanJson: async () => {
+    const { blob, filename } = await getBlob("/api/exports/spoolman.json");
+    saveBlob(blob, filename ?? "foreman-spoolman.json");
+  },
   swatchFit: (line1: string, line2: string) => request<SwatchFit>("POST", "/api/swatch/fit", { line1, line2 }),
   swatchStl: (line1: string, line2: string) => download("/api/swatch/stl", { line1, line2 }, "swatch.stl"),
   swatchBatch: (ids: number[]) => download("/api/swatch/batch", { filament_ids: ids }, "foreman-swatches.zip"),

@@ -304,3 +304,127 @@ pub async fn swatch_zip(sm: &Spoolman, ids: &[i64]) -> Result<Vec<u8>, AppError>
     .await
     .map_err(|e| AppError::Internal(format!("swatch task: {e}")))?
 }
+
+// ---------------------------------------------------------------------------
+// Spool CSV + Spoolman JSON (session 35)
+// ---------------------------------------------------------------------------
+
+async fn all_spool_responses(
+    sm: &Spoolman,
+) -> Result<Vec<spoolman_rs::models::SpoolResponse>, AppError> {
+    let (rows, _) = spoolman_rs::db::spool::find(
+        &sm.db.pool,
+        &sm.db.engine,
+        &spoolman_rs::db::spool::SpoolFilter {
+            allow_archived: true,
+            limit: Some(1_000_000),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|e| AppError::Internal(format!("spoolman: {e}")))?;
+    Ok(rows)
+}
+
+/// A CSV cell: quoted when needed; text that a spreadsheet would run as a formula
+/// (`=`, `+`, `-`, `@`, tab, CR) gets a leading `'`.
+fn csv_text(v: &str) -> String {
+    let v = if v.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{v}")
+    } else {
+        v.to_owned()
+    };
+    if v.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", v.replace('"', "\"\""))
+    } else {
+        v
+    }
+}
+
+fn csv_num(v: Option<f64>) -> String {
+    v.map(|x| {
+        let r = (x * 100.0).round() / 100.0;
+        r.to_string()
+    })
+    .unwrap_or_default()
+}
+
+/// Every spool (archived ones flagged) with weights, location and prices, one row each.
+pub async fn spools_csv(sm: &Spoolman) -> Result<(Vec<u8>, usize), AppError> {
+    let rows = all_spool_responses(sm).await?;
+    let mut out = String::from(
+        "spool_id,vendor,filament,material,colour,remaining_g,used_g,initial_g,\
+         empty_spool_g,location,spool_price,filament_price,lot_nr,first_used,last_used,\
+         archived,comment\n",
+    );
+    for s in &rows {
+        let f = &s.filament;
+        let colour = f
+            .color_hex
+            .clone()
+            .or_else(|| f.multi_color_hexes.clone())
+            .unwrap_or_default();
+        let t = |v: &Option<String>| v.as_deref().map(csv_text).unwrap_or_default();
+        let cells = [
+            s.id.to_string(),
+            f.vendor
+                .as_ref()
+                .map(|v| csv_text(&v.name))
+                .unwrap_or_default(),
+            t(&f.name),
+            t(&f.material),
+            csv_text(&colour),
+            csv_num(s.remaining_weight),
+            csv_num(Some(s.used_weight)),
+            csv_num(s.initial_weight.or(f.weight)),
+            csv_num(s.spool_weight.or(f.spool_weight)),
+            t(&s.location),
+            csv_num(s.price),
+            csv_num(f.price),
+            t(&s.lot_nr),
+            t(&s.first_used),
+            t(&s.last_used),
+            s.archived.to_string(),
+            t(&s.comment),
+        ];
+        out.push_str(&cells.join(","));
+        out.push('\n');
+    }
+    Ok((out.into_bytes(), rows.len()))
+}
+
+/// Vendors, filaments and spools exactly as Spoolman's REST API returns them (incl.
+/// extra fields and archived spools), in one file.
+pub async fn spoolman_json(sm: &Spoolman) -> Result<serde_json::Value, AppError> {
+    let map = |e: spoolman_rs::error::SpoolmanError| AppError::Internal(format!("spoolman: {e}"));
+    let (vendors, _) = spoolman_rs::db::vendor::find(
+        &sm.db.pool,
+        &sm.db.engine,
+        &spoolman_rs::db::vendor::VendorFilter {
+            limit: Some(1_000_000),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(map)?;
+    let (filaments, _) = spoolman_rs::db::filament::find(
+        &sm.db.pool,
+        &sm.db.engine,
+        &spoolman_rs::db::filament::FilamentFilter {
+            limit: Some(1_000_000),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(map)?;
+    let spools = all_spool_responses(sm).await?;
+    Ok(serde_json::json!({
+        "format": "foreman-spoolman-export",
+        "spoolman_api": "v1",
+        "spoolman_schema": spoolman_rs::db::migrations::HEAD,
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "vendors": vendors,
+        "filaments": filaments,
+        "spools": spools,
+    }))
+}

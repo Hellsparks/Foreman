@@ -247,6 +247,24 @@ async function postBlob(path: string, body: unknown): Promise<{ blob: Blob; file
   return { blob: await res.blob(), filename: m ? m[1] : null };
 }
 
+/** GET a file (CSV / JSON download) with its suggested name. */
+async function getBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const res = await apiFetch(path, { method: "GET" });
+  if (!res.ok) {
+    let msg = `GET ${path} → ${res.status}`;
+    try {
+      const j = await res.json();
+      if (j && typeof j.error === "string") msg = j.error;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, msg);
+  }
+  const cd = res.headers.get("Content-Disposition") ?? "";
+  const m = /filename="([^"]+)"/.exec(cd);
+  return { blob: await res.blob(), filename: m ? m[1] : null };
+}
+
 /** Hands a blob to the browser as a download. */
 export function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -481,4 +499,4 @@ export interface NetworkSettings {
 
 export type { ApiKey };
 
-export { ApiError, postBlob, req as request };
+export { ApiError, getBlob, postBlob, req as request };

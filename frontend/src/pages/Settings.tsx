@@ -3,6 +3,7 @@ import { useAppearance, THEMES, MODES, type Theme, type Mode } from "../hooks/us
 import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
 import SecuritySettings from "../auth/SecuritySettings";
+import BackupSettings from "../backup/BackupSettings";
 import ThemeSettings from "../theme/ThemeSettings";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
@@ -204,6 +205,8 @@ export default function Settings() {
       </section>
 
       <SecuritySettings />
+
+      <BackupSettings />
 
       <p className="page-placeholder" style={{ marginTop: 32 }}>
         Server config, backup, notifications — coming in phase 7.
