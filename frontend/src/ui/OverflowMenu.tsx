@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { OverlayPortal } from "./Popover";
 
 export interface OverflowItem {
   label: string;
@@ -55,6 +56,7 @@ export default function OverflowMenu({ items, label = "More actions" }: Overflow
           <circle cx="19" cy="12" r="2" />
         </svg>
       </button>
+      <OverlayPortal>
       {open && <div className="phone-sheet__scrim" onClick={() => setOpen(false)} />}
       <div id={id} className="phone-sheet" role="dialog" aria-label={label} data-open={open} inert={!open ? true : undefined}>
         <div className="phone-sheet__head">
@@ -83,6 +85,7 @@ export default function OverflowMenu({ items, label = "More actions" }: Overflow
           ))}
         </ul>
       </div>
+      </OverlayPortal>
     </>
   );
 }

@@ -1,0 +1,42 @@
+/* Page layout at every width (doc 06 §8–§11). Tokens only.
+ *
+ * §9 Content regions fill the remaining height: the work area is a flex
+ *    column, the page fills it, and the page's content region (`.page-fill`)
+ *    takes what is left, so a list, grid or panel reaches the bottom of the
+ *    viewport whatever its item count. Empty space is inside the container.
+ * §10 Desktop fills the width: groups of cards and sections are an auto-fit
+ *    grid (`.auto-cols`) with a minmax track; they reflow to 1–4 columns.
+ *    Reading text keeps a ~70ch measure.
+ */
+.shell__work {
+  display: flex;
+  flex-direction: column;
+}
+.shell__work > * {
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+.page-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.page-fill--col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Track widths come from content (doc 06 §11):
+   --col-min 460 px: a form/section column (label + control + help), as the
+   printer Config tab; 300 px: a printer card; 280 px: a project card. */
+.auto-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--col-min, 460px)), 1fr));
+  gap: var(--fw-space-5);
+  align-items: start;
+  align-content: start;
+}
+.auto-cols > .span-all { grid-column: 1 / -1; }
+
+/* Reading text: a measure, not the full width. */
+.shell__work p { max-width: 70ch; }

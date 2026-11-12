@@ -37,7 +37,7 @@ export default function Settings() {
   };
 
   return (
-    <div>
+    <div className="set-page auto-cols">
       {/* Phone (doc 06 §2): the settings groups in the left panel. Desktop has no sidebar here. */}
       <EdgePanel side="left" label="Settings groups" storageKey="settings.groups" desktop={false}>
         <span className="edge-panel__label">Settings</span>
@@ -57,13 +57,13 @@ export default function Settings() {
           ))}
         </nav>
       </EdgePanel>
-      <div className="page-header">
+      <div className="page-header span-all">
         <p className="page-header__eyebrow">Settings</p>
         <h1 className="page-header__title phone-dup-title">Settings</h1>
       </div>
 
       {/* Appearance ─────────────────────────────────────────────────────── */}
-      <section aria-labelledby="appearance-heading" style={{ maxWidth: 640 }}>
+      <section aria-labelledby="appearance-heading">
         <h2
           id="appearance-heading"
           style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
@@ -152,7 +152,7 @@ export default function Settings() {
       </section>
 
       {/* Printers ───────────────────────────────────────────────────────── */}
-      <section aria-labelledby="printers-heading" style={{ maxWidth: 720, marginTop: 32 }}>
+      <section aria-labelledby="printers-heading">
         <h2
           id="printers-heading"
           style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
@@ -228,7 +228,7 @@ export default function Settings() {
 
       <BackupSettings />
 
-      <p className="page-placeholder" style={{ marginTop: 32 }}>
+      <p className="page-placeholder span-all">
         Server config, backup, notifications — coming in phase 7.
       </p>
     </div>

@@ -101,7 +101,7 @@ export default function SecuritySettings() {
   };
 
   return (
-    <section aria-labelledby="security-heading" style={{ maxWidth: 720, marginTop: "var(--fw-space-8)" }}>
+    <section aria-labelledby="security-heading">
       <h2
         id="security-heading"
         style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}

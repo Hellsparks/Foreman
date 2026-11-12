@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { OverlayPortal } from "../ui/Popover";
 
 // Icons from PhoneFleet.dc.html (viewBox 24, stroke 1.8).
 const ICONS: Record<string, string> = {
@@ -93,6 +94,7 @@ export default function PhoneNav() {
         </button>
       </nav>
 
+      <OverlayPortal>
       {moreOpen && <div className="phone-sheet__scrim" onClick={() => setMoreOpen(false)} />}
       <div
         id={sheetId}
@@ -121,6 +123,7 @@ export default function PhoneNav() {
           ))}
         </ul>
       </div>
+      </OverlayPortal>
     </>
   );
 }

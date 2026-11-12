@@ -45,6 +45,9 @@
 }
 
 .fw-browser-actions { display: flex; gap: var(--fw-space-1); flex-wrap: wrap; align-items: center; }
+.fw-browser-tools { flex-wrap: wrap; }
+.fw-browser-pick { margin-left: auto; }
+.fw-browser-pick__n { font: var(--fw-type-label) var(--fw-mono); color: var(--fw-muted); padding: 0 var(--fw-space-2); }
 
 .fw-browser .fb-button {
   border: var(--fw-border-width) solid var(--fw-muted);
@@ -162,6 +165,11 @@
 }
 .fw-browser-body > * { min-height: 0; }
 .fw-browser-body[data-inspector="true"] { grid-template-columns: 190px minmax(0, 1fr) 380px; }
+/* Below 1200 px the inspector is an overlay panel (doc 06 §11). */
+@media (max-width: 1199px) {
+  .fw-browser-body[data-inspector="true"] { grid-template-columns: 190px minmax(0, 1fr); }
+  .edge-panel .fw-file-inspector { border: 0; min-height: 100%; }
+}
 
 .fw-browser-locations {
   border-right: var(--fw-border-width) solid var(--fw-border);

@@ -48,7 +48,7 @@ export default function LocationsTab({
           {error}
         </p>
       )}
-      <div className="fil-table-wrap">
+      <div className="fil-table-wrap page-fill">
         <table className="fil-table" style={{ minWidth: 560 }}>
           <thead>
             <tr>

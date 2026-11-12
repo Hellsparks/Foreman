@@ -192,6 +192,7 @@ export default function Service() {
         </div>
       </section>
 
+      <div className="svc-grid auto-cols page-fill">
       {filter === "all" &&
         [...byPrinter.entries()].map(([pid, list]) => (
           <section key={pid} className="svc-sec" aria-label={printerName(pid)}>
@@ -213,6 +214,7 @@ export default function Service() {
             </div>
           </section>
         ))}
+      </div>
 
       {phone && (
         <button type="button" className="ui-list-add" onClick={() => show({ kind: "new", printerId: printers[0]?.id ?? null })}>

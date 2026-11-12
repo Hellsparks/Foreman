@@ -317,3 +317,61 @@
 .ext-link:hover { color: var(--fw-text); }
 .ext-link:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
 .ext-link svg { flex: none; }
+
+/* ── Popover / Menu (ui/Popover.tsx; doc 06 §8) ─────────────────────────── */
+/* Lives in #fw-overlay-root on <body>: fixed, above every page layer. */
+#fw-overlay-root { position: relative; z-index: 50; }
+.ui-pop {
+  position: fixed;
+  z-index: 50;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--fw-raised);
+  color: var(--fw-text);
+  border: var(--fw-border-width) solid var(--fw-border);
+  box-shadow: var(--fw-shadow-overlay);
+}
+.ui-pop:focus { outline: none; }
+.ui-menu__list { display: flex; flex-direction: column; padding: var(--fw-space-1) 0; }
+.ui-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--fw-space-2);
+  width: 100%;
+  min-height: var(--fw-control-h-md);
+  padding: 0 var(--fw-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--fw-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ui-menu__item:hover:not(:disabled) { background: var(--fw-surface); }
+.ui-menu__item:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+.ui-menu__item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ui-menu__item--sub { padding-left: var(--fw-space-6); }
+.ui-menu__item--danger { color: var(--fw-danger); }
+.ui-menu__heading {
+  padding: var(--fw-space-2) var(--fw-space-4) var(--fw-space-1);
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+@media (max-width: 759px) {
+  .ui-menu__item { min-height: var(--fw-control-h); }
+  /* The bell (and any sheetOnPhone popover): a full-height sheet. */
+  .ui-pop--sheet {
+    inset: 0 !important;
+    width: auto !important;
+    max-height: none !important;
+    max-width: none;
+    border: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

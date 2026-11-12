@@ -69,7 +69,7 @@ export function TemplateList() {
         </Link>
       </div>
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
-      <section className="prj-sec">
+      <section className="prj-sec page-fill">
         {rows == null && <p className="prj-muted">Loading…</p>}
         {rows?.length === 0 && <p className="prj-muted">No templates yet.</p>}
         <div className="tpl-list">

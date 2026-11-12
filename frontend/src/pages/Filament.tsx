@@ -196,7 +196,7 @@ export default function Filament() {
         </EdgePanel>
       </header>
 
-      <main className="fil-main">
+      <main className="fil-main page-fill">
         {error && <p className="fil-note fil-note--bad" role="alert">{error}</p>}
         {toast && <p className="fil-note fil-note--ok" role="status">{toast}</p>}
         {phone && (tab === "filaments" || tab === "vendors") && (
@@ -298,13 +298,13 @@ export default function Filament() {
             </div>
             </FilterSheet>
             <div className="fil-count">{shown.length} shown</div>
-            <div className="fil-table-wrap">
+            <div className="fil-table-wrap page-fill">
               <table className="fil-table ph-table ph-grid">
                 <thead>
                   <tr>
                     <th>Spool</th>
                     <th>Material</th>
-                    <th style={{ width: 220 }}>Left</th>
+                    <th style={{ width: "28%" }}>Left</th>
                     <th className="ph-hide">Where</th>
                   </tr>
                 </thead>
@@ -502,7 +502,7 @@ function FilamentsTab({
       <div className="fil-count">
         {rows.length === total ? `${total} filaments` : `${rows.length} of ${total} filaments`}
       </div>
-      <div className="fil-table-wrap">
+      <div className="fil-table-wrap page-fill">
         <table className="fil-table ph-table ph-grid">
           <thead>
             <tr>
@@ -601,7 +601,7 @@ function VendorsTab({
           Add vendor
         </button>
       </div>
-      <div className="fil-table-wrap">
+      <div className="fil-table-wrap page-fill">
         <table className="fil-table ph-table ph-grid">
           <thead>
             <tr>

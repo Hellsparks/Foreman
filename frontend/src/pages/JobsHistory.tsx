@@ -6,7 +6,8 @@ import { FAIL_REASONS, jobs, type Job, type JobOutcome, type JobStats } from "..
 import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import { FilterSheet, HeaderActions, HeaderSearch, StatusChip, relTime, type Tone } from "../ui";
-import { usePhone } from "../hooks/useMediaQuery";
+import { OVERLAY_INSPECTOR_QUERY, usePhone } from "../hooks/useMediaQuery";
+import EdgePanel from "../ui/EdgePanel";
 
 const JOB_TOPICS = ["job"];
 
@@ -180,7 +181,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
   const nFilters = [outcome !== "all", printerId != null, !!material, spoolId != null, !!from, !!to].filter(Boolean).length;
 
   return (
-    <div className="jh-layout">
+    <div className="jh-layout page-fill">
       <main className="jobs-main jh-main">
         <HeaderActions>
           <HeaderSearch value={q} onChange={setQ} label="Search history" />
@@ -320,12 +321,14 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
         </div>
       </main>
       {selected && (
+        <EdgePanel side="right" label="Job details" open onOpenChange={(o) => !o && setSel(null)} overlayQuery={OVERLAY_INSPECTOR_QUERY}>
         <JobInspector
           job={selected}
           onClose={() => setSel(null)}
           onRate={(o, r) => void rate(selected, o, r)}
           onDelete={() => void remove(selected)}
         />
+        </EdgePanel>
       )}
     </div>
   );

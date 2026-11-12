@@ -26,3 +26,5 @@ export { default as FilterSheet } from "./FilterSheet";
 export { PhoneTitle, HeaderActions, HeaderSearch } from "./PhoneHeader";
 export { relTime } from "./relTime";
 export { default as PhoneSheet } from "./PhoneSheet";
+export { default as Popover, Menu, OverlayPortal, overlayRoot, place } from "./Popover";
+export type { MenuItem } from "./Popover";

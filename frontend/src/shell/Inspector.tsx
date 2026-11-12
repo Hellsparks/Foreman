@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import EdgePanel from "../ui/EdgePanel";
+import { OVERLAY_INSPECTOR_QUERY } from "../hooks/useMediaQuery";
 
 interface InspectorProps {
   open: boolean;
@@ -14,8 +15,9 @@ interface InspectorProps {
  * Non-modal right-side Inspector panel.
  *
  * Per doc 02/03: selected record opens here; main view stays usable.
- * Below 760 px it is the right edge panel (doc 06 §2): details for the
- * selection, with a grab tab while something is selected.
+ * Beside the list from 1200 px; below that it is the right edge panel
+ * (doc 06 §2, §11): details for the selection, with a grab tab while
+ * something is selected.
  *
  * When `title` is omitted the shell header is suppressed and the page is
  * expected to render its own header inside the body (via React portal).
@@ -28,7 +30,7 @@ export default function Inspector({
   children,
 }: InspectorProps) {
   return (
-    <EdgePanel side="right" label={title ?? "Details"} open={open} onOpenChange={(o) => !o && onClose()} available={open}>
+    <EdgePanel side="right" label={title ?? "Details"} open={open} onOpenChange={(o) => !o && onClose()} available={open} overlayQuery={OVERLAY_INSPECTOR_QUERY}>
     <aside
       className="inspector"
       data-open={open}

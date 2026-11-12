@@ -74,20 +74,24 @@ export default function ProjectList() {
       </div>
       </EdgePanel>
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
-      {rows == null ? (
-        <p className="prj-muted">Loading…</p>
-      ) : shown.length === 0 ? (
-        <p className="prj-muted">
-          {filter === "active" ? (
-            <>
-              No active projects. <Link to="new">Start one from a template</Link>.
-            </>
+      {rows == null || shown.length === 0 ? (
+        <div className="prj-cards page-fill">
+          {rows == null ? (
+            <p className="prj-muted">Loading…</p>
           ) : (
-            "Nothing here."
+            <p className="prj-muted">
+              {filter === "active" ? (
+                <>
+                  No active projects. <Link to="new">Start one from a template</Link>.
+                </>
+              ) : (
+                "Nothing here."
+              )}
+            </p>
           )}
-        </p>
+        </div>
       ) : (
-        <div className="prj-cards">
+        <div className="prj-cards page-fill">
           {shown.map((p) => {
             const due = dueLabel(p);
             const t = p.totals;

@@ -202,7 +202,7 @@
   border-bottom-color: var(--fw-background);
   font-weight: bold;
 }
-.fil-main { padding: var(--fw-space-6) 0 48px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fil-main { padding: var(--fw-space-6) 0 0; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .fil-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fw-space-2); }
 .fil-filters .fil-input { flex: 1 1 220px; }
 .fil-segs { display: flex; flex-wrap: wrap; }
@@ -228,8 +228,9 @@
   text-transform: uppercase;
   color: var(--fw-muted);
 }
-.fil-table-wrap { overflow-x: auto; border: var(--fw-border-width) solid var(--fw-border); background: var(--fw-raised); }
-.fil-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.fil-table-wrap { overflow-x: auto; border: var(--fw-border-width) solid var(--fw-border); background: var(--fw-raised); align-self: stretch; }
+/* Full width, proportional columns (doc 06 §10); scrolls inside its frame below 640 px. */
+.fil-table { width: 100%; border-collapse: collapse; min-width: 640px; }
 .fil-table th {
   text-align: left;
   padding: 10px var(--fw-space-3);
@@ -304,7 +305,8 @@
 
 /* ── Filament form (4.2): collapsing sections ───────────────────────────── */
 .fil-btn--add { flex: none; min-width: 120px; }
-.ff-secs { display: flex; flex-direction: column; gap: var(--fw-space-2); }
+/* Form sections and field rows reflow with the room they get (doc 06 §10). */
+.ff-secs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: var(--fw-space-2); align-items: start; }
 .ff-sec { border: var(--fw-border-width) solid var(--fw-border); background: var(--fw-raised); }
 .ff-sec--open { border-color: var(--fw-info); }
 .ff-sec__head {
@@ -340,7 +342,7 @@
 .ff-sec__sum { font-weight: normal; font-size: 12px; color: var(--fw-muted); overflow-wrap: anywhere; }
 .ff-sec__body { display: flex; flex-direction: column; gap: var(--fw-space-3); padding: 0 var(--fw-space-3) var(--fw-space-3); }
 .ff-next { display: flex; justify-content: flex-end; }
-.ff-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fw-space-2); }
+.ff-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: var(--fw-space-2); }
 .ff-grid4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fw-space-2); }
 .ff-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fw-space-2); }
 .ff-chip { margin-left: 0; min-height: var(--fw-control-h-sm); }
@@ -549,3 +551,4 @@
   .inv-shop__cost { text-align: left; }
   .inv-shop__acts { grid-column: 1 / -1; justify-content: flex-start; }
 }
+.fil-main > p.fil-sub { margin: 0; }

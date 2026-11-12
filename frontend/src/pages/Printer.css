@@ -665,57 +665,12 @@
   cursor: pointer;
 }
 
-.printer-menu__btn:focus-visible,
-.printer-menu__item:focus-visible {
+.printer-menu__btn:focus-visible {
   outline: 2px solid var(--fw-focus);
   outline-offset: 2px;
 }
 
-.printer-menu__scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-}
 
-.printer-menu__list {
-  position: fixed;
-  z-index: 11;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  background: var(--fw-raised);
-  border: var(--fw-border-width) solid var(--fw-border);
-  box-shadow: var(--fw-shadow-overlay);
-}
-
-.printer-menu__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fw-space-2);
-  min-height: var(--fw-control-h);
-  padding: 0 var(--fw-space-4);
-  border: 0;
-  border-bottom: var(--fw-border-width) solid var(--fw-border);
-  background: transparent;
-  color: var(--fw-text);
-  font-size: var(--fw-font-size);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.printer-menu__item:last-child {
-  border-bottom: 0;
-}
-
-.printer-menu__item:hover {
-  background: var(--fw-surface);
-}
-
-.printer-menu__item--danger {
-  color: var(--fw-danger);
-}
 
 /* Phone (below 760 px): header is back + name + status chip in the shell bar;
    tabs scroll sideways; actions live in the overflow menu; Config is one column. */

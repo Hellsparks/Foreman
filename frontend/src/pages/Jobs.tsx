@@ -7,7 +7,7 @@ import type { PrinterStatus } from "../api/types/PrinterStatus";
 import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import type { ShellContext } from "../shell/Shell";
-import { PhoneTitle, EdgePanel, StatusChip, ToastStack, useToasts, type Tone } from "../ui";
+import { Menu, PhoneTitle, EdgePanel, StatusChip, ToastStack, useToasts, type Tone } from "../ui";
 import { JobsHistory, JobsStats } from "./JobsHistory";
 import "./Jobs.css";
 
@@ -102,21 +102,6 @@ export default function Jobs() {
   useEventStream(onEvent, TOPICS);
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
-  // Close the card menu on outside click / Esc.
-  useEffect(() => {
-    if (menu == null) return;
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
-      if (e instanceof MouseEvent && (e.target as HTMLElement).closest(".jobs-menu, .jobs-card__more")) return;
-      setMenu(null);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [menu]);
 
   const lanes = board?.lanes ?? [];
   const allCards = lanes.flatMap((l) => l.items);
@@ -276,13 +261,13 @@ export default function Jobs() {
       {tab === "stats" && <JobsStats />}
 
       {tab === "queue" && (
-        <main className="jobs-main">
+        <main className="jobs-main page-fill">
           <p className="jobs-hint">
             Drag cards between lanes, or use ⋯ on a card. The fleet lane feeds any compatible printer, preferring one that
             already has the right filament loaded. A printer starts the next job only after its plate is cleared.
           </p>
           {loadErr && <p className="jobs-err">{loadErr}</p>}
-          <div className="jobs-board">
+          <div className="jobs-board page-fill page-fill--col">
             <div className="jobs-lanes">
               {lanes.map((lane) => {
                 const key = laneKey(lane);
@@ -400,15 +385,41 @@ export default function Jobs() {
                                 <Thumb path={c.thumb_url} colour={c.colour} />
                                 <span className="jobs-card__file">{c.item.file_name}</span>
                                 {c.item.status !== "printing" && (
-                                  <button
-                                    type="button"
-                                    className="jobs-card__more"
-                                    aria-label={`Actions for ${c.item.file_name}`}
-                                    aria-expanded={menu === c.item.id}
-                                    onClick={() => setMenu(menu === c.item.id ? null : c.item.id)}
-                                  >
-                                    ⋯
-                                  </button>
+                                  <Menu
+                                    label={`Actions for ${c.item.file_name}`}
+                                    open={menu === c.item.id}
+                                    onOpenChange={(o) => setMenu(o ? c.item.id : null)}
+                                    items={[
+                                      ...(movable
+                                        ? [
+                                            {
+                                              label: c.item.status === "failed" ? "Retry (move to top)" : "Move to top",
+                                              onSelect: () => void doMove(c, c.item.printer_id, 0),
+                                            },
+                                            { label: "Move to", heading: true },
+                                            ...lanes
+                                              .filter((l) => l.printer_id !== c.item.printer_id)
+                                              .map((l) => ({
+                                                key: laneKey(l),
+                                                label: l.name,
+                                                sub: true,
+                                                onSelect: () =>
+                                                  void doMove(c, l.printer_id, l.items.filter((x) => x.item.status === "waiting").length),
+                                              })),
+                                          ]
+                                        : []),
+                                      {
+                                        label: c.item.status === "sending" ? "Cancel upload" : "Remove from queue",
+                                        danger: true,
+                                        onSelect: () => void doRemove(c),
+                                      },
+                                    ]}
+                                    trigger={(t) => (
+                                      <button {...t} type="button" className="jobs-card__more" aria-label={`Actions for ${c.item.file_name}`}>
+                                        ⋯
+                                      </button>
+                                    )}
+                                  />
                                 )}
                               </div>
                               {meta && (
@@ -427,35 +438,6 @@ export default function Jobs() {
                               <span className="jobs-card__tag">
                                 <StatusChip tone={c.tone as Tone} symbol="" word={c.tag} />
                               </span>
-                              {menu === c.item.id && (
-                                <div role="group" aria-label={`Actions for ${c.item.file_name}`} className="jobs-menu">
-                                  {movable && (
-                                    <>
-                                      <button type="button" onClick={() => void doMove(c, c.item.printer_id, 0)}>
-                                        {c.item.status === "failed" ? "Retry (move to top)" : "Move to top"}
-                                      </button>
-                                      <div className="jobs-menu__label">MOVE TO</div>
-                                      {lanes
-                                        .filter((l) => l.printer_id !== c.item.printer_id)
-                                        .map((l) => (
-                                          <button
-                                            key={laneKey(l)}
-                                            type="button"
-                                            className="jobs-menu__sub"
-                                            onClick={() =>
-                                              void doMove(c, l.printer_id, l.items.filter((x) => x.item.status === "waiting").length)
-                                            }
-                                          >
-                                            {l.name}
-                                          </button>
-                                        ))}
-                                    </>
-                                  )}
-                                  <button type="button" className="jobs-menu__danger" onClick={() => void doRemove(c)}>
-                                    {c.item.status === "sending" ? "Cancel upload" : "Remove from queue"}
-                                  </button>
-                                </div>
-                              )}
                             </article>
                           </div>
                         );

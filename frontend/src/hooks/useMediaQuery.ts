@@ -22,3 +22,10 @@ export function useMediaQuery(query: string): boolean {
 export function usePhone(): boolean {
   return useMediaQuery(PHONE_QUERY);
 }
+
+/** List + inspector side by side from this width; below it the inspector is an
+ *  overlay panel (doc 06 §11). From content: rail 176 + gutters 64 + the
+ *  narrowest useful list (~560: a 3-column table or two 280 px cards) +
+ *  inspector 400 ≈ 1200. Keep in sync with the 1199 px queries in the CSS. */
+export const SIDE_BY_SIDE_MIN = 1200;
+export const OVERLAY_INSPECTOR_QUERY = `(max-width: ${SIDE_BY_SIDE_MIN - 1}px)`;
