@@ -166,6 +166,20 @@ const MIGRATIONS: &[&str] = &[
      ON shrinkage_calibration (filament_id)",
 ];
 
+/// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only
+/// ever appended). Written to `PRAGMA user_version` on connect, so a backup can tell
+/// whether its `foreman.db` came from a newer Foreman.
+pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32 + 1;
+
+/// Read `PRAGMA user_version` (0 for databases from before session 35).
+pub async fn schema_version(pool: &SqlitePool) -> Result<u32, AppError> {
+    let v: i64 = sqlx::query_scalar("PRAGMA user_version")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(u32::try_from(v).unwrap_or(0))
+}
+
 /// Foreman-native database handle.
 #[derive(Debug, Clone)]
 pub struct ForemanDb {
@@ -193,6 +207,14 @@ impl ForemanDb {
 
         Self::run_schema(&pool).await?;
         Self::run_migrations(&pool).await?;
+        if schema_version(&pool).await? < SCHEMA_VERSION {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "PRAGMA user_version = {SCHEMA_VERSION}"
+            )))
+            .execute(&pool)
+            .await
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        }
 
         Ok(ForemanDb { pool })
     }

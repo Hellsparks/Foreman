@@ -34,6 +34,7 @@ async fn unclaimed_server_on_all_interfaces_only_answers_health_info_setup() {
         data_dir: dir.path().to_path_buf(),
         db_url: None,
         spoolman_enabled: false,
+        drivers_enabled: true,
         desktop_mode: false,
     };
     let (tx, rx) = oneshot::channel();

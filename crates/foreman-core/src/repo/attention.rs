@@ -217,6 +217,20 @@ pub async fn clear_by_printer_kind(
     Ok(())
 }
 
+/// Clear the open item for (printer_id, kind), `printer_id` may be `None` (system
+/// items such as a failed backup). Returns the cleared item's id, if there was one.
+pub async fn clear_open(
+    pool: &SqlitePool,
+    printer_id: Option<i64>,
+    kind: &str,
+) -> Result<Option<i64>, AppError> {
+    let Some(id) = find_open(pool, printer_id, kind).await? else {
+        return Ok(None);
+    };
+    dismiss(pool, id).await?;
+    Ok(Some(id))
+}
+
 /// Change an item's title (e.g. a maintenance counter that kept accruing).
 pub async fn set_title(pool: &SqlitePool, id: i64, title: &str) -> Result<(), AppError> {
     sqlx::query("UPDATE attention_item SET title = ? WHERE id = ?")

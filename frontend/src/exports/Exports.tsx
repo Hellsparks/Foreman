@@ -75,6 +75,27 @@ export default function Exports({ rows, onError }: { rows: ExportRow[]; onError:
             Import the JSON into HueForge's filament library. Each filament keeps the same id on every export.
           </p>
         </section>
+        <section className="tl-sec ex-card">
+          <h2 className="tl-h2">CSV</h2>
+          <p className="tl-muted tl-small ex-grow">Every spool with vendor, filament, colour, weights, location and prices, for spreadsheets.</p>
+          <span className="tl-small tl-fg--muted">All spools; archived ones are marked.</span>
+          <button type="button" className="tl-btn" disabled={busy} onClick={() => void run(() => exportsApi.spoolsCsv())}>
+            Download CSV
+          </button>
+        </section>
+        <section className="tl-sec ex-card">
+          <h2 className="tl-h2">Spoolman JSON</h2>
+          <p className="tl-muted tl-small ex-grow">
+            Vendors, filaments and spools exactly as Spoolman{"’"}s API returns them, extra fields included.
+          </p>
+          <span className="tl-small tl-fg--muted">One file; archived spools included.</span>
+          <button type="button" className="tl-btn" disabled={busy} onClick={() => void run(() => exportsApi.spoolmanJson())}>
+            Download JSON
+          </button>
+          <p className="tl-small tl-muted">
+            Spoolman itself has no import; scripts can post these records to any Spoolman{"’"}s <span className="tl-mono">/api/v1</span>.
+          </p>
+        </section>
       </div>
 
       <section className="tl-sec">

@@ -2,6 +2,9 @@ mod api;
 mod auth;
 #[cfg(test)]
 mod auth_api_tests;
+mod backup;
+#[cfg(test)]
+mod backup_tests;
 mod calibration;
 #[cfg(test)]
 mod calibration_tests;
@@ -132,6 +135,25 @@ pub async fn serve_with(
         );
     }
 
+    // A restore staged before the last restart is applied before any DB is opened.
+    let restore_outcome = {
+        let src = backup::Sources {
+            data_dir: cfg.data_dir.clone(),
+            spoolman_db: spoolman_sqlite_path(&cfg),
+        };
+        match backup::apply_pending(&src).await {
+            Ok(Some(a)) => {
+                info!(created = %a.manifest.created_at, snapshot = ?a.snapshot, "backup restored");
+                Some(Ok(a))
+            }
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!("restore failed: {e}");
+                Some(Err(e.to_string()))
+            }
+        }
+    };
+
     // Open (or create) the Foreman-native SQLite database.
     let foreman_db_path = cfg.data_dir.join("foreman.db");
     let foreman_db = ForemanDb::connect(&foreman_db_path).await?;
@@ -208,7 +230,11 @@ pub async fn serve_with(
 
     // Driver manager: load printers from DB and spawn drivers.
     let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
-    driver_manager.start_all(&foreman_db.pool).await;
+    if cfg.drivers_enabled {
+        driver_manager.start_all(&foreman_db.pool).await;
+    } else {
+        warn!("printer drivers disabled (FOREMAN__DRIVERS_ENABLED=false): every printer stays offline");
+    }
 
     let http_client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -316,6 +342,11 @@ pub async fn serve_with(
     let app = build_router(app_state.clone());
 
     spawn_spoolman(&cfg, &spoolman).await;
+
+    if let Some(outcome) = restore_outcome {
+        api::backup::report_restore(&app_state, outcome).await;
+    }
+    api::backup::spawn_schedule(app_state.clone());
 
     let mut ready = ready;
     let handle = LocalHandle {
@@ -537,6 +568,83 @@ pub async fn dev_token_cli(cfg: config::ServerConfig) -> anyhow::Result<()> {
     );
     println!("{token}");
     Ok(())
+}
+
+/// The built-in Spoolman's SQLite file, when it is on and uses SQLite.
+fn spoolman_sqlite_path(cfg: &config::ServerConfig) -> Option<PathBuf> {
+    if !cfg.spoolman_enabled {
+        return None;
+    }
+    let sm = SpoolmanConfig::from_env().ok()?;
+    (sm.db_type == spoolman_rs::config::DbType::Sqlite).then(|| sm.sqlite_path())
+}
+
+/// `foreman-server backup [FOLDER]`: write a backup now (safe while the server runs).
+/// Uses the saved folder / Library / encryption settings unless a folder is given.
+pub async fn backup_cli(cfg: config::ServerConfig, dir: Option<PathBuf>) -> anyhow::Result<()> {
+    let db = ForemanDb::connect(&cfg.data_dir.join("foreman.db")).await?;
+    let settings: backup::BackupSettings = repo::setting::get(&db.pool, backup::SETTING_KEY)
+        .await?
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or_default();
+    db.pool.close().await;
+    let passphrase = if settings.encrypt {
+        Some(rpassword::prompt_password("Backup passphrase: ")?)
+    } else {
+        None
+    };
+    let entry = backup::create(
+        &backup::Sources {
+            data_dir: cfg.data_dir.clone(),
+            spoolman_db: spoolman_sqlite_path(&cfg),
+        },
+        &backup::BackupOptions {
+            dest_dir: dir.unwrap_or_else(|| PathBuf::from(&settings.dir)),
+            include_library: settings.include_library,
+            passphrase,
+            kind: backup::BackupKind::Manual,
+        },
+    )
+    .await?;
+    println!("{}", entry.path);
+    Ok(())
+}
+
+/// `foreman-server restore FILE`: restore a backup while the server is stopped (for
+/// when the app itself is broken). Saves the current state first, like the app does.
+pub async fn restore_cli(cfg: config::ServerConfig, file: PathBuf) -> anyhow::Result<()> {
+    let probe = SocketAddr::from(([127, 0, 0, 1], cfg.port));
+    if tokio::net::TcpStream::connect(probe).await.is_ok() {
+        anyhow::bail!(
+            "something is listening on port {}: stop Foreman first (or restore from Settings → Backup)",
+            cfg.port
+        );
+    }
+    let passphrase = if file.to_string_lossy().ends_with(".age") {
+        Some(rpassword::prompt_password("Backup passphrase: ")?)
+    } else {
+        None
+    };
+    std::fs::create_dir_all(&cfg.data_dir)?;
+    let m = backup::stage(&cfg.data_dir, &file, passphrase.as_deref()).await?;
+    println!(
+        "Backup from {} (Foreman {}, {} printers, {} spools, {} filaments) checked.",
+        m.created_at, m.foreman_version, m.counts.printers, m.counts.spools, m.counts.filaments
+    );
+    let src = backup::Sources {
+        data_dir: cfg.data_dir.clone(),
+        spoolman_db: spoolman_sqlite_path(&cfg),
+    };
+    match backup::apply_pending(&src).await? {
+        Some(a) => {
+            if let Some(s) = a.snapshot {
+                println!("Previous state saved as {}", s.display());
+            }
+            println!("Restored into {}. Start Foreman.", cfg.data_dir.display());
+            Ok(())
+        }
+        None => anyhow::bail!("nothing was staged"),
+    }
 }
 
 /// The Spoolman-compatible API on its own port (default 7912).
@@ -803,6 +911,18 @@ fn build_router(app_state: AppState) -> Router {
         .route("/api/exports", get(api::exports::list))
         .route("/api/exports/orca", post(api::exports::orca))
         .route("/api/exports/hueforge", post(api::exports::hueforge))
+        .route("/api/exports/spools.csv", get(api::exports::spools_csv))
+        .route(
+            "/api/exports/spoolman.json",
+            get(api::exports::spoolman_json),
+        )
+        // Backup + restore (6.2, W14)
+        .route("/api/backup", get(api::backup::overview))
+        .route("/api/backup/settings", put(api::backup::put_settings))
+        .route("/api/backup/check-dir", post(api::backup::check_dir))
+        .route("/api/backup/run", post(api::backup::run_now))
+        .route("/api/backup/inspect", post(api::backup::inspect))
+        .route("/api/backup/restore", post(api::backup::restore))
         .route("/api/swatch/fit", post(api::exports::swatch_fit))
         .route("/api/swatch/stl", post(api::exports::swatch_stl))
         .route("/api/swatch/batch", post(api::exports::swatch_batch))
