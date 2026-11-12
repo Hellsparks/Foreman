@@ -63,6 +63,7 @@ const PAGE_TITLES: [string, string][] = [
   ["/fleet", "Fleet"], ["/printer", "Printer"], ["/jobs", "Jobs"], ["/library", "Library"],
   ["/projects", "Projects"], ["/filament", "Filament"], ["/service", "Service"],
   ["/tools", "Tools"], ["/settings", "Settings"], ["/attention", "Attention"], ["/start", "Start print"],
+  ["/setup", "Setup"],
 ];
 
 /** Phone header title: the section the route belongs to. */

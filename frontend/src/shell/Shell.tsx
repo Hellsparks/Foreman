@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
-import { Outlet } from "react-router-dom";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { setupApi } from "../api/setup";
 import Rail from "./Rail";
 import TopBar from "./TopBar";
 import Inspector from "./Inspector";
@@ -28,7 +29,30 @@ export interface ShellContext {
 
 const INSPECTOR_BODY_ID = "shell-inspector-body";
 
+/**
+ * After sign-in on a server whose setup isn't finished, open the wizard once per
+ * app load; it continues at the saved step (6.4). Leaving it is allowed.
+ */
+function useSetupRedirect() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const checked = useRef(false);
+  useEffect(() => {
+    if (checked.current) return;
+    checked.current = true;
+    setupApi
+      .get()
+      .then((ov) => {
+        if (ov.needs_wizard && pathname !== "/setup") navigate("/setup", { replace: true });
+      })
+      .catch(() => {
+        /* setup state unavailable: stay where we are */
+      });
+  }, [navigate, pathname]);
+}
+
 export default function Shell() {
+  useSetupRedirect();
   const [railCollapsed, setRailCollapsed] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
 

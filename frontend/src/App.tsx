@@ -11,6 +11,7 @@ import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
 import Attention from "./pages/Attention";
 import StartPrint from "./pages/StartPrint";
+import SetupWizard from "./setup/SetupWizard";
 import DevComponents from "./pages/DevComponents";
 import AuthGate from "./auth/AuthGate";
 import DesktopRoot from "./desktop/DesktopRoot";
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="settings/*" element={<Settings />} />
           <Route path="attention" element={<Attention />} />
           <Route path="start" element={<StartPrint />} />
+          <Route path="setup" element={<SetupWizard />} />
           {/* Dev-only: not in the rail, reachable by URL */}
           <Route path="dev/components" element={<DevComponents />} />
           {/* 404 fallback within the shell */}

@@ -5,6 +5,7 @@ import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/clie
 import SecuritySettings from "../auth/SecuritySettings";
 import BackupSettings from "../backup/BackupSettings";
 import ThemeSettings from "../theme/ThemeSettings";
+import RerunSetup from "../setup/RerunSetup";
 import { EdgePanel } from "../ui";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
@@ -47,6 +48,7 @@ export default function Settings() {
             ["printers-heading", "Printers"],
             ["security-heading", "Security"],
             ["backup-heading", "Backup"],
+            ["setup-heading", "Setup"],
           ].map(([id, label]) => (
             <a key={id} href={`#${id}`} className="set-groups__link" onClick={(e) => {
               e.preventDefault();
@@ -227,6 +229,8 @@ export default function Settings() {
       <SecuritySettings />
 
       <BackupSettings />
+
+      <RerunSetup />
 
       <p className="page-placeholder span-all">
         Server config, backup, notifications — coming in phase 7.
