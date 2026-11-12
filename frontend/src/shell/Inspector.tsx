@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import EdgePanel from "../ui/EdgePanel";
 
 interface InspectorProps {
   open: boolean;
@@ -13,7 +14,8 @@ interface InspectorProps {
  * Non-modal right-side Inspector panel.
  *
  * Per doc 02/03: selected record opens here; main view stays usable.
- * Below 760 px it becomes a bottom panel — handled via CSS.
+ * Below 760 px it is the right edge panel (doc 06 §2): details for the
+ * selection, with a grab tab while something is selected.
  *
  * When `title` is omitted the shell header is suppressed and the page is
  * expected to render its own header inside the body (via React portal).
@@ -26,6 +28,7 @@ export default function Inspector({
   children,
 }: InspectorProps) {
   return (
+    <EdgePanel side="right" label={title ?? "Details"} open={open} onOpenChange={(o) => !o && onClose()} available={open}>
     <aside
       className="inspector"
       data-open={open}
@@ -64,5 +67,6 @@ export default function Inspector({
         {children}
       </div>
     </aside>
+    </EdgePanel>
   );
 }

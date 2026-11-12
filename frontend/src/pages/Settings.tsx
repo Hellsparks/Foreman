@@ -5,6 +5,7 @@ import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/clie
 import SecuritySettings from "../auth/SecuritySettings";
 import BackupSettings from "../backup/BackupSettings";
 import ThemeSettings from "../theme/ThemeSettings";
+import { EdgePanel } from "../ui";
 
 // Accent preview colours per theme × mode — matches tokens.css accent-hover values.
 // Used only for the swatch dots; never hardcoded in component logic.
@@ -37,6 +38,25 @@ export default function Settings() {
 
   return (
     <div>
+      {/* Phone (doc 06 §2): the settings groups in the left panel. Desktop has no sidebar here. */}
+      <EdgePanel side="left" label="Settings groups" storageKey="settings.groups" desktop={false}>
+        <span className="edge-panel__label">Settings</span>
+        <nav className="set-groups" aria-label="Settings groups">
+          {[
+            ["appearance-heading", "Appearance"],
+            ["printers-heading", "Printers"],
+            ["security-heading", "Security"],
+            ["backup-heading", "Backup"],
+          ].map(([id, label]) => (
+            <a key={id} href={`#${id}`} className="set-groups__link" onClick={(e) => {
+              e.preventDefault();
+              document.getElementById(id)?.scrollIntoView({ block: "start" });
+            }}>
+              {label}
+            </a>
+          ))}
+        </nav>
+      </EdgePanel>
       <div className="page-header">
         <p className="page-header__eyebrow">Settings</p>
         <h1 className="page-header__title phone-dup-title">Settings</h1>

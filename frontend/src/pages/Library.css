@@ -475,55 +475,71 @@
   padding: var(--fw-space-1) 0;
 }
 
-/* Phone (below 760 px): locations become a strip above the list; selecting a
-   file replaces the list with its inspector (Send lives there). */
+/* Phone (below 760 px, doc 06 §2, §4): the header holds search + "⋯"
+   (Upload / New folder / Paste); locations are the left edge panel, the file
+   inspector (with Send) the right one; breadcrumbs collapse to back + current
+   folder; the grid starts under the header; selection actions are a bar at
+   the bottom, only while something is picked. */
 @media (max-width: 759px) {
   .lib-page {
-    margin: calc(-1 * var(--fw-space-4)) calc(-1 * var(--fw-space-4)) calc(-1 * var(--fw-space-6));
-    height: calc(100% + var(--fw-space-4) + var(--fw-space-6));
+    margin: calc(-1 * var(--fw-space-2)) calc(-1 * var(--fw-space-4)) calc(-1 * var(--fw-space-6));
+    height: calc(100% + var(--fw-space-2) + var(--fw-space-6));
+  }
+
+  .fw-browser-tools,
+  .fw-file-location-title {
+    display: none;
   }
 
   .fw-browser-body,
   .fw-browser-body[data-inspector="true"] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .fw-browser-locations {
-    display: flex;
-    gap: var(--fw-space-1);
+  .edge-panel .fw-browser-locations {
+    border: 0;
+    min-height: 100%;
     padding: var(--fw-space-2);
-    border-right: 0;
-    border-bottom: var(--fw-border-width) solid var(--fw-border);
-    overflow-x: auto;
-    overflow-y: hidden;
+  }
+  .edge-panel .fw-browser-locations button { min-height: var(--fw-control-h); }
+
+  .edge-panel .fw-file-inspector {
+    border: 0;
+    min-height: 100%;
+    padding: var(--fw-space-4);
   }
 
-  .fw-browser-locations > span {
-    display: none;
+  .fw-crumbs-phone {
+    gap: var(--fw-space-1);
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-2);
   }
-
-  .fw-browser-locations button,
-  .fw-loc-row {
-    flex: none;
-    width: auto;
+  .fw-crumbs-phone .fw-crumbs-phone__up {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    padding: 0;
+  }
+  .fw-crumbs-phone__here {
+    min-width: 0;
+    padding: 0 var(--fw-space-2);
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .fw-browser-body[data-inspector="true"] > .fw-browser-locations,
-  .fw-browser-body[data-inspector="true"] > :nth-child(2) {
-    display: none;
+  /* Selection: a bottom action bar (the last flex item of the browser). */
+  .fw-browser > .fw-browser-banner:not(.fw-browser-banner--warn) {
+    order: 10;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    border-top: var(--fw-border-width) solid var(--fw-border);
+    border-bottom: 0;
+    scrollbar-width: none;
   }
-
-  .fw-browser-body[data-inspector="true"] > .fw-file-inspector {
-    grid-row: 1 / -1;
-    min-width: 0;
-    overflow-y: auto;
-    border-left: 0;
-  }
-
-  .fw-browser-search {
-    flex: 1 1 100%;
-    max-width: none;
-  }
+  .fw-browser > .fw-browser-banner:not(.fw-browser-banner--warn) > * { flex: none; }
+  .fw-browser > .fw-browser-banner .fb-button { min-height: var(--fw-control-h); }
 }

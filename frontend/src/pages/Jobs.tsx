@@ -7,7 +7,7 @@ import type { PrinterStatus } from "../api/types/PrinterStatus";
 import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
 import type { ShellContext } from "../shell/Shell";
-import { StatusChip, ToastStack, useToasts, type Tone } from "../ui";
+import { PhoneTitle, EdgePanel, StatusChip, ToastStack, useToasts, type Tone } from "../ui";
 import { JobsHistory, JobsStats } from "./JobsHistory";
 import "./Jobs.css";
 
@@ -251,6 +251,10 @@ export default function Jobs() {
             Add job
           </Link>
         </div>
+        <PhoneTitle>
+          Jobs <span>· {tabs.find(([id]) => id === tab)?.[1]}</span>
+        </PhoneTitle>
+        <EdgePanel side="left" label="Jobs sections" storageKey="jobs.sections">
         <div role="tablist" aria-label="Jobs sections" className="jobs-tabs">
           {tabs.map(([id, label]) => (
             <button
@@ -265,6 +269,7 @@ export default function Jobs() {
             </button>
           ))}
         </div>
+        </EdgePanel>
       </header>
 
       {tab === "history" && <JobsHistory notify={addToast} />}

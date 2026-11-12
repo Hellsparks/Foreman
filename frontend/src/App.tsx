@@ -9,6 +9,8 @@ import Filament from "./pages/Filament";
 import Service from "./pages/Service";
 import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
+import Attention from "./pages/Attention";
+import StartPrint from "./pages/StartPrint";
 import DevComponents from "./pages/DevComponents";
 import AuthGate from "./auth/AuthGate";
 import DesktopRoot from "./desktop/DesktopRoot";
@@ -30,6 +32,8 @@ export default function App() {
           <Route path="service/*" element={<Service />} />
           <Route path="tools/*" element={<Tools />} />
           <Route path="settings/*" element={<Settings />} />
+          <Route path="attention" element={<Attention />} />
+          <Route path="start" element={<StartPrint />} />
           {/* Dev-only: not in the rail, reachable by URL */}
           <Route path="dev/components" element={<DevComponents />} />
           {/* 404 fallback within the shell */}

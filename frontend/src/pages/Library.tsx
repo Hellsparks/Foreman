@@ -22,7 +22,7 @@ import {
   type TransferInfo,
 } from "../api/library";
 import { isManualSwaps, kindLabel } from "../api/projects";
-import { OverflowMenu } from "../ui";
+import { EdgePanel, HeaderActions, HeaderSearch, OverflowMenu } from "../ui";
 import { usePhone } from "../hooks/useMediaQuery";
 import "./Library.css";
 
@@ -950,6 +950,32 @@ export default function Library() {
           </div>
         </div>
 
+        {phone && (
+          <HeaderActions>
+            <HeaderSearch value={query} onChange={setQuery} label="Search this folder…" />
+            <OverflowMenu
+              label="Library actions"
+              items={[
+                { label: "Upload", onSelect: () => fileInput.current?.click(), disabled: isTrash },
+                { label: "New folder", onSelect: () => { setCreating(!creating); setFname(""); setFerr(""); }, disabled: isTrash },
+                { label: pasteLabel, onSelect: paste, disabled: !clip || isTrash },
+              ]}
+            />
+          </HeaderActions>
+        )}
+
+        {phone ? (
+          <nav className="fw-browser-crumbs fw-crumbs-phone" aria-label="Folder">
+            {upTarget && (
+              <button type="button" className="fw-crumbs-phone__up" aria-label="Up one folder" onClick={() => go(upTarget)}>
+                <Chevron d="M15 5l-7 7 7 7" />
+              </button>
+            )}
+            <span className="fw-crumbs-phone__here" aria-current="page">
+              {crumbs[crumbs.length - 1].label}
+            </span>
+          </nav>
+        ) : (
         <nav className="fw-browser-crumbs" aria-label="Folder breadcrumbs">
           {crumbs.map((cr, i) => (
             <span key={whereKey(cr.w)} style={{ display: "contents" }}>
@@ -965,6 +991,7 @@ export default function Library() {
           ))}
           <span className="fw-browser-crumbs__note">{topNote}</span>
         </nav>
+        )}
 
         {pickN > 0 && (
           <div className="fw-browser-banner">
@@ -1060,15 +1087,16 @@ export default function Library() {
         )}
 
         <div className="fw-browser-body" data-inspector={sel ? "true" : undefined}>
+          <EdgePanel side="left" label="Locations" storageKey="library.locations">
           <nav className="fw-browser-locations" aria-label="File locations">
             <span>LIBRARY</span>
             {libLocs.map((l) => (
-              <button key={whereKey(l.w)} type="button" aria-current={isCurLoc(l.w) ? "page" : undefined} onClick={() => go(l.w)} {...dropOn(l.w)}>
+              <button key={whereKey(l.w)} type="button" data-panel-close aria-current={isCurLoc(l.w) ? "page" : undefined} onClick={() => go(l.w)} {...dropOn(l.w)}>
                 <span aria-hidden="true">{l.icon}</span>
                 <span className="fw-loc-name">{l.name}</span>
               </button>
             ))}
-            <button type="button" aria-current={isTrash ? "page" : undefined} onClick={() => go({ kind: "trash" })}>
+            <button type="button" data-panel-close aria-current={isTrash ? "page" : undefined} onClick={() => go({ kind: "trash" })}>
               <span aria-hidden="true">⌫</span>
               <span className="fw-loc-name">Trash</span>
             </button>
@@ -1079,7 +1107,7 @@ export default function Library() {
               const s = sftp[p.printer_id];
               return (
                 <div key={p.printer_id} className="fw-loc-row">
-                  <button type="button" aria-current={isCurLoc(w) ? "page" : undefined} onClick={() => go(w)} {...dropOn(w)}>
+                  <button type="button" data-panel-close aria-current={isCurLoc(w) ? "page" : undefined} onClick={() => go(w)} {...dropOn(w)}>
                     <span aria-hidden="true" style={{ color: printerDot(p) }}>
                       ●
                     </span>
@@ -1104,6 +1132,7 @@ export default function Library() {
               );
             })}
           </nav>
+          </EdgePanel>
 
           <div className="fw-browser-content">
             <h3 className="fw-file-location-title">{locTitle}</h3>
@@ -1224,6 +1253,7 @@ export default function Library() {
           </div>
 
           {sel && (
+            <EdgePanel side="right" label="File details" open onOpenChange={(o) => !o && setSelKey(null)}>
             <aside className="fw-file-inspector" aria-label="File inspector">
               {!sel.isDir && (
                 <div>
@@ -1403,6 +1433,7 @@ export default function Library() {
                 </div>
               )}
             </aside>
+            </EdgePanel>
           )}
         </div>
 

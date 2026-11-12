@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { hours, progressText, projectsApi, type ProjectSummary } from "../api/projects";
 import { money } from "../api/inventory";
 import { useEventStream } from "../hooks/useEventStream";
+import { usePhone } from "../hooks/useMediaQuery";
+import { EdgePanel, PhoneTitle } from "../ui";
 import { Dot } from "./Thumb";
 
 const TOPICS = ["queue", "job"];
@@ -35,6 +37,7 @@ export default function ProjectList() {
   useEffect(load, [load]);
   useEventStream(load, TOPICS);
   // Finished (done) and archived projects are read-only records under Archived.
+  const phone = usePhone();
   const isActive = (p: ProjectSummary) => p.status === "active";
   const shown = (rows ?? []).filter((p) => (filter === "active") === isActive(p));
   const count = (f: "active" | "archived") => (rows ?? []).filter((p) => (f === "active") === isActive(p)).length;
@@ -53,6 +56,10 @@ export default function ProjectList() {
           New project
         </Link>
       </div>
+      <PhoneTitle>
+        Projects <span>· {filter === "active" ? "Active" : "Archived"}</span>
+      </PhoneTitle>
+      <EdgePanel side="left" label="Show projects" storageKey="projects.filter">
       <div role="group" aria-label="Show" className="prj-segs">
         {(
           [
@@ -60,11 +67,12 @@ export default function ProjectList() {
             ["archived", "Archived"],
           ] as const
         ).map(([id, label]) => (
-          <button key={id} type="button" className="prj-seg" aria-pressed={filter === id} onClick={() => setFilter(id)}>
+          <button key={id} type="button" className="prj-seg" data-panel-close aria-pressed={filter === id} onClick={() => setFilter(id)}>
             {label} · {count(id)}
           </button>
         ))}
       </div>
+      </EdgePanel>
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
       {rows == null ? (
         <p className="prj-muted">Loading…</p>
@@ -85,6 +93,25 @@ export default function ProjectList() {
             const t = p.totals;
             const pct = (n: number) => (t.prints ? (n / t.prints) * 100 : 0);
             return (
+              phone ? (
+                /* Phone (doc 06 §4): swatches, name, progress bar, "3 of 8"; nothing per plate. */
+                <button key={p.id} type="button" className="prj-card prj-card--phone" onClick={() => nav(String(p.id))}>
+                  <span className="prj-card__swatch" aria-hidden="true">
+                    {p.swatches.slice(0, 4).map((h, i) => (
+                      <Dot key={i} hex={h} />
+                    ))}
+                  </span>
+                  <span className="prj-card__name">{p.name}</span>
+                  <span className="prj-card__count">
+                    {t.printed} of {t.prints}
+                  </span>
+                  <span className="prj-bar" aria-hidden="true">
+                    <span className="prj-bar__done" style={{ width: `${pct(t.printed)}%` }} />
+                    <span className="prj-bar__run" style={{ width: `${pct(t.printing)}%` }} />
+                    <span className="prj-bar__queued" style={{ width: `${pct(t.queued)}%` }} />
+                  </span>
+                </button>
+              ) : (
               <button key={p.id} type="button" className="prj-card" onClick={() => nav(String(p.id))}>
                 <span className="prj-card__top">
                   <span className="prj-card__name">{p.name}</span>
@@ -114,8 +141,19 @@ export default function ProjectList() {
                   {p.template_name && <span className="prj-muted" style={{ marginLeft: 6 }}>{p.template_name}</span>}
                 </span>
               </button>
+              )
             );
           })}
+        </div>
+      )}
+      {phone && (
+        <div className="prj-phone-add">
+          <Link className="ui-list-add" to="new">
+            + New project
+          </Link>
+          <Link className="ui-list-add" to="templates">
+            Templates
+          </Link>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { exportsApi, type ExportRow } from "../api/exports";
 import Calibration from "../calibration/Calibration";
 import Exports from "../exports/Exports";
 import Swatches from "../exports/Swatches";
+import { EdgePanel, PhoneTitle } from "../ui";
 import "./Tools.css";
 
 type Tab = "cal" | "swatch" | "import" | "export";
@@ -35,6 +36,10 @@ export default function Tools() {
     <div className="tl">
       <header className="tl-head">
         <h1 className="tl-title phone-dup-title">Tools</h1>
+        <PhoneTitle>
+          Tools <span>· {TABS.find(([id]) => id === tab)?.[1]}</span>
+        </PhoneTitle>
+        <EdgePanel side="left" label="Tools sections" storageKey="tools.sections">
         <div role="tablist" aria-label="Tools" className="tl-tabs">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} className="tl-tab" onClick={() => setTab(id)}>
@@ -42,6 +47,7 @@ export default function Tools() {
             </button>
           ))}
         </div>
+        </EdgePanel>
       </header>
       {needRows && error && (
         <p className="tl-error" role="alert">

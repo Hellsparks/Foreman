@@ -34,7 +34,8 @@ import {
   type VendorRow,
 } from "../api/filaments";
 import "../filament/filament.css";
-import { ExternalLink } from "../ui";
+import { EdgePanel, ExternalLink, FilterSheet, HeaderActions, HeaderSearch, OverflowMenu, PhoneTitle } from "../ui";
+import { usePhone } from "../hooks/useMediaQuery";
 import InventoryTab from "../filament/InventoryTab";
 import LocationsTab, { NO_LOCATION } from "../filament/LocationsTab";
 import { inventoryApi, type Inventory, type Locations } from "../api/inventory";
@@ -61,6 +62,7 @@ export default function Filament() {
   const { openInspector, closeInspector, inspectorOpen, inspectorBodyId } =
     useOutletContext<ShellContext>();
   const [tab, setTab] = useState<Tab>("spools");
+  const phone = usePhone();
   const [rows, setRows] = useState<SpoolRow[] | null>(null);
   const [fils, setFils] = useState<FilamentRow[] | null>(null);
   const [vendors, setVendors] = useState<VendorRow[]>([]);
@@ -171,6 +173,19 @@ export default function Filament() {
               : `${all.length} spool${all.length === 1 ? "" : "s"} · ${kg.toFixed(1)} kg on hand · ${lowCount} low · ${filaments.length} filament${filaments.length === 1 ? "" : "s"} · ${vendors.length} vendor${vendors.length === 1 ? "" : "s"}`}
           </p>
         </div>
+        <PhoneTitle>
+          Filament <span>· {TABS.find(([id]) => id === tab)?.[1]}</span>
+        </PhoneTitle>
+        {(tab === "spools" || tab === "filaments") && (
+          <HeaderActions>
+            {tab === "spools" ? (
+              <HeaderSearch value={q} onChange={setQ} label="Search spools" />
+            ) : (
+              <HeaderSearch value={fq} onChange={setFq} label="Search filaments" />
+            )}
+          </HeaderActions>
+        )}
+        <EdgePanel side="left" label="Filament sections" storageKey="filament.sections">
         <div role="tablist" aria-label="Filament sections" className="fil-tabs">
           {TABS.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} className="fil-tab" onClick={() => setTab(id)}>
@@ -178,11 +193,24 @@ export default function Filament() {
             </button>
           ))}
         </div>
+        </EdgePanel>
       </header>
 
       <main className="fil-main">
         {error && <p className="fil-note fil-note--bad" role="alert">{error}</p>}
         {toast && <p className="fil-note fil-note--ok" role="status">{toast}</p>}
+        {phone && (tab === "filaments" || tab === "vendors") && (
+          <div className="ui-filterbar fil-phonebar">
+            <OverflowMenu
+              label={tab === "filaments" ? "Filament actions" : "Vendor actions"}
+              items={[
+                tab === "filaments"
+                  ? { label: "Add filament", onSelect: () => show({ kind: "filament", id: null }) }
+                  : { label: "Add vendor", onSelect: () => show({ kind: "vendor", id: null }) },
+              ]}
+            />
+          </div>
+        )}
         {tab === "filaments" ? (
           <FilamentsTab
             rows={filsShown}
@@ -237,6 +265,12 @@ export default function Filament() {
                 Add spool
               </button>
             </div>
+            <FilterSheet
+              active={(mat !== "all" ? 1 : 0) + (low ? 1 : 0) + (showArchived ? 1 : 0) + (loc ? 1 : 0)}
+              extra={
+                <OverflowMenu label="Spool actions" items={[{ label: "Add spool", onSelect: () => show({ kind: "new-spool", filamentId: null }) }]} />
+              }
+            >
             <div className="fil-filters">
               <div role="group" aria-label="Material" className="fil-segs">
                 {["all", ...materials].map((m) => (
@@ -262,6 +296,7 @@ export default function Filament() {
                 <option value={NO_LOCATION}>No location</option>
               </select>
             </div>
+            </FilterSheet>
             <div className="fil-count">{shown.length} shown</div>
             <div className="fil-table-wrap">
               <table className="fil-table ph-table ph-grid">

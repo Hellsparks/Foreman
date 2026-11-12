@@ -17,6 +17,8 @@ import {
   type ProjectView,
 } from "../api/projects";
 import { useEventStream } from "../hooks/useEventStream";
+import { usePhone } from "../hooks/useMediaQuery";
+import { HeaderActions, OverflowMenu, PhoneTitle } from "../ui";
 import { dueLabel } from "./ProjectList";
 import Thumb, { Dot } from "./Thumb";
 import { money } from "../api/inventory";
@@ -33,6 +35,7 @@ export default function ProjectDetail() {
   const { id } = useParams();
   const pid = Number(id);
   const nav = useNavigate();
+  const phone = usePhone();
   const [p, setP] = useState<ProjectView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -83,6 +86,11 @@ export default function ProjectDetail() {
   const t = p.totals;
   // Finished and archived projects are read-only records; Reopen to change them.
   const ro = p.status !== "active";
+  const archive = () =>
+    void run(
+      () => projectsApi.update(pid, { name: null, due_date: null, status: ro ? "active" : "archived" }),
+      ro ? "Reopened" : "Project archived · find it under Archived",
+    ).then(() => !ro && nav("/projects"));
   const pct = (n: number) => (t.prints ? (n / t.prints) * 100 : 0);
   const due = dueLabel(p);
   const hex = (key: string) => {
@@ -93,6 +101,23 @@ export default function ProjectDetail() {
 
   return (
     <div className="prj">
+      <PhoneTitle>
+        <Link to="/projects" className="topbar__back" aria-label="Back to Projects">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+        </Link>
+        Projects
+      </PhoneTitle>
+      <HeaderActions>
+        <OverflowMenu
+          label="Project actions"
+          items={[
+            ...(ro ? [] : [{ label: "Rename", onSelect: () => setEditName(p.name) }]),
+            { label: ro ? "Reopen" : "Archive", onSelect: archive, disabled: busy },
+          ]}
+        />
+      </HeaderActions>
       <Link className="prj-back" to="/projects">
         ← Projects
       </Link>
@@ -224,9 +249,9 @@ export default function ProjectDetail() {
           <span className="prj-bar__queued" style={{ width: `${pct(t.queued)}%` }} />
         </div>
         <p className="prj-sub" style={{ marginTop: 6 }}>
-          {progressText(t)} · {hours(t.secs_used)} printed of ~{hours(planned)} · {Math.round(t.grams_used)} g used
+          {phone ? `${t.printed} of ${t.prints} printed${t.remaining ? ` · ${t.remaining} to queue` : ""}` : <>{progressText(t)} · {hours(t.secs_used)} printed of ~{hours(planned)} · {Math.round(t.grams_used)} g used
           {t.cost_used != null && p.currency ? ` · ${money(t.cost_used, p.currency)}` : ""}
-          {p.status === "done" ? " · ✓ closed" : ""}
+          {p.status === "done" ? " · ✓ closed" : ""}</>}
         </p>
       </div>
 

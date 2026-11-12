@@ -44,7 +44,6 @@
   .shell .ui-btn,
   .shell .ui-btn--small,
   .shell .fleet__add-btn,
-  .shell .fleet__attention-toggle,
   .shell .fil-btn--add {
     min-width: 0;
   }
@@ -65,24 +64,6 @@
   }
   .ui-overflow-btn:hover { background: var(--fw-surface); }
   .ui-overflow-btn:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
-
-  /* Attention actions: no fixed grid; content width, one row. */
-  .shell .fleet__attn-actions {
-    display: flex;
-    flex: 1 1 100%;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    align-items: center;
-    gap: var(--fw-space-2);
-  }
-  .shell .fleet__attn-btn {
-    width: auto;
-    min-height: var(--fw-control-h);
-    padding: 0 var(--fw-space-3);
-  }
-  .shell .fleet__attn-row { align-items: flex-start; gap: var(--fw-space-2) var(--fw-space-3); padding: var(--fw-space-2) var(--fw-space-3); }
-  .shell .fleet__attn-text { flex: 1 1 0; }
-  .shell .fleet__attn-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ── Printer cards ───────────────────────────────────────────────────── */
   .shell .fleet-card { min-height: 0; gap: var(--fw-space-2); padding: var(--fw-space-3); }
@@ -258,4 +239,573 @@
   /* Stat tiles two-up; tiles are glanceable, not tap targets. */
   .shell .jh-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--fw-space-2); }
   .shell .jh-kpis > * { padding: var(--fw-space-2) var(--fw-space-3); }
+}
+
+/* ── Edge panels (doc 06 §2; ui/EdgePanel.tsx, phone only) ─────────────── */
+/* Overlay, never push; max 85% of the viewport; grab tab 20 × 64 inside a
+   44 × 64 button, vertically centred, riding on the panel's outer edge. */
+.edge-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  background: var(--fw-text);
+  opacity: 0.35;
+}
+.edge-panel {
+  --edge-w: min(85vw, 360px);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: var(--edge-w);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--fw-raised);
+  box-shadow: var(--fw-shadow-overlay);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  visibility: hidden;
+  transition: transform var(--fw-duration-expand, 240ms) cubic-bezier(0.2, 0, 0, 1), visibility 0s linear var(--fw-duration-expand, 240ms);
+}
+.edge-panel--left { left: 0; transform: translateX(-100%); border-right: var(--fw-border-width) solid var(--fw-border); }
+.edge-panel--right { right: 0; transform: translateX(100%); border-left: var(--fw-border-width) solid var(--fw-border); }
+.edge-panel[data-open="true"] { transform: none; visibility: visible; transition-delay: 0s; }
+.edge-tab {
+  position: fixed;
+  top: 50%;
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  width: 44px;
+  height: 64px;
+  margin-top: -32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fw-text);
+  cursor: pointer;
+  touch-action: none;
+  transition: left var(--fw-duration-expand, 240ms) cubic-bezier(0.2, 0, 0, 1), right var(--fw-duration-expand, 240ms) cubic-bezier(0.2, 0, 0, 1);
+}
+.edge-tab--left { left: 0; justify-content: flex-start; }
+.edge-tab--right { right: 0; justify-content: flex-end; }
+.edge-tab--left[data-open="true"] { left: min(85vw, 360px); }
+.edge-tab--right[data-open="true"] { right: min(85vw, 360px); }
+.edge-tab__grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 64px;
+  background: var(--fw-surface);
+  border: var(--fw-border-width) solid var(--fw-border);
+  box-shadow: var(--fw-shadow-overlay);
+}
+.edge-tab--left .edge-tab__grip { border-left: 0; border-radius: 0 var(--fw-radius) var(--fw-radius) 0; }
+.edge-tab--right .edge-tab__grip { border-right: 0; border-radius: var(--fw-radius) 0 0 var(--fw-radius); }
+.edge-tab:focus-visible { outline: none; }
+.edge-tab:focus-visible .edge-tab__grip { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .edge-panel,
+  .edge-tab { transition: none; }
+}
+
+/* ── Phone header pieces + filter chip (doc 06 §1, §4) ─────────────────── */
+@media (max-width: 759px) {
+  .topbar__ptitle {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar__ptitle > span { color: var(--fw-muted); }
+  .topbar__psearch-btn[data-active="true"] { border-color: var(--fw-accent); }
+  /* Open page search takes the whole header. */
+  .topbar:has(.topbar__psearch) > :not(.topbar__actions),
+  .topbar:has(.topbar__psearch) .topbar__actions > :not(.topbar__psearch) {
+    display: none;
+  }
+  .topbar__psearch {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--fw-space-1);
+    min-width: 0;
+  }
+  .topbar__psearch-input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-3);
+    border: var(--fw-border-width) solid var(--fw-muted);
+    border-radius: var(--fw-radius);
+    background: var(--fw-raised);
+    color: var(--fw-text);
+    font: inherit;
+  }
+  .topbar__psearch-input:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+  .topbar__psearch-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    border: 0;
+    background: transparent;
+    color: var(--fw-text);
+    cursor: pointer;
+  }
+  .topbar__psearch-close:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+  /* The header's own action buttons (HeaderActions) are 44 px icon buttons. */
+  .topbar__actions .ui-overflow-btn { border-color: var(--fw-border); background: var(--fw-raised); }
+
+  .ui-filterbar {
+    display: flex;
+    align-items: center;
+    gap: var(--fw-space-2);
+  }
+  .ui-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fw-space-2);
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-3);
+    border: var(--fw-border-width) solid var(--fw-muted);
+    border-radius: var(--fw-radius);
+    background: transparent;
+    color: var(--fw-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .ui-filter-chip[data-active="true"] { border-color: var(--fw-accent); font-weight: bold; }
+  .ui-filter-chip:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+  .ui-filter-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fw-space-3);
+    padding: var(--fw-space-4);
+    overflow-y: auto;
+  }
+  .ui-filter-body > * { flex-wrap: wrap; }
+
+  /* Section tabs inside a left panel: one 48 px row each. */
+  .edge-panel [role="tablist"] {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border: 0;
+    overflow: visible;
+  }
+  .edge-panel [role="tablist"] > [role="tab"] {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 48px;
+    width: 100%;
+    padding: 0 var(--fw-space-4);
+    border: 0;
+    border-left: 3px solid transparent;
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--fw-text);
+    text-align: left;
+    font: inherit;
+  }
+  .edge-panel [role="tablist"] > [role="tab"][aria-selected="true"] {
+    border-left-color: var(--fw-accent);
+    background: var(--fw-background);
+    font-weight: bold;
+  }
+  .edge-panel__label {
+    display: block;
+    padding: var(--fw-space-3) var(--fw-space-4) var(--fw-space-2);
+    font: var(--fw-type-label) / 1 var(--fw-mono);
+    letter-spacing: var(--fw-tracking-label);
+    text-transform: uppercase;
+    color: var(--fw-muted);
+  }
+
+  /* An "add" action at the end of a list (instead of a header button). */
+  .ui-list-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--fw-control-h);
+    border: var(--fw-border-width) dashed var(--fw-muted);
+    border-radius: var(--fw-radius);
+    background: transparent;
+    color: var(--fw-text);
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .ui-list-add:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+}
+.ui-list-add-wrap { display: none; }
+@media (max-width: 759px) {
+  .ui-list-add-wrap { display: block; }
+}
+
+/* ── Per page (doc 06 §4). Phone only. ─────────────────────────────────── */
+@media (max-width: 759px) {
+  /* Fleet: printers as rows (PhoneFleet.dc.html): name, job line, one chip. */
+  .shell .fleet__header { display: none; }
+  .shell .fleet { gap: var(--fw-space-2); }
+  .shell .fleet__grid { gap: var(--fw-space-2); }
+  .shell .fleet-card__fw,
+  .shell .fleet-card__path-label,
+  .shell .fleet-card__cam,
+  .shell .fleet-card__temps,
+  .shell .fleet-card__chips,
+  .shell .fleet-card__sub {
+    display: none;
+  }
+  .shell .fleet-card { padding: var(--fw-space-1) var(--fw-space-1) var(--fw-space-2) var(--fw-space-3); gap: 0; }
+  .shell .fleet-card__mid { gap: var(--fw-space-2); }
+  .shell .fleet-card__status { display: flex; align-items: center; gap: var(--fw-space-2); min-width: 0; }
+  .shell .fleet-card__status > .fleet-card__job { flex: 1; }
+}
+@media (max-width: 759px) {
+  /* Filament: sections in the left panel, search in the header, filters behind
+     one chip, add actions in "⋯", list edge to edge. */
+  .shell .fil-head { border: 0; gap: 0; }
+  .shell .fil-head__sub,
+  .shell .fil-count,
+  .shell .fil-filters:has(> .fil-btn--add) {
+    display: none;
+  }
+  .shell .fil-main { padding: 0 0 var(--fw-space-4); gap: var(--fw-space-2); }
+  .shell .fil-phonebar { justify-content: flex-end; }
+  .shell .ui-filterbar .ui-overflow-btn { margin-left: auto; }
+  .ui-filter-body .fil-filters { flex-direction: column; align-items: stretch; }
+  .ui-filter-body .fil-segs { flex-wrap: wrap; }
+  .ui-filter-body .fil-input { flex: none; width: 100%; }
+}
+@media (max-width: 759px) {
+  /* Jobs: sections in the left panel; queue cards = thumbnail, name, one chip;
+     history = one row per job (outcome dot, name, relative time, grams);
+     stats = one number per tile, label beneath, two per row. */
+  .shell .jobs-head__row,
+  .shell .jobs-hint,
+  .shell .jobs-card__grip,
+  .shell .jobs-card__meta,
+  .shell .jobs-card__source,
+  .shell .jh-count,
+  .shell .jh-kpi__sub {
+    display: none;
+  }
+  .shell .jobs-head { border: 0; margin: 0; padding: 0; }
+  .shell .jobs-card__file { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shell .jobs-btn,
+  .shell .jobs-card__more { min-height: var(--fw-control-h); min-width: var(--fw-control-h); }
+  .ui-filter-body .jh-search { display: none; }
+  .ui-filter-body .jh-toolbar { flex-direction: column; align-items: stretch; }
+  .ui-filter-body .jh-seg { flex-wrap: wrap; }
+
+  .shell .ph-hist tr {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    column-gap: var(--fw-space-2);
+  }
+  .shell .ph-hist td:nth-child(6) { grid-column: 1; grid-row: 1; text-align: left; }
+  .shell .ph-hist td:nth-child(1) { grid-column: 2; grid-row: 1; }
+  .shell .ph-hist td:nth-child(3) { grid-column: 3; grid-row: 1; color: var(--fw-muted); }
+  .shell .ph-hist td:nth-child(5) { display: block; grid-column: 4; grid-row: 1; text-align: right; }
+  .shell .ph-hist td:nth-child(2),
+  .shell .ph-hist td:nth-child(4),
+  .shell .ph-hist td:nth-child(5) .jh-sub,
+  .shell .ph-hist .jh-thumb,
+  .shell .ph-hist .jh-file > :not(.jh-file__btn) {
+    display: none;
+  }
+  .shell .ph-hist td:nth-child(6) .ui-status-chip { padding: 1px var(--fw-space-1); }
+
+  .shell .jh-kpi { display: flex; flex-direction: column; }
+  .shell .jh-kpi > .jh-cap { order: 2; margin: 0; }
+}
+@media (max-width: 759px) {
+  /* Projects list: filter in the left panel; one compact card per project. */
+  .shell .prj-head:has(> .prj-head__main > .prj-sub) { display: none; }
+  .shell .prj { gap: var(--fw-space-2); }
+  .shell .prj-cards { gap: var(--fw-space-2); }
+  .shell .prj-card--phone {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fw-space-1) var(--fw-space-3);
+    padding: var(--fw-space-2) var(--fw-space-3);
+    min-height: 0;
+  }
+  .shell .prj-card--phone .prj-card__swatch { grid-row: 1 / span 2; display: flex; gap: 2px; }
+  .shell .prj-card--phone .prj-card__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; }
+  .shell .prj-card--phone .prj-card__count { font-size: var(--fw-type-label); color: var(--fw-muted); white-space: nowrap; }
+  .shell .prj-card--phone .prj-bar { grid-column: 2 / -1; margin: 0; }
+  .prj-phone-add { display: grid; grid-template-columns: 1fr 1fr; gap: var(--fw-space-2); }
+  .edge-panel .prj-segs { display: flex; flex-direction: column; }
+  .edge-panel .prj-seg { min-height: 48px; width: 100%; text-align: left; border-radius: 0; padding: 0 var(--fw-space-4); }
+}
+@media (max-width: 759px) {
+  /* Header back link (detail pages). */
+  .topbar__ptitle { display: flex; align-items: center; gap: var(--fw-space-1); }
+  .topbar__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    margin-left: calc(-1 * var(--fw-space-3));
+    color: var(--fw-text);
+  }
+  .topbar__back:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+
+  /* Project detail: name (two lines max), one primary action, plates as a
+     plain list with colour slots inline (swatch + name, one line). */
+  .shell .prj-back,
+  .shell .pd-facts > :not(.prj-chip),
+  .shell .prj-title > .prj-btn,
+  .shell .prj-head > .prj-btn:not(.prj-btn--primary),
+  .shell .pd-plate .prj-muted,
+  .shell .pd-plate .prj-flag {
+    display: none;
+  }
+  .shell .prj-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-size: 22px;
+  }
+  .shell .prj-head { gap: var(--fw-space-2); }
+  .shell .prj-head > .prj-btn--primary { width: 100%; justify-content: center; min-height: var(--fw-control-h); }
+  .shell .prj-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shell .pd-plate { flex-wrap: nowrap; gap: var(--fw-space-2); padding: var(--fw-space-1) 0; }
+  .shell .pd-plate > :nth-child(3) { flex: 1 1 0; }
+  .shell .pd-plate b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shell .pd-plate br { display: none; }
+  .shell .pd-plate__slots { flex-wrap: nowrap; overflow: hidden; margin: 0; }
+  .shell .pd-slotchip { flex: none; }
+  .shell .pd-plate__status { display: none; }
+  .shell .pd-plate .prj-btn--small { display: none; }
+  .shell .prj-step button { width: var(--fw-control-h); min-height: var(--fw-control-h); }
+}
+@media (max-width: 759px) {
+  /* Tall sheet (PhoneSheet): full height, its body scrolls. */
+  .phone-sheet--tall { top: 0; max-height: none; }
+  .phone-sheet__body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--fw-space-3); }
+
+  /* Printer Live: webcam first, one compact temperature row, controls in a sheet. */
+  .live-compact {
+    display: flex;
+    align-items: center;
+    gap: var(--fw-space-2);
+    min-width: 0;
+  }
+  .live-compact__temps {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: var(--fw-type-label) / 1.3 var(--fw-mono);
+    color: var(--fw-muted);
+  }
+  .live-compact__temps b { color: var(--fw-text); font-weight: bold; }
+  .live-compact__btn {
+    flex: none;
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-4);
+    border: var(--fw-border-width) solid var(--fw-muted);
+    border-radius: var(--fw-radius);
+    background: transparent;
+    color: var(--fw-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .live-compact__btn:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+  .shell .webcam-bar__toggle { min-height: var(--fw-control-h); }
+  /* Inside the sheet every control is a 44 px target. */
+  .phone-sheet .preset-btn,
+  .phone-sheet .heater-row__off,
+  .phone-sheet .heater-row__input,
+  .phone-sheet .step-btn,
+  .phone-sheet .ext-btn,
+  .phone-sheet .jog-pad button,
+  .phone-sheet .jog-layout button,
+  .phone-sheet .ext-actions button {
+    min-height: var(--fw-control-h);
+    min-width: var(--fw-control-h);
+  }
+}
+@media (max-width: 759px) {
+  /* Service (closest rules: list rows, filters behind one chip, add at the end). */
+  .shell .svc-head { display: none; }
+  .shell .svc { gap: var(--fw-space-3); }
+  .shell .svc-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--fw-space-1) var(--fw-space-2);
+    min-height: 0;
+    padding: var(--fw-space-1) var(--fw-space-3);
+  }
+  .shell .svc-row__open b,
+  .shell .svc-row__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shell .svc-row__prog { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: var(--fw-space-2); }
+  .shell .svc-row__prog .svc-meter { flex: 1; }
+  .shell .svc-row .svc-btn:disabled { display: none; }
+  .shell .svc-btn,
+  .shell .svc-btn--small { min-height: var(--fw-control-h); }
+  .ui-filter-body .svc-bar { flex-direction: column; align-items: stretch; }
+  .ui-filter-body .svc-seg button,
+  .ui-filter-body .svc-soon input { min-height: var(--fw-control-h); }
+}
+@media (max-width: 759px) {
+  /* Settings groups (phone-only left panel). */
+  .set-groups { display: flex; flex-direction: column; }
+  .set-groups__link {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 0 var(--fw-space-4);
+    border-bottom: var(--fw-border-width) solid var(--fw-border);
+    color: var(--fw-text);
+    text-decoration: none;
+  }
+  .set-groups__link:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+  /* Pages whose only header is the screen-reader title take no space. */
+  .shell .page-header { margin-bottom: 0; }
+  .shell .tl-head { border: 0; margin: 0; padding: 0; }
+}
+
+@media (max-width: 759px) {
+  /* Edge-to-edge lists (Filament, Jobs History): the page spans the gutter and
+     everything but the list gets the gutter back, so nothing overflows. */
+  .shell .fil-page,
+  .shell .jobs-page {
+    margin-left: calc(-1 * var(--fw-space-4));
+    margin-right: calc(-1 * var(--fw-space-4));
+  }
+  .shell .fil-main > :not(.fil-table-wrap),
+  .shell .jobs-page > :not(.jh-layout):not(.jobs-main),
+  .shell .jobs-main > :not(.jh-table-wrap) {
+    margin-left: var(--fw-space-4);
+    margin-right: var(--fw-space-4);
+  }
+  .shell .fil-table-wrap,
+  .shell .jh-table-wrap { border-left: 0; border-right: 0; }
+
+  /* Fleet rows: the name and the menu are full tap targets. */
+  .shell .fleet-card__name { min-height: var(--fw-control-h); }
+  .shell .fleet-card__menu-btn { min-width: var(--fw-control-h); min-height: var(--fw-control-h); }
+
+  /* Library grid on phone: three across, smaller art, one-line names. */
+  .shell .fw-file-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--fw-space-1);
+    padding: var(--fw-space-2);
+  }
+  .shell .fw-file-card { gap: 2px; padding: var(--fw-space-1) 2px; }
+  .shell .fw-file-art { width: 76px; height: 64px; margin: 0 auto var(--fw-space-1); }
+  .shell .fw-file-card strong {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  /* Select tick: 22 px box inside a 44 px tap target. */
+  .shell .fw-file-tick {
+    top: 0;
+    left: 0;
+    width: var(--fw-control-h);
+    height: var(--fw-control-h);
+    border: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .shell .fw-file-tick::before {
+    content: "";
+    position: absolute;
+    inset: 11px;
+    z-index: -1;
+    border: var(--fw-border-width) solid var(--fw-muted);
+    background: var(--fw-raised);
+  }
+  .shell .fw-file-tick[aria-checked="true"] { background: transparent; }
+  .shell .fw-file-tick[aria-checked="true"]::before { background: var(--fw-accent-hover); border-color: var(--fw-accent-hover); }
+
+  /* Remaining small controls. */
+  .shell .prj-btn { min-height: var(--fw-control-h); }
+  .shell section[aria-labelledby="printers-heading"] button { min-height: var(--fw-control-h) !important; }
+}
+@media (max-width: 759px) {
+  /* Small file art: the format badge only, no print time inside the face. */
+  .shell .fw-document-face b span { display: none; }
+  .shell .fw-document-face b { font-size: 10px; }
+  /* Page headers that only hold the screen-reader title take no gap either. */
+  .shell .attn-page > .page-header,
+  .shell .tl-head,
+  .shell .jobs-head {
+    display: contents;
+  }
+}
+@media (max-width: 759px) {
+  .shell .jobs-main { padding-top: 0; gap: var(--fw-space-2); }
+}
+@media (max-width: 759px) {
+  /* Printer: sections in the left panel, the actions menu in the header. */
+  .shell .printer-header { display: contents; }
+  .shell .printer-header__spacer { display: none; }
+  .topbar__actions .printer-menu__btn { min-width: var(--fw-control-h); min-height: var(--fw-control-h); }
+  /* Fleet rows: status and job line read left to right. */
+  .shell .fleet-card__mid { justify-content: flex-start; }
+  .shell .fleet-card__status { align-items: flex-start; text-align: left; }
+}
+@media (max-width: 759px) {
+  /* §6: no sentence-long helper text on phone (status lines stay). */
+  .shell .ths__help,
+  .shell section[aria-labelledby="backup-heading"] > .bk-warn + p.auth__hint {
+    display: none;
+  }
+}
+@media (max-width: 759px) {
+  /* Library locations inside the panel: a list again (tokens.css makes it a strip below 700 px). */
+  .edge-panel .fw-browser-locations { display: block; overflow: visible; border-bottom: 0; }
+  .edge-panel .fw-browser-locations > span { display: block; }
+  .edge-panel .fw-browser-locations button { width: 100%; flex-shrink: 1; }
+  .edge-panel .fw-browser-locations .fw-loc-conn { width: var(--fw-control-h); flex: none; }
+  /* Small file art: the fallback label must fit the face. */
+  .shell .fw-document-face { overflow: hidden; }
+  .shell .fw-document-face__blank { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+  /* Controls in sheets and panels: 44 px. */
+  .ui-filter-body .fil-seg { min-width: var(--fw-control-h); }
+  .phone-sheet .babystep button,
+  .phone-sheet [aria-label*="abystep"] button,
+  .phone-sheet .live-panel button { min-height: var(--fw-control-h); }
+  .edge-panel .inspector__close,
+  .edge-panel .svc-insp__close,
+  .edge-panel button { min-height: var(--fw-control-h); }
+  .edge-panel .inspector__close { min-width: var(--fw-control-h); }
+  .edge-panel .fil-insp,
+  .edge-panel .fil-insp * { min-width: 0; }
+}
+@media (max-width: 759px) { .edge-panel .fil-close { min-width: var(--fw-control-h); min-height: var(--fw-control-h); } }
+@media (max-width: 759px) {
+  .edge-panel #shell-inspector-body { height: auto !important; min-height: 100%; }
+  .edge-panel .fb-button { min-height: var(--fw-control-h); }
+  .edge-panel [aria-label="Close inspector"] { min-width: var(--fw-control-h); min-height: var(--fw-control-h); }
+}
+@media (max-width: 759px) {
+  .shell .printer-live { padding-top: 0; }
+  .edge-panel .fb-button.fb-small { min-height: var(--fw-control-h); }
+  /* Service: an empty "Due work" box is not worth a screen of chrome on phone. */
+  .shell .svc-sec[aria-label="Due work"]:has(.svc-empty) { display: none; }
 }

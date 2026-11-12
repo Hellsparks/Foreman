@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
-import { StatusChip, SectionLabel, Button } from "../ui";
+import { StatusChip, SectionLabel, Button, PhoneSheet, EdgePanel, HeaderActions } from "../ui";
 import { createPortal } from "react-dom";
 import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
@@ -136,6 +136,7 @@ export default function Printer() {
   }, [activeTab]);
 
   const phone = usePhone();
+  const [controlsOpen, setControlsOpen] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -329,6 +330,7 @@ export default function Printer() {
           topbarSlot,
         )}
       <header className="printer-header">
+        <EdgePanel side="left" label="Printer sections" storageKey="printer.sections">
         <div className="printer-tabs" role="tablist" aria-label="Printer sections" ref={tabsRef}>
           {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
             <button
@@ -342,9 +344,11 @@ export default function Printer() {
             </button>
           ))}
         </div>
+        </EdgePanel>
         <div className="printer-header__spacer" />
         {phone ? (
           (isPrinting || printer.primary_url) && (
+            <HeaderActions>
             <div className="printer-menu">
               <button
                 type="button"
@@ -403,6 +407,7 @@ export default function Printer() {
                 </>
               )}
             </div>
+            </HeaderActions>
           )
         ) : (
         <div className="printer-header__actions">
@@ -578,7 +583,22 @@ export default function Printer() {
             </section>
           </div>
 
+          {/* Phone (doc 06 §4): temperatures as one compact row; controls in a sheet behind one button. */}
+          {phone && (
+            <div className="live-compact">
+              <span className="live-compact__temps">
+                Nozzle <b>{nozzleActual.toFixed(0)}°</b>
+                {nozzleTarget > 0 ? ` → ${nozzleTarget.toFixed(0)}°` : ""} · Bed <b>{bedActual.toFixed(0)}°</b>
+                {bedTarget > 0 ? ` → ${bedTarget.toFixed(0)}°` : ""}
+              </span>
+              <button type="button" className="live-compact__btn" aria-haspopup="dialog" aria-expanded={controlsOpen} onClick={() => setControlsOpen(true)}>
+                Controls
+              </button>
+            </div>
+          )}
+
           {/* RIGHT COLUMN: temps, toolhead, extruder */}
+          <PhoneSheet open={controlsOpen} onClose={() => setControlsOpen(false)} label="Controls">
           <div className="printer-live__right">
 
             {/* Temperatures */}
@@ -824,6 +844,7 @@ export default function Printer() {
               </div>
             </section>
           </div>
+          </PhoneSheet>
         </div>
       ) : activeTab === "Files" || activeTab === "Terminal" ? null : activeTab === "Spools" ? (
         <PrinterSpoolsTab printerId={printerId} />

@@ -7,20 +7,18 @@ import {
 import { createPortal } from "react-dom";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { queue } from "../api/queue";
-import { FAIL_REASONS, jobs, type JobOutcome } from "../api/jobs";
 import { useEventStream } from "../hooks/useEventStream";
-import type { PrinterWithStatus, AttentionItem } from "../api/client";
+import type { PrinterWithStatus } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
-import { StatusChip, ProgressBar, Swatch, OverflowMenu } from "../ui";
+import { StatusChip, ProgressBar, Swatch } from "../ui";
 import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
 import { useSignedUrl } from "../hooks/useSignedUrl";
-import { ATTENTION_PREFIX, everyText, maintenanceApi, type TaskTemplate } from "../api/maintenance";
+import { everyText, maintenanceApi, type TaskTemplate } from "../api/maintenance";
 import "./Fleet.css";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -140,26 +138,6 @@ function amsChips(
   return [];
 }
 
-function attentionTone(kind: string): Tone {
-  if (kind === "error") return "bad";
-  if (kind === "print_finished") return "warn";
-  if (kind === "offline") return "off";
-  if (kind === "paused") return "warn";
-  if (kind.startsWith(ATTENTION_PREFIX)) return "warn";
-  return "warn";
-}
-
-function attentionSymbol(kind: string): string {
-  if (kind === "error") return "✖";
-  if (kind === "print_finished") return "◐";
-  if (kind === "offline") return "○";
-  if (kind === "paused") return "‖";
-  if (kind.startsWith(ATTENTION_PREFIX)) return "⚙";
-  return "!";
-}
-
-const ATTENTION_TOPICS = ["attention.added", "attention.updated", "attention.cleared"];
-
 // ── Fleet page ───────────────────────────────────────────────────────────────
 
 export default function Fleet() {
@@ -176,11 +154,6 @@ export default function Fleet() {
 
   const [printers, setPrinters] = useState<PrinterWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
-  const [attnOpen, setAttnOpen] = useState(true);
-  /** Per attention item: the rating given here, and whether the reason picker is open. */
-  const [rated, setRated] = useState<Record<number, { outcome: JobOutcome; reason?: string }>>({});
-  const [reasonFor, setReasonFor] = useState<number | null>(null);
   const [menuFor, setMenuFor] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
@@ -202,15 +175,6 @@ export default function Fleet() {
     }
   }, []);
 
-  const loadAttention = useCallback(async () => {
-    try {
-      const items = await api.listAttention();
-      setAttentionItems(items);
-    } catch (e) {
-      console.error("Failed to load attention:", e);
-    }
-  }, []);
-
   const loadSlots = useCallback(async () => {
     try {
       setSlots(await spools.loaded());
@@ -221,16 +185,11 @@ export default function Fleet() {
 
   useEffect(() => {
     loadPrinters();
-    loadAttention();
     loadSlots();
-  }, [loadPrinters, loadAttention, loadSlots]);
+  }, [loadPrinters, loadSlots]);
 
   const onSpoolEvent = useCallback(() => void loadSlots(), [loadSlots]);
   useEventStream(onSpoolEvent, SPOOL_TOPICS);
-
-  // Live Attention strip (e.g. "clear the plate" when a print finishes).
-  const onAttentionEvent = useCallback(() => void loadAttention(), [loadAttention]);
-  useEventStream(onAttentionEvent, ATTENTION_TOPICS);
 
   // Refresh snapshots every 10 s.
   useEffect(() => {
@@ -336,35 +295,6 @@ export default function Fleet() {
     }
   };
 
-  const plateCleared = async (printerId: number, itemId: number) => {
-    try {
-      await queue.plateCleared(printerId);
-      setAttentionItems((prev) => prev.filter((i) => i.id !== itemId));
-    } catch (e) {
-      console.error("Failed to mark plate cleared:", e);
-    }
-  };
-
-  const rateJob = async (item: AttentionItem, outcome: JobOutcome, reason?: string) => {
-    if (item.job_id == null) return;
-    try {
-      await jobs.rate(item.job_id, outcome, reason ?? null);
-      setRated((prev) => ({ ...prev, [item.id]: { outcome, reason } }));
-      setReasonFor(outcome === "failed" && !reason ? item.id : null);
-    } catch (e) {
-      console.error("Failed to rate job:", e);
-    }
-  };
-
-  const dismissAttention = async (id: number) => {
-    try {
-      await api.dismissAttention(id);
-      setAttentionItems((prev) => prev.filter((i) => i.id !== id));
-    } catch (e) {
-      console.error("Failed to dismiss attention:", e);
-    }
-  };
-
   // Portal target for inspector content.
   const [portalTarget, setPortalTarget] = useState<Element | null>(null);
   useEffect(() => {
@@ -401,147 +331,6 @@ export default function Fleet() {
         </div>
       )}
 
-      {/* ── Attention strip ──────────────────────────────────────────────── */}
-      <section
-        className="fleet__attention"
-        aria-label="Attention"
-      >
-        <div className="fleet__attention-header">
-          <h2 className="fleet__attention-title">
-            Attention · {attentionItems.length}
-          </h2>
-          <div style={{ flex: 1 }} />
-          <button
-            type="button"
-            className="fleet__attention-toggle"
-            aria-expanded={attnOpen}
-            onClick={() => setAttnOpen((v) => !v)}
-          >
-            {attnOpen ? "Collapse" : "Expand"}
-          </button>
-        </div>
-
-        {attnOpen && (
-          <>
-            {attentionItems.length === 0 ? (
-              <p className="fleet__attention-empty">
-                ✓ Nothing needs you right now.
-              </p>
-            ) : (
-              attentionItems.map((item) => {
-                const tone = attentionTone(item.kind);
-                const sym = attentionSymbol(item.kind);
-                const relatedPrinter = item.printer_id != null
-                  ? printers.find((p) => p.id === item.printer_id)
-                  : null;
-                return (
-                  <div key={item.id} className="fleet__attn-row">
-                    <StatusChip tone={tone} symbol={sym} word={item.kind === "offline" ? "Offline" : item.kind === "error" ? "Error" : item.kind === "print_finished" ? "Clear plate" : item.kind.startsWith(ATTENTION_PREFIX) ? "Service" : item.kind} />
-                    <div className="fleet__attn-text">
-                      <div className="fleet__attn-title">{item.title}</div>
-                      {item.body && (
-                        <div className="fleet__attn-body">{item.body}</div>
-                      )}
-                      {item.kind === "print_finished" && item.job_id != null && (
-                        <div className="fleet__attn-rate" role="group" aria-label="How did it go?">
-                          {rated[item.id] ? (
-                            <span className="fleet__attn-rated">
-                              Rated {rated[item.id].outcome === "good" ? "✓ Good" : `✖ Failed${rated[item.id].reason ? ` · ${rated[item.id].reason}` : ""}`}
-                            </span>
-                          ) : (
-                            <span className="fleet__attn-rated">How did it go?</span>
-                          )}
-                          <button
-                            type="button"
-                            className="fleet__attn-chip"
-                            aria-pressed={rated[item.id]?.outcome === "good"}
-                            onClick={() => void rateJob(item, "good")}
-                          >
-                            ✓ Good
-                          </button>
-                          <button
-                            type="button"
-                            className="fleet__attn-chip"
-                            aria-pressed={rated[item.id]?.outcome === "failed"}
-                            onClick={() => void rateJob(item, "failed")}
-                          >
-                            ✖ Failed
-                          </button>
-                          {reasonFor === item.id &&
-                            FAIL_REASONS.map((r) => (
-                              <button
-                                key={r}
-                                type="button"
-                                className="fleet__attn-chip fleet__attn-chip--reason"
-                                onClick={() => void rateJob(item, "failed", r)}
-                              >
-                                {r}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="fleet__attn-actions">
-                      {phone ? (
-                        <PhoneAttnActions
-                          item={item}
-                          relatedPrinter={relatedPrinter}
-                          onPlateCleared={(pid) => void plateCleared(pid, item.id)}
-                          onService={() => navigate(`/service?task=${item.kind.slice(ATTENTION_PREFIX.length)}`)}
-                          onOpenPrinter={() => relatedPrinter && selectPrinter(relatedPrinter.id)}
-                          onDismiss={() => dismissAttention(item.id)}
-                        />
-                      ) : (
-                        <>
-
-                      {item.kind === "print_finished" && item.printer_id != null && (
-                        <button
-                          type="button"
-                          className="fleet__attn-btn fleet__attn-btn--primary"
-                          onClick={() => void plateCleared(item.printer_id as number, item.id)}
-                        >
-                          Plate cleared
-                        </button>
-                      )}
-                      {item.kind.startsWith(ATTENTION_PREFIX) && (
-                        <button
-                          type="button"
-                          className="fleet__attn-btn fleet__attn-btn--primary"
-                          onClick={() => navigate(`/service?task=${item.kind.slice(ATTENTION_PREFIX.length)}`)}
-                        >
-                          Open in Service
-                        </button>
-                      )}
-                      {relatedPrinter && (
-                        <button
-                          type="button"
-                          className="fleet__attn-btn"
-                          onClick={() => selectPrinter(relatedPrinter.id)}
-                        >
-                          Open printer
-                        </button>
-                      )}
-                      {/* A service item clears when the task is marked done. */}
-                      {!item.kind.startsWith(ATTENTION_PREFIX) && (
-                        <button
-                          type="button"
-                          className="fleet__attn-btn"
-                          onClick={() => dismissAttention(item.id)}
-                        >
-                          Dismiss
-                        </button>
-                      )}
-                                            </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </>
-        )}
-      </section>
-
       {/* ── Printer grid ─────────────────────────────────────────────────── */}
       {loading ? (
         <p className="fleet__loading">Loading printers…</p>
@@ -575,6 +364,13 @@ export default function Fleet() {
             );
           })}
         </section>
+      )}
+
+      {/* Phone: the header's Add printer moves to the end of the list (doc 06 §1). */}
+      {phone && !loading && (
+        <button type="button" className="ui-list-add" onClick={() => setShowAddPanel((v) => !v)}>
+          {showAddPanel ? "Cancel adding a printer" : "+ Add printer"}
+        </button>
       )}
 
       {/* ── Inspector portal ─────────────────────────────────────────────── */}
@@ -755,48 +551,6 @@ export function PrinterCard({
 }
 
 // ── CameraThumb ───────────────────────────────────────────────────────────────
-
-/** Attention actions on phone: one primary and at most one secondary beside it;
- *  anything else goes in the "⋯" sheet. */
-function PhoneAttnActions({
-  item,
-  relatedPrinter,
-  onPlateCleared,
-  onService,
-  onOpenPrinter,
-  onDismiss,
-}: {
-  item: AttentionItem;
-  relatedPrinter: { id: number } | null | undefined;
-  onPlateCleared: (printerId: number) => void;
-  onService: () => void;
-  onOpenPrinter: () => void;
-  onDismiss: () => void;
-}) {
-  const acts: { label: string; run: () => void }[] = [];
-  if (item.kind === "print_finished" && item.printer_id != null) {
-    const pid = item.printer_id;
-    acts.push({ label: "Plate cleared", run: () => onPlateCleared(pid) });
-  }
-  if (item.kind.startsWith(ATTENTION_PREFIX)) acts.push({ label: "Open in Service", run: onService });
-  if (relatedPrinter) acts.push({ label: "Open printer", run: onOpenPrinter });
-  if (!item.kind.startsWith(ATTENTION_PREFIX)) acts.push({ label: "Dismiss", run: onDismiss });
-  const shown = acts.slice(0, 2);
-  const rest = acts.slice(2);
-  return (
-    <>
-      {shown.map((a, i) => (
-        <button key={a.label} type="button" className={`fleet__attn-btn${i === 0 ? " fleet__attn-btn--primary" : ""}`} onClick={a.run}>
-          {a.label}
-        </button>
-      ))}
-      {rest.length > 0 && (
-        <OverflowMenu label="More actions" items={rest.map((a) => ({ label: a.label, onSelect: a.run }))} />
-      )}
-    </>
-  );
-}
-
 
 function CameraThumb({ url }: { url: string | null }) {
   const [err, setErr] = useState(false);

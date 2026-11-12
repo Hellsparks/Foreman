@@ -5,7 +5,8 @@ import { api, type PrinterWithStatus } from "../api/client";
 import { FAIL_REASONS, jobs, type Job, type JobOutcome, type JobStats } from "../api/jobs";
 import { useEventStream } from "../hooks/useEventStream";
 import { useSignedUrl } from "../hooks/useSignedUrl";
-import { StatusChip, type Tone } from "../ui";
+import { FilterSheet, HeaderActions, HeaderSearch, StatusChip, relTime, type Tone } from "../ui";
+import { usePhone } from "../hooks/useMediaQuery";
 
 const JOB_TOPICS = ["job"];
 
@@ -103,6 +104,7 @@ const OUTCOMES: [string, string][] = [
 ];
 
 export function JobsHistory({ notify }: { notify: (text: string) => void }) {
+  const phone = usePhone();
   const printers = usePrinters();
   const [q, setQ] = useState("");
   const [outcome, setOutcome] = useState("all");
@@ -175,10 +177,15 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
   };
 
   const filtered = q || outcome !== "all" || printerId != null || material || spoolId != null || from || to;
+  const nFilters = [outcome !== "all", printerId != null, !!material, spoolId != null, !!from, !!to].filter(Boolean).length;
 
   return (
     <div className="jh-layout">
       <main className="jobs-main jh-main">
+        <HeaderActions>
+          <HeaderSearch value={q} onChange={setQ} label="Search history" />
+        </HeaderActions>
+        <FilterSheet active={nFilters}>
         <div className="jh-toolbar">
           <label className="jh-search">
             <span className="jh-sr">Search history</span>
@@ -257,6 +264,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
             </button>
           )}
         </div>
+        </FilterSheet>
         <div className="jh-count">
           {total} {total === 1 ? "job" : "jobs"}
         </div>
@@ -295,14 +303,14 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
                       </span>
                     </td>
                     <td>{j.printer_name}</td>
-                    <td className="jh-muted jh-nowrap">{j.end === "running" ? "printing…" : fmtWhen(j.ended_at)}</td>
+                    <td className="jh-muted jh-nowrap">{j.end === "running" ? "printing…" : phone ? relTime(j.ended_at) : fmtWhen(j.ended_at)}</td>
                     <td className="jh-num jh-mono ph-hide">{fmtDuration(j.duration_secs)}</td>
                     <td className="jh-num jh-mono ph-hide">
                       {fmtGrams(j.grams_used ?? j.grams_planned)}
                       {sp && <span className="jh-sub">{sp}</span>}
                     </td>
                     <td className="jh-nowrap">
-                      <StatusChip tone={c.tone} symbol={c.sym} word={c.word} />
+                      <StatusChip tone={c.tone} symbol={c.sym} word={c.word} short={phone ? "" : undefined} />
                     </td>
                   </tr>
                 );
