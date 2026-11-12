@@ -22,7 +22,7 @@ Rule: **if it isn't frontend, it's Rust.** (One exception: the C++ glue in `fore
 | D7 | Status updates | Moonraker: **websocket subscriptions**, not 3 s polling. Bambu: persistent MQTT. OctoPrint/Duet: polling stays (per-driver interval) | Lower latency, less load, accurate job end detection. |
 | D8 | Swatch STL generator | **Port to Rust** (`foreman-swatch` crate), see §5 | Job is tiny: fixed plate + 2 lines of debossed text. Python/CadQuery (~500 MB) is overkill. |
 | D9 | Docker self-management (install Spoolman, GHCR self-update, socket mount) | **Remove.** Spoolman is built in; updates handled by desktop updater / server package. Research update mechanism at that phase | Docker-socket-in-container is a big attack surface and no longer needed. |
-| D10 | Marathon data | One-shot **importer** for existing `marathon.db` (migrations 001–041) + uploads dir. New schema starts clean | Lets you move without losing history/projects/maintenance. |
+| D10 | Marathon data | ❌ **DROPPED (owner, 2026-11-12):** no Marathon importer. The owner was the only Marathon user and the old data isn't needed. Foreman starts clean; the live Spoolman DB is used as is (W1 "use existing Spoolman DB"). | ~~One-shot importer for `marathon.db` + uploads dir.~~ |
 | D11 | Bambu Cloud | ✅ **DECIDED 2026-11-10:** do what OrcaSlicer does — load Bambu's prebuilt `bambu_networking` plugin (downloaded from Bambu, pinned ABI series; a custom path such as Open Bamboo Networking is allowed). One `foreman-bambu-helper` process per Bambu account (the plugin keeps one login per process), talking JSON lines over stdio to the server. Only the helper has C++ (one glue file). **x86_64 only** (Bambu publishes the plugin for x86_64): on ARM the feature is off with a warning. | Keeps printers in cloud mode with Handy working, gets signing from Bambu's own plugin, and lets several people's Bambu accounts sit next to the Klipper printers in one Foreman. Orca itself can only hold one Bambu account. |
 
 ---
@@ -33,8 +33,8 @@ Each workflow lists: trigger · steps · backend pieces · what changes vs today
 
 ### W1 — First run / setup
 - **Trigger:** no config.
-- **Steps:** choose mode (this machine is the server / connect to a server) → data source (fresh · import Marathon DB · use existing Spoolman DB · point at external Spoolman) → add printers (auto-discover + manual) → optional features → done.
-- **Backend:** `setup` state machine, Marathon importer, Spoolman DB detector (engine + alembic revision), printer discovery.
+- **Steps:** choose mode (this machine is the server / connect to a server) → data source (fresh · use existing Spoolman DB · point at external Spoolman; no Marathon import, D10 dropped) → add printers (auto-discover + manual) → optional features → done.
+- **Backend:** `setup` state machine, Spoolman DB detector (engine + alembic revision), printer discovery.
 - **Changes:** Spoolman install step gone (built-in). Add discovery (mDNS for Moonraker, SSDP/LAN for Bambu — verify at build). Wizard resumable.
 
 ### W2 — Add / configure a printer
@@ -123,7 +123,7 @@ crates/
     scheduler/       per-printer + fleet queue (W5)
     projects/        templates, projects, plates (W9)
     filament/        guard, inventory, scale proxy, Bambu tray sync (W8)
-    maintenance/ stats/ calibration/ exports/ backup/ importer/ (Marathon DB)
+    maintenance/ stats/ calibration/ exports/ backup/
   spoolman-rs/       Spoolman-compatible API + WS, multi-DB, alembic-aware (D3–D5)
   foreman-server/    axum: REST, /ws/events, static frontend, OctoPrint-compat, MCP, Spoolman mount
   foreman-desktop/   Tauri 2 shell: embedded server or remote, tray, notifications, dialogs
@@ -143,7 +143,7 @@ Cross-cutting: typed API (Rust → TS type generation, tool picked at scaffold s
 4. **Files, compat, queue, job engine** (W4, W5, W7).
 5. **Filament flows** (W8) on top of spoolman-rs.
 6. **Projects, maintenance, stats, calibration, exports** (W9–W13).
-7. **System**: setup, importer, backup, auth, MCP (W1, W14).
+7. **System**: setup, backup, auth, MCP (W1, W14). (Marathon importer dropped, D10.)
 8. **Tauri desktop shell**, then mobile (W15).
 9. **Frontend per workflow** — UI specs come from the Claude artifacts design track; this doc defines the flows each screen must serve.
 
