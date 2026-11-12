@@ -26,9 +26,22 @@ function describe(el: HTMLElement): string {
 
 const SCROLLS = new Set(["auto", "scroll"]);
 
+/** Inside a visually-hidden (≤ 1 px) box, e.g. a table header kept for screen readers. */
+function srOnly(el: HTMLElement, root: HTMLElement, cache: Map<Element, boolean>): boolean {
+  const p = el.parentElement;
+  if (!p || p === root || !root.contains(p)) return false;
+  const known = cache.get(p);
+  if (known !== undefined) return known;
+  const r = p.getBoundingClientRect();
+  const hidden = (r.width <= 1 && r.height <= 1) || srOnly(p, root, cache);
+  cache.set(p, hidden);
+  return hidden;
+}
+
 export function scanClipping(root: HTMLElement): ClipHit[] {
   const hits: ClipHit[] = [];
   const all = [root, ...root.querySelectorAll<HTMLElement>("*")];
+  const sr = new Map<Element, boolean>();
   for (const el of all) {
     // xterm draws its own text; data-clip-ignore opts a subtree out.
     if (el.closest("[data-clip-ignore], .xterm")) continue;
@@ -37,8 +50,9 @@ export function scanClipping(root: HTMLElement): ClipHit[] {
     if (el instanceof SVGElement || el.tagName === "svg") continue;
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden") continue;
-    // Visually-hidden screen-reader text is 1 px on purpose.
+    // Visually-hidden screen-reader text is 1 px on purpose (and so is what is inside it).
     if (el.clientWidth <= 1 || el.clientHeight <= 1) continue;
+    if (srOnly(el, root, sr)) continue;
     // Inputs/selects scroll their own text; images have no text.
     if (/^(INPUT|SELECT|TEXTAREA|IMG|CANVAS|VIDEO|TABLE|TBODY|THEAD|TR)$/.test(el.tagName)) continue;
 

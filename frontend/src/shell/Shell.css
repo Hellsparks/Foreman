@@ -232,6 +232,11 @@ body {
   user-select: none;
 }
 
+/* Page-owned header buttons (phone): no box of its own, so it adds no gap. */
+.topbar__actions {
+  display: contents;
+}
+
 /* Page-owned area at the left of the top bar (e.g. printer name + status). */
 .topbar__page {
   display: flex;
@@ -638,9 +643,9 @@ body {
 
 /* ── Phone layout (below 760 px) ─────────────────────────────────────────── */
 /* Not the desktop shell squeezed: the rail goes, a bottom tab bar comes (after
-   PhoneFleet.dc.html), the header is page title + search icon only, and the
-   inspector becomes a bottom panel. Keep the breakpoint in sync with
-   hooks/useMediaQuery.ts. */
+   PhoneFleet.dc.html, doc 06 §5), the header is 48 px with the page title, a
+   search icon and the Attention bell, and the inspector becomes the right edge
+   panel (ui/EdgePanel). Keep the breakpoint in sync with hooks/useMediaQuery.ts. */
 
 /* Phone-only pieces are invisible on desktop. */
 .topbar__title,
@@ -652,8 +657,9 @@ body {
 }
 
 @media (max-width: 759px) {
+  /* Doc 06 §1: header 48 px (title + at most two icon buttons). */
   .shell {
-    --shell-bar-h: 64px;
+    --shell-bar-h: 48px;
   }
 
   .rail {
@@ -661,30 +667,28 @@ body {
   }
 
   .shell__work {
-    padding: var(--fw-space-4) var(--fw-space-4) var(--fw-space-6);
+    padding: var(--fw-space-2) var(--fw-space-4) var(--fw-space-6);
   }
 
-  .shell__content {
-    flex-direction: column-reverse;
-  }
-
-  .inspector {
+  /* The inspector is the right edge panel (ui/EdgePanel): it fills the panel. */
+  .edge-panel .inspector,
+  .edge-panel .inspector[data-open="false"] {
     width: 100%;
-    max-height: 60dvh;
-    border-left: none;
-    border-top: var(--fw-border-width) solid var(--fw-border);
+    height: 100%;
+    border: 0;
+    transition: none;
   }
 
-  .inspector[data-open="false"] {
-    max-height: 0;
-    border-top-width: 0;
-  }
-
-  /* Header: page title + search icon. No Send, no Attention, no window
-     controls, no keyboard hint (those are desktop). */
+  /* Header: page title + search icon + bell (doc 06 §1, §3). No Send, no
+     window controls, no keyboard hint (those are desktop). A page may put its
+     own header buttons in .topbar__actions (they replace the global search). */
   .topbar {
-    gap: var(--fw-space-3);
-    padding: 0 var(--fw-space-4);
+    gap: var(--fw-space-2);
+    padding: 0 var(--fw-space-2) 0 var(--fw-space-4);
+  }
+
+  .topbar__actions:not(:empty) ~ .topbar__search-toggle {
+    display: none;
   }
 
   .topbar__title {
@@ -692,7 +696,7 @@ body {
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: 28px;
+    font-size: 22px;
     line-height: 1.15;
     letter-spacing: -0.02em;
     white-space: nowrap;
@@ -792,9 +796,9 @@ body {
     border-top-color: var(--fw-accent);
   }
 
-  /* Scan: accent, raised, centre */
-  .phone-nav__btn--scan,
-  .phone-nav__btn--scan[aria-current="page"] {
+  /* Start print: accent, centre (doc 06 §5) */
+  .phone-nav__btn--start,
+  .phone-nav__btn--start[aria-current="page"] {
     margin: 0 var(--fw-space-1);
     border-top-color: transparent;
     border-radius: var(--fw-radius);

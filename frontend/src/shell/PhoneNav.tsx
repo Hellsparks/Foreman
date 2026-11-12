@@ -5,7 +5,7 @@ import { NavLink, useLocation } from "react-router-dom";
 const ICONS: Record<string, string> = {
   Fleet: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
   Jobs: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
-  Scan: "M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10",
+  Start: "M7 4l13 8-13 8z",
   Filament: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 9a3 3 0 100 6 3 3 0 000-6z",
   Library: "M3 6h6l2 2h10v11H3z",
   Projects: "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5",
@@ -31,8 +31,9 @@ const MORE_ITEMS = [
 ];
 
 /**
- * Bottom tab bar for phone (below 760 px), after PhoneFleet.dc.html:
- * Fleet · Jobs · Scan (accent, raised, centre) · Filament · More.
+ * Bottom tab bar for phone (below 760 px), after PhoneFleet.dc.html and doc 06 §5:
+ * Fleet · Jobs · Start print (accent, centre) · Filament · More.
+ * Start print was Scan; Scan comes back under Filament when the devices exist.
  * "More" opens a sheet with the remaining sections. Hidden on desktop by CSS.
  */
 export default function PhoneNav() {
@@ -69,9 +70,8 @@ export default function PhoneNav() {
         <NavLink to="/jobs" className="phone-nav__btn">
           <Icon name="Jobs" />Jobs
         </NavLink>
-        {/* Scan has no screen of its own yet: it opens Filament, where spools are looked up. */}
-        <NavLink to="/filament" className="phone-nav__btn phone-nav__btn--scan" aria-label="Scan a spool">
-          <Icon name="Scan" size={24} sw={2} />Scan
+        <NavLink to="/start" className="phone-nav__btn phone-nav__btn--start">
+          <Icon name="Start" size={24} sw={2} />Start print
         </NavLink>
         <NavLink to="/filament" className="phone-nav__btn">
           <Icon name="Filament" />Filament

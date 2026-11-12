@@ -1,0 +1,208 @@
+/* Attention: bell panel + Attention page (§3, doc 06). Tokens only.
+   Cards after PhoneFleet.dc.html: chip + sentence + meta, actions in one row. */
+
+.attn-bell {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ── Panel (desktop: anchored under the bell) ───────────────────────────── */
+.attn-pop {
+  position: absolute;
+  top: calc(100% + var(--fw-space-2));
+  right: 0;
+  z-index: 30;
+  width: 420px;
+  max-width: calc(100vw - 2 * var(--fw-space-4));
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--fw-raised);
+  border: var(--fw-border-width) solid var(--fw-border);
+  box-shadow: var(--fw-shadow-overlay);
+}
+.attn-pop:focus { outline: none; }
+.attn-pop:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+
+.attn-pop__head {
+  display: flex;
+  align-items: center;
+  gap: var(--fw-space-2);
+  padding: var(--fw-space-1) var(--fw-space-1) var(--fw-space-1) var(--fw-space-4);
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+  flex-shrink: 0;
+}
+.attn-pop__title {
+  flex: 1;
+  font: var(--fw-type-label) / 1 var(--fw-mono);
+  letter-spacing: var(--fw-tracking-label);
+  text-transform: uppercase;
+  color: var(--fw-muted);
+}
+.attn-pop__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--fw-control-h);
+  min-height: var(--fw-control-h);
+  border: 0;
+  background: transparent;
+  color: var(--fw-text);
+  cursor: pointer;
+  border-radius: var(--fw-radius-control);
+}
+.attn-pop__close:hover { background: var(--fw-surface); }
+.attn-pop__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--fw-space-3);
+}
+.attn-pop__all {
+  flex-shrink: 0;
+  min-height: var(--fw-control-h);
+  border: 0;
+  border-top: var(--fw-border-width) solid var(--fw-border);
+  background: transparent;
+  color: var(--fw-text);
+  font: inherit;
+  cursor: pointer;
+}
+.attn-pop__all:hover { background: var(--fw-surface); }
+.attn-pop__close:focus-visible,
+.attn-pop__all:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: -2px; }
+
+/* ── Items ──────────────────────────────────────────────────────────────── */
+.attn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-2);
+}
+.attn-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-2);
+  padding: var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-border);
+  background: var(--fw-raised);
+}
+.attn-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fw-space-2);
+}
+.attn-card__head > .ui-status-chip { flex: none; }
+.attn-card__text { flex: 1; min-width: 0; }
+.attn-card__title {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attn-card__body,
+.attn-card__meta {
+  font-size: var(--fw-type-label);
+  color: var(--fw-muted);
+}
+.attn-card__actions {
+  display: flex;
+  gap: var(--fw-space-2);
+}
+.attn-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-2);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
+  background: transparent;
+  color: var(--fw-text);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attn-btn:hover { background: var(--fw-surface); }
+.attn-btn--primary {
+  border-color: var(--fw-accent-hover);
+  background: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+  font-weight: bold;
+}
+.attn-btn--primary:hover { background: var(--fw-accent); }
+.attn-rate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fw-space-2);
+}
+.attn-rate__label {
+  font-size: var(--fw-type-label);
+  color: var(--fw-muted);
+}
+.attn-chip {
+  min-height: var(--fw-control-h);
+  padding: 0 var(--fw-space-3);
+  border: var(--fw-border-width) solid var(--fw-muted);
+  border-radius: var(--fw-radius);
+  background: var(--fw-raised);
+  color: var(--fw-text);
+  font: inherit;
+  cursor: pointer;
+}
+.attn-chip[aria-pressed="true"] {
+  background: var(--fw-accent-hover);
+  border-color: var(--fw-accent-hover);
+  color: var(--fw-on-accent);
+}
+.attn-chip--reason { border-style: dashed; }
+.attn-btn:focus-visible,
+.attn-chip:focus-visible { outline: 2px solid var(--fw-focus); outline-offset: 2px; }
+.attn-empty { margin: 0; padding: var(--fw-space-3) 0; color: var(--fw-muted); }
+.attn-error { margin: 0 0 var(--fw-space-2); color: var(--fw-danger); }
+
+/* ── Attention page ─────────────────────────────────────────────────────── */
+.attn-page {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-4);
+}
+.attn-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fw-space-2);
+}
+
+/* ── Phone: the panel is a full-height sheet; the bell is an icon button ── */
+@media (max-width: 759px) {
+  .attn-pop {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    z-index: 40;
+    border: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .shell .attn-bell .topbar__btn--attention {
+    display: inline-flex;
+    justify-content: center;
+    gap: var(--fw-space-1);
+    min-width: var(--fw-control-h);
+    min-height: var(--fw-control-h);
+    padding: 0 var(--fw-space-2);
+  }
+  .shell .attn-page { gap: var(--fw-space-3); }
+  .attn-page__filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .attn-page__filters > * { flex: none; }
+}

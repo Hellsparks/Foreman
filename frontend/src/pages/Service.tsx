@@ -27,6 +27,8 @@ import {
   type TaskView,
 } from "../api/maintenance";
 import { useEventStream } from "../hooks/useEventStream";
+import { usePhone } from "../hooks/useMediaQuery";
+import { FilterSheet, PhoneTitle } from "../ui";
 import type { ShellContext } from "../shell/Shell";
 import { ToastStack, useToasts } from "../ui";
 import "./Service.css";
@@ -128,6 +130,7 @@ export default function Service() {
     }
   };
 
+  const phone = usePhone();
   const filtered = (list: TaskView[]) =>
     list.filter((t) => filter === "all" || (filter === "due" ? t.progress.state !== "ok" : t.progress.state === "overdue"));
   const selId = panel?.kind === "task" ? panel.id : null;
@@ -154,6 +157,10 @@ export default function Service() {
         </button>
       </div>
 
+      <PhoneTitle>
+        Service{over + soon > 0 ? <span> · {over + soon} due</span> : null}
+      </PhoneTitle>
+      <FilterSheet active={filter === "all" ? 0 : 1}>
       <div className="svc-bar">
         <div role="group" aria-label="Show" className="svc-seg">
           {(
@@ -170,6 +177,7 @@ export default function Service() {
         </div>
         {ov && <DueSoonSetting pct={ov.due_soon_pct} onSaved={load} onError={setError} />}
       </div>
+      </FilterSheet>
 
       {error && (
         <p className="svc-error" role="alert">
@@ -205,6 +213,12 @@ export default function Service() {
             </div>
           </section>
         ))}
+
+      {phone && (
+        <button type="button" className="ui-list-add" onClick={() => show({ kind: "new", printerId: printers[0]?.id ?? null })}>
+          + New task
+        </button>
+      )}
 
       {portal &&
         inspectorOpen &&

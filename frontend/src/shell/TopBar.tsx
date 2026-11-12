@@ -4,12 +4,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { ConnectionState } from "../hooks/useEventStream";
 import { useRoute } from "../desktop/route";
 import { usePhone } from "../hooks/useMediaQuery";
+import AttentionBell from "../attention/AttentionBell";
 
 /** True only when running inside the Tauri shell. */
 export const IS_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Pages portal their title/status into this element. */
 export const TOPBAR_SLOT_ID = "topbar-page-slot";
+/** Phone: pages portal their own header buttons (search, "⋯") into this element. */
+export const TOPBAR_ACTIONS_ID = "topbar-actions-slot";
 
 export function WindowControls() {
   const win = getCurrentWindow();
@@ -59,7 +62,7 @@ export function WindowControls() {
 const PAGE_TITLES: [string, string][] = [
   ["/fleet", "Fleet"], ["/printer", "Printer"], ["/jobs", "Jobs"], ["/library", "Library"],
   ["/projects", "Projects"], ["/filament", "Filament"], ["/service", "Service"],
-  ["/tools", "Tools"], ["/settings", "Settings"],
+  ["/tools", "Tools"], ["/settings", "Settings"], ["/attention", "Attention"], ["/start", "Start print"],
 ];
 
 /** Phone header title: the section the route belongs to. */
@@ -69,10 +72,9 @@ function pageTitle(pathname: string): string {
 
 interface TopBarProps {
   connectionState: ConnectionState;
-  attentionCount: number;
 }
 
-export default function TopBar({ connectionState: _connectionState, attentionCount }: TopBarProps) {
+export default function TopBar({ connectionState: _connectionState }: TopBarProps) {
   const win = IS_TAURI ? getCurrentWindow() : null;
   const route = useRoute();
   const navigate = useNavigate();
@@ -124,6 +126,9 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
         />
         <kbd className="topbar__kbd">Ctrl K</kbd>
       </label>
+
+      {/* Phone: page header buttons; when present they replace the global search. */}
+      <div id={TOPBAR_ACTIONS_ID} className="topbar__actions" />
 
       {/* Phone: search icon that expands the field to full width. */}
       <button
@@ -184,25 +189,8 @@ export default function TopBar({ connectionState: _connectionState, attentionCou
         Send
       </button>
 
-      {/* Attention — accent border with count */}
-      <button
-        type="button"
-        className="topbar__btn topbar__btn--attention"
-        aria-label={`Attention — ${attentionCount} item${attentionCount === 1 ? "" : "s"} need action`}
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          aria-hidden="true"
-        >
-          <path d="M6 16V11a6 6 0 0112 0v5l2 2H4l2-2zM10 21h4" />
-        </svg>
-        <span className="topbar__attention-count">{attentionCount}</span>
-      </button>
+      {/* Attention: bell + count, opens the open items (§3, doc 06) */}
+      <AttentionBell />
 
       {/* Window controls — Tauri only */}
       {IS_TAURI && <WindowControls />}
