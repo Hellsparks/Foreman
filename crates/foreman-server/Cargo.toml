@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+description = "Foreman print farm server (headless)"
 
 [[bin]]
 name = "foreman-server"
@@ -81,3 +83,30 @@ if-addrs = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 tower = { workspace = true, features = ["util"] }
+
+[package.metadata.dist]
+# The web UI, staged by the release workflow (frontend/dist copied here).
+include = ["../../target/release-web/frontend/"]
+
+# `cargo deb -p foreman-server` (release workflow): the headless server as a
+# systemd service running as user `foreman`, data in /var/lib/foreman.
+[package.metadata.deb]
+name = "foreman-server"
+maintainer = "Foreman Contributors"
+copyright = "Foreman Contributors"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+Foreman manages a print farm: Klipper/Moonraker, Bambu and Prusa printers, a \
+Spoolman-compatible filament inventory, a print library and queue. This package \
+runs the headless server as the systemd service `foreman` on port 9090."""
+section = "net"
+priority = "optional"
+depends = "$auto"
+maintainer-scripts = "debian/"
+assets = [
+    ["target/release/foreman-server", "usr/bin/", "755"],
+    ["../../target/release-web/frontend/**/*", "usr/share/foreman/frontend/", "644"],
+    ["debian/default", "etc/default/foreman", "644"],
+    ["../../README.md", "usr/share/doc/foreman-server/README.md", "644"],
+]
+systemd-units = { unit-name = "foreman", enable = true, start = true }

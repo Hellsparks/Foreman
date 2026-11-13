@@ -1,0 +1,3 @@
+# Environment for foreman.service. Any FOREMAN__* setting works here, e.g.
+#   FOREMAN__HOST=127.0.0.1   keep Foreman on this machine only
+#   FOREMAN__PORT=9091

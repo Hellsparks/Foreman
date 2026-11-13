@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+#DEBHELPER#
+
+# purge removes the data (database, uploads, secret.key) and the service user.
+if [ "$1" = "purge" ]; then
+    rm -rf /var/lib/foreman /etc/foreman
+    if getent passwd foreman >/dev/null; then
+        userdel foreman || true
+    fi
+    if getent group foreman >/dev/null; then
+        groupdel foreman || true
+    fi
+fi

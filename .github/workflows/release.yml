@@ -1,0 +1,552 @@
+name: Release
+
+# Tag-driven releases. Pushing a tag v* builds everything and publishes a GitHub
+# Release (a tag with a "-", like v0.4.0-rc.1, publishes as a pre-release):
+#   server:  foreman-server archives (dist), .deb with a systemd unit (cargo-deb),
+#            multi-arch Docker image (ghcr.io/hellsparks/foreman)
+#   desktop: Windows NSIS, Linux AppImage/.deb/.rpm (x86_64 + aarch64), all signed
+#            for the updater, plus latest.json; beta.json on the update-channels branch
+#   SHA256SUMS for every file.
+# Dry run (nothing published): Actions → Release → Run workflow, "publish" off;
+# also runs on pull requests that touch the release pipeline, as v<workspace version>.
+# The would-be release (files, body, latest.json) is uploaded as the "release-preview" artifact.
+# Pre-releases ship no .rpm: Tauri CLI 2.12.4's bundler refuses a "-" in the rpm version.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub Release + Docker image (off = dry run). The tag v<version> must already exist."
+        type: boolean
+        default: false
+      version:
+        description: "Version to build, e.g. 0.4.0 or 0.4.0-rc.1"
+        type: string
+        default: "0.0.0-dryrun.1"
+      summary:
+        description: "Summary at the top of the release body (a pushed tag uses its annotation)"
+        type: string
+        default: "Dry run of the release pipeline."
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - ".github/scripts/**"
+      - "docker/**"
+      - "crates/foreman-server/debian/**"
+      - "crates/foreman-desktop/tauri.conf.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_AUTO_INSTALL: "0"
+  DIST_VERSION: "0.33.1"
+  CARGO_DEB_VERSION: "3.8.0"
+  IMAGE: ghcr.io/hellsparks/foreman
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version, tag and mode
+        id: v
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_PUBLISH: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          case "$EVENT" in
+            push)              tag=$GITHUB_REF_NAME; publish=true ;;
+            workflow_dispatch) tag=v${IN_VERSION#v}; publish=$IN_PUBLISH ;;
+            *)                 tag=v$(cargo metadata --no-deps --format-version 1 \
+                                    | jq -r '.packages[] | select(.name == "foreman-server") | .version')
+                               publish=false ;;
+          esac
+          version=${tag#v}
+          if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$tag' is not v<major>.<minor>.<patch>[-pre]"; exit 1
+          fi
+          if [[ $publish == true ]]; then
+            # The annotated tag object (actions/checkout can leave a lightweight copy).
+            git fetch --force origin "refs/tags/$tag:refs/tags/$tag" \
+              || { echo "::error::tag $tag does not exist on origin"; exit 1; }
+          fi
+          prerelease=false; [[ $version == *-* ]] && prerelease=true
+          {
+            echo "tag=$tag"; echo "version=$version"
+            echo "prerelease=$prerelease"; echo "publish=$publish"
+          } >>"$GITHUB_OUTPUT"
+          echo "### $tag — prerelease: $prerelease, publish: $publish" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Release notes
+        shell: bash
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          PUBLISH: ${{ steps.v.outputs.publish }}
+          IN_SUMMARY: ${{ inputs.summary }}
+        run: |
+          set -euo pipefail
+          if [[ $PUBLISH == true ]]; then
+            ref=$TAG
+            git for-each-ref "refs/tags/$TAG" --format='%(contents)' >summary.txt
+            [[ $(git cat-file -t "$TAG") == tag ]] \
+              || echo "::warning::$TAG is a lightweight tag; no summary. Use git tag -a."
+          else
+            ref=HEAD
+            printf '%s\n' "${IN_SUMMARY:-Dry run of the release pipeline.}" >summary.txt
+          fi
+          .github/scripts/release-notes.sh "$TAG" "$ref" summary.txt notes
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes/
+
+  server:
+    name: Server (${{ matrix.target }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            deb_arch: amd64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-22.04-arm
+            deb_arch: arm64
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set version
+        run: cargo set-version "$VERSION"
+
+      - name: Build the web UI
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # dist's archive and cargo-deb's assets both take the UI from here
+      # (crates/foreman-server/Cargo.toml).
+      - name: Stage the web UI
+        run: |
+          rm -rf target/release-web
+          mkdir -p target/release-web
+          cp -r frontend/dist target/release-web/frontend
+
+      - name: Install dist and cargo-deb
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            "https://github.com/axodotdev/cargo-dist/releases/download/v${DIST_VERSION}/cargo-dist-installer.sh" | sh
+          cargo install cargo-deb --version "$CARGO_DEB_VERSION" --locked
+
+      - name: Archive (dist)
+        run: dist build --tag "v$VERSION" --artifacts=local --target "${{ matrix.target }}"
+
+      - name: Debian package (cargo-deb)
+        run: |
+          cargo deb -p foreman-server --no-build --profile dist --target "${{ matrix.target }}" \
+            --output "target/distrib/foreman-server_${VERSION}_${{ matrix.deb_arch }}.deb"
+          dpkg-deb --info "target/distrib/foreman-server_${VERSION}_${{ matrix.deb_arch }}.deb"
+
+      - name: Smoke test the archive
+        run: |
+          d=$(mktemp -d)
+          tar -xJf "target/distrib/foreman-server-${{ matrix.target }}.tar.xz" -C "$d"
+          ls -R "$d" | head -20
+          bin=$(find "$d" -name foreman-server -type f)
+          FOREMAN__DATA_DIR="$d/data" FOREMAN__PORT=19090 FOREMAN__SPOOLMAN_ENABLED=false "$bin" >"$d/log" 2>&1 &
+          for _ in $(seq 1 30); do curl -fs http://127.0.0.1:19090/api/health && break; sleep 1; done
+          echo
+          curl -fsS http://127.0.0.1:19090/api/health | grep -q "\"version\":\"$VERSION\""
+          curl -fsS http://127.0.0.1:19090/ | grep -o '<title>[^<]*</title>'
+          kill %1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.target }}
+          path: |
+            target/distrib/foreman-server-${{ matrix.target }}.tar.xz
+            target/distrib/foreman-server-${{ matrix.target }}.tar.xz.sha256
+            target/distrib/foreman-server_*.deb
+          if-no-files-found: error
+
+  deb-test:
+    name: .deb installs and starts (${{ matrix.deb_arch }})
+    needs: [plan, server]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-22.04, deb_arch: amd64 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-22.04-arm, deb_arch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: server-${{ matrix.target }}
+          path: server
+      - name: Install and start in a systemd container
+        run: .github/scripts/test-deb.sh "server/foreman-server_${{ needs.plan.outputs.version }}_${{ matrix.deb_arch }}.deb"
+
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            runner: windows-latest
+            bundles: nsis
+            bundles_pre: nsis
+            cli: \frontend\node_modules\.bin\tauri.cmd
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+            bundles: appimage,deb,rpm
+            bundles_pre: appimage,deb
+            cli: /frontend/node_modules/.bin/tauri
+          - name: linux-aarch64
+            runner: ubuntu-22.04-arm
+            bundles: appimage,deb,rpm
+            bundles_pre: appimage,deb
+            cli: /frontend/node_modules/.bin/tauri
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the signing key is configured
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PASS: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [[ -z $KEY || -z $PASS ]]; then
+            echo "::error::Set the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets (README → Updater signing key)."
+            exit 1
+          fi
+
+      - name: Install Tauri system libraries (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 &&
+               sudo apt-get install -y --no-install-recommends -o Acquire::Retries=3 \
+                 libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+                 patchelf xdg-utils file libfuse2; then
+              exit 0
+            fi
+            echo "apt attempt $attempt failed; retrying in 20s"
+            sleep 20
+          done
+          exit 1
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-desktop-${{ matrix.name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set version
+        shell: bash
+        run: cargo set-version "$VERSION"
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      # Build only: no tagName/releaseId, so the action uploads nothing; the
+      # publish job attaches every file to one release.
+      - name: Build and sign (tauri-action)
+        uses: tauri-apps/tauri-action@v1
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: crates/foreman-desktop
+          # The CLI binary itself: given an "npm …" script the action inserts its
+          # own "--" after "build", which hands --bundles to cargo.
+          tauriScript: ${{ github.workspace }}${{ matrix.cli }}
+          args: --bundles ${{ needs.plan.outputs.prerelease == 'true' && matrix.bundles_pre || matrix.bundles }}
+
+      # One naming scheme across platforms (Tauri's rpm/deb names vary with
+      # pre-release versions). Renaming keeps the .sig valid: it signs the bytes.
+      - name: Collect bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          b=target/release/bundle
+          mkdir -p out
+          take() { # take <glob> <new name>
+            local f; f=$(compgen -G "$1" | head -1) || { echo "::error::no $1"; exit 1; }
+            cp "$f" "out/$2"
+            if [[ -f "$f.sig" ]]; then cp "$f.sig" "out/$2.sig"; else echo "::error::$f has no .sig"; exit 1; fi
+          }
+          case "${{ matrix.name }}" in
+            windows-x64)
+              take "$b/nsis/*-setup.exe" "Foreman_${VERSION}_windows_x64-setup.exe" ;;
+            linux-x86_64)
+              take "$b/appimage/*.AppImage" "Foreman_${VERSION}_linux_x86_64.AppImage"
+              take "$b/deb/*.deb" "Foreman_${VERSION}_linux_amd64.deb"
+              [[ $VERSION == *-* ]] || take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_x86_64.rpm" ;;
+            linux-aarch64)
+              take "$b/appimage/*.AppImage" "Foreman_${VERSION}_linux_aarch64.AppImage"
+              take "$b/deb/*.deb" "Foreman_${VERSION}_linux_arm64.deb"
+              [[ $VERSION == *-* ]] || take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_aarch64.rpm" ;;
+          esac
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          path: out/
+          if-no-files-found: error
+
+  docker:
+    name: Docker image (amd64 + arm64)
+    needs: [plan, server]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: server
+          merge-multiple: true
+
+      - name: Stage the archives
+        run: |
+          set -euo pipefail
+          mkdir -p docker/staging/data
+          for pair in amd64:x86_64-unknown-linux-gnu arm64:aarch64-unknown-linux-gnu; do
+            arch=${pair%%:*}; target=${pair#*:}
+            mkdir -p "docker/staging/$arch"
+            tar -xJf "server/foreman-server-$target.tar.xz" -C "docker/staging/$arch" --strip-components=1
+          done
+          ls docker/staging/*
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image tags
+        id: meta
+        shell: bash
+        env:
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+        run: |
+          tags="$IMAGE:$VERSION"
+          if [[ $PRERELEASE == false ]]; then
+            tags="$tags,$IMAGE:${VERSION%.*},$IMAGE:latest"
+          fi
+          echo "tags=$tags" >>"$GITHUB_OUTPUT"
+          echo "$tags"
+
+      - name: Smoke test (amd64)
+        run: |
+          docker buildx build --load --platform linux/amd64 -t foreman-smoke docker
+          docker run -d --name smoke -p 19090:9090 foreman-smoke
+          for _ in $(seq 1 30); do curl -fs http://127.0.0.1:19090/api/health && break; sleep 1; done
+          echo
+          curl -fsS http://127.0.0.1:19090/api/health | grep -q "\"version\":\"$VERSION\""
+          curl -fsS http://127.0.0.1:19090/ | grep -o '<title>[^<]*</title>'
+          docker logs smoke 2>&1 | grep -m1 "foreman-server starting"
+          docker rm -f smoke
+
+      - name: Log in to GHCR
+        if: needs.plan.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (and push when publishing)
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: docker
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.plan.outputs.publish == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/Hellsparks/Foreman
+            org.opencontainers.image.version=${{ needs.plan.outputs.version }}
+            org.opencontainers.image.licenses=GPL-3.0-or-later
+            org.opencontainers.image.description=Foreman print farm server
+
+  publish:
+    name: ${{ needs.plan.outputs.publish == 'true' && 'Publish release' || 'Dry run (nothing published)' }}
+    needs: [plan, server, deb-test, desktop, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.plan.outputs.tag }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only ours: docker/build-push-action adds a .dockerbuild record that download-artifact can't extract.
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: artifacts/release-notes
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: artifacts
+
+      - name: Assemble release files, updater manifest and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts/server-* artifacts/desktop-* -type f -exec cp {} release/ \;
+          .github/scripts/updater-manifest.sh release "$VERSION" artifacts/release-notes/notes.md >release/latest.json
+          jq . release/latest.json
+          (cd release && sha256sum -- * >../SHA256SUMS && mv ../SHA256SUMS .)
+          cp artifacts/release-notes/body.md body.md
+
+      - name: Check the updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          m=release/latest.json
+          jq -e --arg v "$VERSION" '.version == $v' $m >/dev/null
+          for key in $(jq -r '.platforms | keys[]' $m); do
+            file=$(jq -r --arg k "$key" '.platforms[$k].url | split("/") | last' $m)
+            [[ -f "release/$file" ]] || { echo "::error::$key points at missing $file"; exit 1; }
+            jq -e --arg k "$key" --rawfile s "release/$file.sig" \
+              '.platforms[$k].signature == ($s | rtrimstr("\n"))' $m >/dev/null \
+              || { echo "::error::$key signature differs from $file.sig"; exit 1; }
+            [[ $(jq -r --arg k "$key" '.platforms[$k].url' $m) == "https://github.com/Hellsparks/Foreman/releases/download/$TAG/$file" ]]
+            echo "ok  $key -> $file"
+          done
+
+      - name: Artifact list
+        shell: bash
+        run: |
+          {
+            echo "### Release files for $TAG ($( [[ $PRERELEASE == true ]] && echo pre-release || echo full release ))"
+            echo '```'
+            (cd release && ls -l --time-style=+ | awk 'NR>1 {printf "%12s  %s\n", $5, $NF}')
+            echo '```'
+            echo "Docker: $IMAGE:$VERSION (linux/amd64, linux/arm64)"
+            echo
+            echo "### latest.json"
+            echo '```json'
+            cat release/latest.json
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-preview
+          path: |
+            release/
+            body.md
+
+      - name: Create the GitHub Release
+        if: needs.plan.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          flags=(--verify-tag --title "Foreman $VERSION" --notes-file body.md)
+          if [[ $PRERELEASE == true ]]; then flags+=(--prerelease --latest=false); else flags+=(--latest); fi
+          gh release create "$TAG" "${flags[@]}" release/*
+
+      # beta.json = the newest release of any kind (installs with "Beta updates" on).
+      - name: Update the beta channel
+        if: needs.plan.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          dir=$(mktemp -d)
+          if git ls-remote --exit-code --heads origin update-channels >/dev/null; then
+            git clone --quiet --depth 1 --branch update-channels \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$dir"
+          else
+            git init --quiet -b update-channels "$dir"
+            git -C "$dir" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            printf '# Updater channels\n\nWritten by the release workflow. `beta.json` is the update\nmanifest for desktop installs with Settings → About → Beta updates on.\n' >"$dir/README.md"
+          fi
+          current=$(jq -r '.version // "0.0.0"' "$dir/beta.json" 2>/dev/null || echo 0.0.0)
+          newest=$(printf '%s\n%s\n' "$current" "$VERSION" | node -e '
+            const [a, b] = require("fs").readFileSync(0, "utf8").trim().split("\n");
+            const p = v => { const [core, pre] = v.split(/-(.*)/s); return [core.split(".").map(Number), pre]; };
+            const cmp = (x, y) => { const [cx, px] = p(x), [cy, py] = p(y);
+              for (let i = 0; i < 3; i++) if (cx[i] !== cy[i]) return cx[i] - cy[i];
+              if (!px || !py) return (px ? -1 : 0) - (py ? -1 : 0);
+              return px.localeCompare(py, "en", { numeric: true }); };
+            console.log(cmp(a, b) >= 0 ? a : b);')
+          if [[ $newest != "$VERSION" ]]; then
+            echo "beta.json stays at $current (newer than $VERSION)"; exit 0
+          fi
+          cp release/latest.json "$dir/beta.json"
+          git -C "$dir" add beta.json README.md 2>/dev/null || git -C "$dir" add beta.json
+          git -C "$dir" commit --quiet -m "beta channel: $TAG"
+          git -C "$dir" push --quiet origin update-channels
+          echo "beta.json -> $VERSION"

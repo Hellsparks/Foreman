@@ -61,6 +61,7 @@ struct DesktopPrefs {
     autostart: bool,
     local_in_use: bool,
     tray_available: bool,
+    update_channel: settings::UpdateChannel,
 }
 
 #[derive(Serialize)]
@@ -174,7 +175,20 @@ fn desktop_prefs(app: AppHandle) -> DesktopPrefs {
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
         local_in_use,
         tray_available: app.state::<Tray>().available.load(Ordering::SeqCst),
+        update_channel: s.update_channel,
     }
+}
+
+#[tauri::command]
+fn set_update_channel(
+    app: AppHandle,
+    channel: settings::UpdateChannel,
+) -> Result<DesktopPrefs, String> {
+    let file = settings::path(&app_data(&app)?);
+    let mut s = settings::load(&file);
+    s.update_channel = channel;
+    settings::save(&file, &s)?;
+    Ok(desktop_prefs(app))
 }
 
 #[tauri::command]
@@ -208,14 +222,19 @@ fn app_info(app: AppHandle) -> AppInfo {
     }
 }
 
-/// Ask GitHub Releases for a newer version; keeps it for [`update_install`].
+/// Ask the chosen update channel for a newer version; keeps it for [`update_install`].
 #[tauri::command]
 async fn update_check(
     app: AppHandle,
     pending: tauri::State<'_, PendingUpdate>,
 ) -> Result<Option<UpdateInfo>, String> {
+    let endpoint = load_settings(&app).update_channel.endpoint();
+    let url = endpoint.parse().map_err(|e| format!("{endpoint}: {e}"))?;
     let update = app
-        .updater()
+        .updater_builder()
+        .endpoints(vec![url])
+        .map_err(|e| e.to_string())?
+        .build()
         .map_err(|e| e.to_string())?
         .check()
         .await
@@ -448,6 +467,7 @@ fn main() {
             desktop_prefs,
             set_keep_running,
             set_autostart,
+            set_update_channel,
             app_info,
             update_check,
             update_install,

@@ -44,6 +44,12 @@ pub struct ServerConfig {
     #[serde(default = "default_spoolman_enabled")]
     pub drivers_enabled: bool,
 
+    /// Folder holding the built web UI (`index.html` + assets). Default: looked up
+    /// next to the binary (`frontend/`, then `../share/foreman/frontend`), then the
+    /// source tree's `frontend/dist` for dev builds. `FOREMAN__FRONTEND_DIR` overrides.
+    #[serde(default)]
+    pub frontend_dir: Option<PathBuf>,
+
     /// Embedded in the desktop app (Mode A): localhost-only unless the admin enables
     /// "Let other devices connect". Set by foreman-desktop, not by config files.
     #[serde(skip)]
@@ -76,6 +82,33 @@ pub fn default_data_dir() -> PathBuf {
 }
 
 impl ServerConfig {
+    /// The web UI folder: the configured one, else the first that has an
+    /// `index.html` among `<exe dir>/frontend` (archives, Docker),
+    /// `<exe dir>/../share/foreman/frontend` (.deb) and the dev source tree.
+    pub fn resolve_frontend_dir(&self) -> PathBuf {
+        if let Some(dir) = &self.frontend_dir {
+            return dir.clone();
+        }
+        let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|r| r.join("frontend/dist"))
+            .unwrap_or_else(|| PathBuf::from("frontend/dist"));
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|e| e.parent().map(PathBuf::from));
+        let mut candidates = Vec::new();
+        if let Some(d) = exe_dir {
+            candidates.push(d.join("frontend"));
+            candidates.push(d.join("../share/foreman/frontend"));
+        }
+        candidates.push(dev.clone());
+        candidates
+            .into_iter()
+            .find(|c| c.join("index.html").is_file())
+            .unwrap_or(dev)
+    }
+
     /// Load config from environment + optional config file.
     ///
     /// Never panics; falls back to defaults on any error.
@@ -132,7 +165,29 @@ impl Default for ServerConfig {
             data_dir,
             spoolman_enabled: default_spoolman_enabled(),
             drivers_enabled: true,
+            frontend_dir: None,
             desktop_mode: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frontend_dir_override_wins() {
+        let cfg = ServerConfig {
+            frontend_dir: Some(PathBuf::from("/opt/foreman/ui")),
+            ..ServerConfig::default()
+        };
+        assert_eq!(cfg.resolve_frontend_dir(), PathBuf::from("/opt/foreman/ui"));
+    }
+
+    #[test]
+    fn frontend_dir_falls_back_to_the_source_tree() {
+        // Test binaries live in target/<profile>/deps, with no frontend/ beside them.
+        let dir = ServerConfig::default().resolve_frontend_dir();
+        assert!(dir.ends_with("frontend/dist"), "{}", dir.display());
     }
 }

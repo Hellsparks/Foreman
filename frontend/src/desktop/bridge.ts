@@ -62,7 +62,11 @@ export interface DesktopPrefs {
   autostart: boolean;
   local_in_use: boolean;
   tray_available: boolean;
+  /** "beta" also offers pre-releases (v0.4.0-rc.1). */
+  update_channel: UpdateChannel;
 }
+
+export type UpdateChannel = "stable" | "beta";
 
 export interface AppInfo {
   version: string;
@@ -91,8 +95,9 @@ export const desktop = {
   prefs: () => invoke<DesktopPrefs>("desktop_prefs"),
   setKeepRunning: (on: boolean) => invoke<DesktopPrefs>("set_keep_running", { on }),
   setAutostart: (on: boolean) => invoke<DesktopPrefs>("set_autostart", { on }),
+  setUpdateChannel: (channel: UpdateChannel) => invoke<DesktopPrefs>("set_update_channel", { channel }),
   appInfo: () => invoke<AppInfo>("app_info"),
-  /** Asks GitHub Releases; null when this is the newest version. */
+  /** Asks the chosen update channel; null when this is the newest version. */
   updateCheck: () => invoke<UpdateInfo | null>("update_check"),
   /** Downloads, stops the built-in server, installs and restarts the app. */
   updateInstall: () => invoke<void>("update_install"),

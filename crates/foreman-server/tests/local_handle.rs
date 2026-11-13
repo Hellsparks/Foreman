@@ -33,6 +33,7 @@ async fn local_handle_mints_app_sessions_before_setup() {
         db_url: None,
         spoolman_enabled: false,
         drivers_enabled: true,
+        frontend_dir: None,
         desktop_mode: true,
     };
     let (tx, rx) = oneshot::channel();
