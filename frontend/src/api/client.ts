@@ -131,6 +131,8 @@ export interface PrinterWithStatus {
   status: PrinterStatus | null;
   active_path_index?: number | null;
   active_path_name?: string | null;
+  /** Set when Foreman can't send, start, pause, resume or cancel prints here. */
+  control_unsupported?: string | null;
 }
 
 /** An active attention item. */

@@ -440,9 +440,13 @@ impl MoonrakerDriver {
             None => ws_url.to_owned(),
         };
 
-        let (ws, _) = tokio_tungstenite::connect_async(&connect_url)
-            .await
-            .map_err(|e| AppError::Driver(format!("ws connect: {e}")))?;
+        // A dead address can hang the TCP connect for minutes; a path switch must not wait for it.
+        let (ws, _) = tokio::select! {
+            r = tokio::time::timeout(Duration::from_secs(10), tokio_tungstenite::connect_async(&connect_url)) => r
+                .map_err(|_| AppError::Driver("ws connect: timed out".into()))?
+                .map_err(|e| AppError::Driver(format!("ws connect: {e}")))?,
+            _ = shutdown_rx.changed() => return Ok(()),
+        };
 
         let (mut ws_tx, mut ws_rx) = ws.split();
         let mut rpc_id: u64 = 1;
@@ -1059,6 +1063,25 @@ mod tests {
         c.merge_update(&json!({"print_stats": {"state": "standby", "message": ""}}));
         assert_eq!(c.print_end, None);
         assert_eq!(c.print_message, None);
+    }
+
+    /// A path switch disconnects the driver on a dead address; that must not wait out the TCP connect.
+    #[tokio::test]
+    async fn disconnect_does_not_wait_for_a_hanging_connect() {
+        let (tx, _rx) = broadcast::channel(16);
+        let d = MoonrakerDriver::new(
+            MoonrakerConfig {
+                printer_id: 1,
+                url: "http://192.0.2.1".into(),
+                api_key: None,
+            },
+            Arc::new(tx),
+        );
+        d.connect().await.expect("connect");
+        tokio::time::timeout(Duration::from_secs(3), d.disconnect())
+            .await
+            .expect("disconnect hung on the dead address")
+            .expect("disconnect");
     }
 
     #[tokio::test]

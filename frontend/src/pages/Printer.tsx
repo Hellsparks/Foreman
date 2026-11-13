@@ -155,6 +155,7 @@ export default function Printer() {
   const liveStatus: PrinterStatus | null = statuses[printerId] ?? printer?.status ?? null;
   const state = liveStatus?.state ?? "offline";
   const isPrinting = state === "printing" || state === "paused";
+  const noControl = printer?.control_unsupported ?? null;
 
   // Temp input draft state (avoids WS overwriting while typing)
   const [nozzleDraft, setNozzleDraft] = useState("");
@@ -350,8 +351,9 @@ export default function Printer() {
               items={[
                 ...(isPrinting
                   ? [
-                      { label: state === "paused" ? "Resume" : "Pause", onSelect: () => cmd(state === "paused" ? "resume" : "pause") },
-                      { label: "Cancel print…", danger: true, onSelect: () => setCancelOpen(true) },
+                      { label: state === "paused" ? "Resume" : "Pause", disabled: !!noControl, onSelect: () => cmd(state === "paused" ? "resume" : "pause") },
+                      { label: "Cancel print…", danger: true, disabled: !!noControl, onSelect: () => setCancelOpen(true) },
+                      ...(noControl ? [{ label: noControl, heading: true }] : []),
                     ]
                   : []),
                 ...(printer.primary_url
@@ -384,8 +386,11 @@ export default function Printer() {
         <div className="printer-header__actions">
             {isPrinting && (
               <>
+                {noControl && <span className="printer-header__nocontrol">{noControl}</span>}
                 <Button
                   variant="secondary"
+                  disabled={!!noControl}
+                  title={noControl ?? undefined}
                   onClick={() =>
                     cmd(state === "paused" ? "resume" : "pause")
                   }
@@ -394,6 +399,8 @@ export default function Printer() {
                 </Button>
                 <Button
                   variant="secondary"
+                  disabled={!!noControl}
+                  title={noControl ?? undefined}
                   onClick={() => setCancelOpen(true)}
                   style={{ borderColor: "var(--fw-danger)", color: "var(--fw-danger)" }}
                 >

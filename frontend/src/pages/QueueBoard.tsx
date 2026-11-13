@@ -45,6 +45,7 @@ function laneState(lane: QueueLane, st: PrinterStatus | undefined): { tone: Tone
   }
   if (state === "error") return { tone: "bad", word: "✖ ERROR", now: st?.display_message || "Printer reports an error" };
   if (state === "offline") return { tone: "off", word: "○ OFFLINE", now: "Not connected" };
+  if (lane.control_unsupported) return { tone: "off", word: "○ READ-ONLY", now: lane.control_unsupported };
   if (!lane.plate_clear) return { tone: "warn", word: "◐ CLEAR PLATE", now: "Print done · waiting for you" };
   return {
     tone: "ok",
@@ -235,7 +236,7 @@ export function QueueBoard({
             const waiting = lane.items.filter((x) => x.item.status === "waiting");
             const active = lane.items.some((x) => x.item.status === "sending" || x.item.status === "printing");
             const canStart =
-              lane.printer_id != null && !active && (waiting.length > 0 || (lanes[0]?.items.some((x) => x.item.status === "waiting") ?? false));
+              lane.printer_id != null && !lane.control_unsupported && !active && (waiting.length > 0 || (lanes[0]?.items.some((x) => x.item.status === "waiting") ?? false));
             const isDrop = drag != null && dropAt?.lane === key;
             return (
               <section
@@ -277,7 +278,7 @@ export function QueueBoard({
                         type="button"
                         className="jobs-btn"
                         disabled={!canStart || busy != null}
-                        title={canStart ? "Start this printer's next job now" : "Nothing to start, or a job is running"}
+                        title={lane.control_unsupported ?? (canStart ? "Start this printer's next job now" : "Nothing to start, or a job is running")}
                         onClick={() => void startNext(lane)}
                       >
                         {busy === `start-${lane.printer_id}` ? "Starting…" : "Start next now"}

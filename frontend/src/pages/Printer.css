@@ -83,6 +83,13 @@
   font-size: 13px;
 }
 
+.printer-header__nocontrol {
+  align-self: center;
+  font-size: 12px;
+  color: var(--fw-muted);
+  white-space: nowrap;
+}
+
 /* Tab bar */
 .printer-tabs {
   display: flex;

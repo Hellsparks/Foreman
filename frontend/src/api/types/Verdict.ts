@@ -3,4 +3,4 @@
 /**
  * Compatibility verdict for one printer × one file.
  */
-export type Verdict = "ready" | "busy" | "plate" | "material" | "no_spool" | "too_big" | "nozzle" | "offline";
+export type Verdict = "ready" | "busy" | "plate" | "material" | "no_spool" | "too_big" | "nozzle" | "offline" | "unsupported";

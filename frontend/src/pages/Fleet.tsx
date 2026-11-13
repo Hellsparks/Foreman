@@ -426,8 +426,21 @@ export function PrinterCard({
   const hasProgress = pct > 0 && pct < 100;
   const chips = amsChips(status, printer.firmware, slots);
   const canLoad = slots.some((s) => s.writable);
+  const noControl = printer.control_unsupported ?? null;
+  const paused = state === "paused";
   const menuItems: MenuItem[] = [
     { label: "Open printer page", onSelect: onOpenPage },
+    ...(state === "printing" || paused
+      ? [
+          {
+            label: paused ? "Resume" : "Pause",
+            disabled: !!noControl,
+            onSelect: () =>
+              void api.sendCommand(printer.id, paused ? "resume" : "pause").catch((e) => console.error(`${printer.name}:`, e)),
+          },
+        ]
+      : []),
+    ...(noControl ? [{ label: noControl, heading: true }] : []),
     ...(canLoad ? [{ label: "Load spool…", onSelect: onLoadSpool }] : []),
     ...(printer.primary_url
       ? [

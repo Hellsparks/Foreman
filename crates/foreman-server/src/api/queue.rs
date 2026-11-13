@@ -74,6 +74,8 @@ pub struct QueueLane {
     pub name: String,
     pub plate_clear: bool,
     pub auto_start: bool,
+    /// Set when Foreman can't start prints on this printer (e.g. "Not supported (cloud mode)").
+    pub control_unsupported: Option<String>,
     /// Last known printer status (clients prefer newer `printer_status` events).
     pub status: Option<PrinterStatus>,
     pub items: Vec<QueueCard>,
@@ -143,9 +145,12 @@ pub struct StartNextResult {
 // Shared with Send and the slicer upload
 // ---------------------------------------------------------------------------
 
-/// Refuse a printer lane the file can never print on (too big, wrong nozzle).
+/// Refuse a printer lane the file can never print on (too big, wrong nozzle, cloud mode).
 fn hard_mismatch(r: &CompatResult) -> bool {
-    matches!(r.verdict, Verdict::TooBig | Verdict::Nozzle)
+    matches!(
+        r.verdict,
+        Verdict::TooBig | Verdict::Nozzle | Verdict::Unsupported
+    )
 }
 
 async fn check_lane(
@@ -237,6 +242,7 @@ pub async fn board(State(state): State<AppState>) -> Result<Json<QueueBoard>, Ap
         name: "Fleet queue".into(),
         plate_clear: true,
         auto_start: true,
+        control_unsupported: None,
         status: None,
         items: Vec::new(),
     }];
@@ -246,6 +252,7 @@ pub async fn board(State(state): State<AppState>) -> Result<Json<QueueBoard>, Ap
             name: s.printer.name.clone(),
             plate_clear: s.printer.plate_clear,
             auto_start: s.printer.auto_start_from_queue,
+            control_unsupported: compat::control_unsupported(&s.printer).map(str::to_owned),
             status: s.status.clone(),
             items: Vec::new(),
         });
@@ -321,7 +328,9 @@ fn lane_tag(r: &CompatResult, is_head: bool, auto_start: bool) -> (&'static str,
         Verdict::Plate => ("warn", "◐ Clear plate first".into()),
         Verdict::Offline => ("off", "○ Printer offline".into()),
         Verdict::Material | Verdict::NoSpool => ("warn", format!("⚠ {}", r.reason)),
-        Verdict::TooBig | Verdict::Nozzle => ("bad", format!("✖ {}", r.reason)),
+        Verdict::TooBig | Verdict::Nozzle | Verdict::Unsupported => {
+            ("bad", format!("✖ {}", r.reason))
+        }
     }
 }
 

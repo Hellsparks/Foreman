@@ -858,6 +858,9 @@ impl Scheduler {
             .into_iter()
             .find(|s| s.printer.id == printer_id)
             .ok_or_else(|| AppError::NotFound(format!("printer {printer_id}")))?;
+        if let Some(reason) = compat::control_unsupported(&snap.printer) {
+            return Err(AppError::InvalidInput(reason.into()));
+        }
         if plate_confirm {
             snap.printer.plate_clear = true;
         }
