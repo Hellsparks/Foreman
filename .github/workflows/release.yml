@@ -416,6 +416,8 @@ jobs:
 
       - name: Build (and push when publishing)
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: docker
           platforms: linux/amd64,linux/arm64
@@ -441,8 +443,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only ours: docker/build-push-action adds a .dockerbuild record that download-artifact can't extract.
       - uses: actions/download-artifact@v4
         with:
+          name: release-notes
+          path: artifacts/release-notes
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: server-*
+          path: artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
           path: artifacts
 
       - name: Assemble release files, updater manifest and checksums
