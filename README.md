@@ -92,7 +92,7 @@ with *publish* off, or `gh workflow run release.yml -f version=0.4.0-rc.1`.
 | File | What |
 |---|---|
 | `Foreman_<v>_windows_x64-setup.exe` | Windows installer (NSIS) |
-| `Foreman_<v>_linux_{x86_64,aarch64}.AppImage`, `_{amd64,arm64}.deb`, `_{x86_64,aarch64}.rpm` | Linux desktop app |
+| `Foreman_<v>_linux_{x86_64,aarch64}.AppImage`, `_{amd64,arm64}.deb`, `_{x86_64,aarch64}.rpm` | Linux desktop app (no `.rpm` for pre-releases: Tauri's bundler refuses a `-` in the rpm version) |
 | `*.sig`, `latest.json` | Updater signatures and manifest |
 | `foreman-server_<v>_{amd64,arm64}.deb` | Headless server as a systemd service |
 | `foreman-server-{x86_64,aarch64}-unknown-linux-gnu.tar.xz` (+ `.sha256`) | Headless server binary + web UI (built with dist) |

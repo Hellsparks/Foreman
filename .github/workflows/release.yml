@@ -8,8 +8,9 @@ name: Release
 #            for the updater, plus latest.json; beta.json on the update-channels branch
 #   SHA256SUMS for every file.
 # Dry run (nothing published): Actions → Release → Run workflow, "publish" off;
-# also runs on pull requests that touch the release pipeline. The would-be release
-# (files, body, latest.json) is uploaded as the "release-preview" artifact.
+# also runs on pull requests that touch the release pipeline, as v<workspace version>.
+# The would-be release (files, body, latest.json) is uploaded as the "release-preview" artifact.
+# Pre-releases ship no .rpm: Tauri CLI 2.12.4's bundler refuses a "-" in the rpm version.
 
 on:
   push:
@@ -76,7 +77,9 @@ jobs:
           case "$EVENT" in
             push)              tag=$GITHUB_REF_NAME; publish=true ;;
             workflow_dispatch) tag=v${IN_VERSION#v}; publish=$IN_PUBLISH ;;
-            *)                 tag=v0.0.0-dryrun.$GITHUB_RUN_NUMBER; publish=false ;;
+            *)                 tag=v$(cargo metadata --no-deps --format-version 1 \
+                                    | jq -r '.packages[] | select(.name == "foreman-server") | .version')
+                               publish=false ;;
           esac
           version=${tag#v}
           if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
@@ -235,14 +238,17 @@ jobs:
           - name: windows-x64
             runner: windows-latest
             bundles: nsis
+            bundles_pre: nsis
             cli: \frontend\node_modules\.bin\tauri.cmd
           - name: linux-x86_64
             runner: ubuntu-22.04
             bundles: appimage,deb,rpm
+            bundles_pre: appimage,deb
             cli: /frontend/node_modules/.bin/tauri
           - name: linux-aarch64
             runner: ubuntu-22.04-arm
             bundles: appimage,deb,rpm
+            bundles_pre: appimage,deb
             cli: /frontend/node_modules/.bin/tauri
     env:
       VERSION: ${{ needs.plan.outputs.version }}
@@ -309,7 +315,7 @@ jobs:
           # The CLI binary itself: given an "npm …" script the action inserts its
           # own "--" after "build", which hands --bundles to cargo.
           tauriScript: ${{ github.workspace }}${{ matrix.cli }}
-          args: --bundles ${{ matrix.bundles }}
+          args: --bundles ${{ needs.plan.outputs.prerelease == 'true' && matrix.bundles_pre || matrix.bundles }}
 
       # One naming scheme across platforms (Tauri's rpm/deb names vary with
       # pre-release versions). Renaming keeps the .sig valid: it signs the bytes.
@@ -330,11 +336,11 @@ jobs:
             linux-x86_64)
               take "$b/appimage/*.AppImage" "Foreman_${VERSION}_linux_x86_64.AppImage"
               take "$b/deb/*.deb" "Foreman_${VERSION}_linux_amd64.deb"
-              take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_x86_64.rpm" ;;
+              [[ $VERSION == *-* ]] || take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_x86_64.rpm" ;;
             linux-aarch64)
               take "$b/appimage/*.AppImage" "Foreman_${VERSION}_linux_aarch64.AppImage"
               take "$b/deb/*.deb" "Foreman_${VERSION}_linux_arm64.deb"
-              take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_aarch64.rpm" ;;
+              [[ $VERSION == *-* ]] || take "$b/rpm/*.rpm" "Foreman_${VERSION}_linux_aarch64.rpm" ;;
           esac
           ls -l out
 

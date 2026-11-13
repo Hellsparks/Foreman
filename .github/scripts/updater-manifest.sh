@@ -13,6 +13,9 @@ dir=$1
 version=$2
 notes_file=$3
 base="https://github.com/Hellsparks/Foreman/releases/download/v${version}"
+# Pre-releases have no .rpm (see release.yml).
+rpm=yes
+[[ $version == *-* ]] && rpm=no
 
 # key|file|required
 entries=(
@@ -21,11 +24,11 @@ entries=(
   "linux-x86_64|Foreman_${version}_linux_x86_64.AppImage|yes"
   "linux-x86_64-appimage|Foreman_${version}_linux_x86_64.AppImage|yes"
   "linux-x86_64-deb|Foreman_${version}_linux_amd64.deb|yes"
-  "linux-x86_64-rpm|Foreman_${version}_linux_x86_64.rpm|yes"
+  "linux-x86_64-rpm|Foreman_${version}_linux_x86_64.rpm|$rpm"
   "linux-aarch64|Foreman_${version}_linux_aarch64.AppImage|yes"
   "linux-aarch64-appimage|Foreman_${version}_linux_aarch64.AppImage|yes"
   "linux-aarch64-deb|Foreman_${version}_linux_arm64.deb|yes"
-  "linux-aarch64-rpm|Foreman_${version}_linux_aarch64.rpm|yes"
+  "linux-aarch64-rpm|Foreman_${version}_linux_aarch64.rpm|$rpm"
 )
 
 platforms='{}'
