@@ -40,7 +40,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlEQTc5Q0Y5ODAyMEQ5QTAKUldTZzJTQ0ErWnlublFNZEZhakN2Y3hSaW1oSk1yUFVxSE9GTHZ1NVQzaVgxNWU4L1VvbnhXRFkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyMTVDOEIyOTU2M0ZFMUQKUldRZC9tT1Zzc2dWRXN3US9oVVM0dzltYTYvV28yK09UQSs1aUliMWJTRGgzbkZWRXRqVXQ5Q1cK",
       "endpoints": [
         "https://github.com/Hellsparks/Foreman/releases/latest/download/latest.json"
       ],

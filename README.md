@@ -58,8 +58,14 @@ public half is in `crates/foreman-desktop/tauri.conf.json` (`plugins.updater.pub
 
   PowerShell: `Get-Content -Raw $HOME\.tauri\foreman-updater.key | gh secret set TAURI_SIGNING_PRIVATE_KEY --repo Hellsparks/Foreman`
   (same for the password file).
-- Regenerate (only if lost/compromised; then update `pubkey` and both secrets):
-  `npm --prefix frontend exec -- tauri signer generate --ci -f -w ~/.tauri/foreman-updater.key -p <passphrase>`
+- Regenerate (only if lost/compromised; then update `pubkey` and set both secrets again).
+  It asks for the passphrase; save the same text in `foreman-updater.key.password`
+  (one line, no trailing newline). Call the CLI directly: `npm exec` echoes its
+  arguments, so a `-p` passphrase would be printed.
+
+  ```
+  node frontend/node_modules/@tauri-apps/cli/tauri.js signer generate -w $HOME/.tauri/foreman-updater.key
+  ```
 
 ## Releases (maintainer)
 
