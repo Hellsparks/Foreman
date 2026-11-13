@@ -645,6 +645,7 @@
   /* Service (closest rules: list rows, filters behind one chip, add at the end). */
   .shell .svc-head { display: none; }
   .shell .svc { gap: var(--fw-space-3); }
+  .shell .svc--printer { padding-top: 0; }
   .shell .svc-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
@@ -682,10 +683,12 @@
 }
 
 @media (max-width: 759px) {
-  /* Edge-to-edge lists (Filament, Jobs History): the page spans the gutter and
-     everything but the list gets the gutter back, so nothing overflows. */
+  /* Edge-to-edge lists (Filament, Jobs History, printer Queue/History tabs): the
+     page spans the gutter and everything but the list gets the gutter back, so
+     nothing overflows. */
   .shell .fil-page,
-  .shell .jobs-page {
+  .shell .jobs-page,
+  .shell .printer-tabfill {
     margin-left: calc(-1 * var(--fw-space-4));
     margin-right: calc(-1 * var(--fw-space-4));
   }
