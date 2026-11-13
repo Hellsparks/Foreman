@@ -493,8 +493,8 @@ impl DriverManager {
         self.path_fail_counts.write().await.insert(printer_id, 0);
 
         // Restart driver with new URL.
-        if let Some(handle) = self.drivers.read().await.get(&printer_id) {
-            if let Err(e) = handle.driver.disconnect().await {
+        if let Some(old) = self.get_driver(printer_id).await {
+            if let Err(e) = old.disconnect().await {
                 warn!(printer_id, "switch_to_path disconnect: {e}");
             }
         }
@@ -920,6 +920,10 @@ impl DriverManager {
                 caps.spoolman_spool_id = live.spoolman_spool_id;
                 // Bambu learns its AMS size from the first full report.
                 caps.ams_slot_count = live.ams_slot_count.or(caps.ams_slot_count);
+                // Webcam URLs are resolved against the address the driver uses now (active path).
+                if !live.webcams.is_empty() {
+                    caps.webcams = live.webcams;
+                }
             }
         }
         Some(caps)
@@ -947,11 +951,13 @@ impl DriverManager {
             .insert(printer_id, DriverHandle { driver });
     }
 
-    /// Return the first webcam snapshot URL for a printer (from cached capabilities).
+    /// Return the first webcam snapshot URL for a printer, on its active connection path.
     pub async fn get_snapshot_url(&self, printer_id: i64) -> Option<String> {
-        let caps = self.capabilities_cache.read().await;
-        caps.get(&printer_id)
-            .and_then(|c| c.webcams.iter().find_map(|w| w.snapshot_url.clone()))
+        self.get_capabilities(printer_id)
+            .await?
+            .webcams
+            .into_iter()
+            .find_map(|w| w.snapshot_url)
     }
 
     // ── Command dispatch with safety checks ──────────────────────────────
