@@ -8,6 +8,8 @@ mod backup_tests;
 mod calibration;
 #[cfg(test)]
 mod calibration_tests;
+#[cfg(test)]
+mod cloud_mode_tests;
 pub mod config;
 pub mod discovery;
 mod driver_manager;

@@ -1026,6 +1026,11 @@ impl DriverManager {
                 .ok_or_else(|| AppError::NotFound(format!("no driver for printer {printer_id}")))?
         };
 
+        let printer = foreman_core::repo::printer::get(&self.pool, printer_id).await?;
+        if let Some(reason) = foreman_core::compat::control_unsupported(&printer) {
+            return Err(AppError::InvalidInput(reason.into()));
+        }
+
         // Safety: refuse movement commands while printing.
         if Self::is_blocked_while_printing(&cmd) {
             let status = self.status_cache.read().await;

@@ -1401,10 +1401,15 @@ export default function Library() {
                               Print now
                             </button>
                           )}
+                          {c.verdict === "unsupported" && (
+                            <button type="button" className="fb-button fb-primary fb-small" disabled title={c.reason}>
+                              Print now
+                            </button>
+                          )}
                           {c.quick_fix && c.verdict !== "plate" && (
                             <span className="fw-send-fix">{c.quick_fix}</span>
                           )}
-                          {c.verdict !== "too_big" && c.verdict !== "nozzle" && (
+                          {c.verdict !== "too_big" && c.verdict !== "nozzle" && c.verdict !== "unsupported" && (
                             <button
                               type="button"
                               className="fb-button fb-small"
