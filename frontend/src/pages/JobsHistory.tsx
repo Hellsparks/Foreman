@@ -104,12 +104,20 @@ const OUTCOMES: [string, string][] = [
   ["unrated", "Not rated"],
 ];
 
-export function JobsHistory({ notify }: { notify: (text: string) => void }) {
+export function JobsHistory({
+  notify,
+  fixedPrinterId,
+}: {
+  notify: (text: string) => void;
+  /** Printer page → History: one printer's jobs, no printer filter or column. */
+  fixedPrinterId?: number;
+}) {
   const phone = usePhone();
   const printers = usePrinters();
   const [q, setQ] = useState("");
   const [outcome, setOutcome] = useState("all");
-  const [printerId, setPrinterId] = useState<number | null>(null);
+  const [printerId, setPrinterId] = useState<number | null>(fixedPrinterId ?? null);
+  const scoped = fixedPrinterId != null;
   const [material, setMaterial] = useState("");
   const [spool, setSpool] = useState("");
   const [from, setFrom] = useState("");
@@ -177,8 +185,9 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
     }
   };
 
-  const filtered = q || outcome !== "all" || printerId != null || material || spoolId != null || from || to;
-  const nFilters = [outcome !== "all", printerId != null, !!material, spoolId != null, !!from, !!to].filter(Boolean).length;
+  const printerFiltered = !scoped && printerId != null;
+  const filtered = q || outcome !== "all" || printerFiltered || material || spoolId != null || from || to;
+  const nFilters = [outcome !== "all", printerFiltered, !!material, spoolId != null, !!from, !!to].filter(Boolean).length;
 
   return (
     <div className="jh-layout page-fill">
@@ -207,6 +216,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
           </div>
         </div>
         <div className="jh-toolbar">
+          {!scoped && (
           <select
             aria-label="Printer"
             className="jh-select"
@@ -220,6 +230,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
               </option>
             ))}
           </select>
+          )}
           <label className="jh-field">
             <span className="jh-field__k">Material</span>
             <input
@@ -254,7 +265,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
               onClick={() => {
                 setQ("");
                 setOutcome("all");
-                setPrinterId(null);
+                setPrinterId(fixedPrinterId ?? null);
                 setMaterial("");
                 setSpool("");
                 setFrom("");
@@ -275,7 +286,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
             <thead>
               <tr>
                 <th>File</th>
-                <th>Printer</th>
+                <th className={scoped ? "jh-col--off" : undefined}>Printer</th>
                 <th>Finished</th>
                 <th className="jh-num ph-hide">Time</th>
                 <th className="jh-num ph-hide">Filament</th>
@@ -286,7 +297,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
               {list.length === 0 && (
                 <tr>
                   <td colSpan={6} className="jh-empty">
-                    {filtered ? "No jobs match these filters." : "No jobs yet. Prints show up here when they start."}
+                    {filtered ? "No jobs match these filters." : scoped ? "No jobs on this printer yet. Prints show up here when they start." : "No jobs yet. Prints show up here when they start."}
                   </td>
                 </tr>
               )}
@@ -303,7 +314,7 @@ export function JobsHistory({ notify }: { notify: (text: string) => void }) {
                         </button>
                       </span>
                     </td>
-                    <td>{j.printer_name}</td>
+                    <td className={scoped ? "jh-col--off" : undefined}>{j.printer_name}</td>
                     <td className="jh-muted jh-nowrap">{j.end === "running" ? "printing…" : phone ? relTime(j.ended_at) : fmtWhen(j.ended_at)}</td>
                     <td className="jh-num jh-mono ph-hide">{fmtDuration(j.duration_secs)}</td>
                     <td className="jh-num jh-mono ph-hide">

@@ -46,13 +46,13 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-export default function Service() {
+/** Data, actions and the inspector, shared by the Service page and the printer page's Service tab. */
+function useService() {
   const { openInspector, closeInspector, inspectorOpen, inspectorBodyId } = useOutletContext<ShellContext>();
   const [params, setParams] = useSearchParams();
   const [ov, setOv] = useState<Overview | null>(null);
   const [printers, setPrinters] = useState<PrinterWithStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
   const [panel, setPanel] = useState<Panel | null>(null);
   const { toasts, addToast, removeToast } = useToasts();
 
@@ -87,23 +87,7 @@ export default function Service() {
     if (params.has("task")) setParams({}, { replace: true });
   }, [closeInspector, params, setParams]);
 
-  // Deep link from an Attention item: /service?task=<id>.
-  useEffect(() => {
-    const id = Number(params.get("task"));
-    if (id && ov?.tasks.some((t) => t.task.id === id) && (panel?.kind !== "task" || panel.id !== id)) show({ kind: "task", id });
-  }, [params, ov]);
-
   const tasks = ov?.tasks ?? [];
-  const due = tasks.filter((t) => t.progress.state !== "ok");
-  const over = tasks.filter((t) => t.progress.state === "overdue").length;
-  const soon = due.length - over;
-  const byPrinter = useMemo(() => {
-    const m = new Map<number, TaskView[]>();
-    for (const p of printers) m.set(p.id, []);
-    for (const t of tasks) m.set(t.task.printer_id, [...(m.get(t.task.printer_id) ?? []), t]);
-    for (const list of m.values()) list.sort((a, b) => a.task.name.localeCompare(b.task.name));
-    return m;
-  }, [tasks, printers]);
   const printerName = (id: number) => printers.find((p) => p.id === id)?.name ?? `Printer ${id}`;
 
   const markDone = async (v: TaskView, notes = "") => {
@@ -130,15 +114,63 @@ export default function Service() {
     }
   };
 
-  const phone = usePhone();
-  const filtered = (list: TaskView[]) =>
-    list.filter((t) => filter === "all" || (filter === "due" ? t.progress.state !== "ok" : t.progress.state === "overdue"));
   const selId = panel?.kind === "task" ? panel.id : null;
   const row = (v: TaskView, withPrinter: boolean) => (
     <TaskRow key={`${withPrinter ? "d" : "p"}${v.task.id}`} v={v} withPrinter={withPrinter} selected={selId === v.task.id}
       onOpen={() => show({ kind: "task", id: v.task.id })} onSnooze={() => void snooze(v)} onDone={() => void markDone(v)} />
   );
-  const cur = selId != null ? tasks.find((t) => t.task.id === selId) : undefined;
+
+  const panels = (
+    <>
+      {portal &&
+        inspectorOpen &&
+        panel &&
+        createPortal(
+          (() => {
+            const cur = selId != null ? tasks.find((t) => t.task.id === selId) : undefined;
+            return panel.kind === "task" && cur ? (
+              <TaskInspector key={cur.task.id} v={cur} onClose={close} onDone={(n) => markDone(cur, n)} onChanged={load}
+                onDeleted={() => { close(); void load(); }} onError={setError} />
+            ) : panel.kind === "new" ? (
+              <NewTaskPanel printers={printers} printerId={panel.printerId} onClose={close}
+                onCreated={(id) => { void load().then(() => (id != null ? show({ kind: "task", id }) : close())); }} onError={setError} />
+            ) : panel.kind === "printer" ? (
+              <PrinterHistory printerId={panel.id} name={printerName(panel.id)} onClose={close} />
+            ) : null;
+          })(),
+          portal,
+        )}
+      <ToastStack toasts={toasts} onDismiss={removeToast} />
+    </>
+  );
+
+  return { ov, printers, tasks, error, setError, load, panel, show, row, printerName, panels, params };
+}
+
+export default function Service() {
+  const { ov, printers, tasks, error, setError, load, panel, show, row, printerName, panels, params } = useService();
+  const [filter, setFilter] = useState<Filter>("all");
+
+  // Deep link from an Attention item: /service?task=<id>.
+  useEffect(() => {
+    const id = Number(params.get("task"));
+    if (id && ov?.tasks.some((t) => t.task.id === id) && (panel?.kind !== "task" || panel.id !== id)) show({ kind: "task", id });
+  }, [params, ov]);
+
+  const due = tasks.filter((t) => t.progress.state !== "ok");
+  const over = tasks.filter((t) => t.progress.state === "overdue").length;
+  const soon = due.length - over;
+  const byPrinter = useMemo(() => {
+    const m = new Map<number, TaskView[]>();
+    for (const p of printers) m.set(p.id, []);
+    for (const t of tasks) m.set(t.task.printer_id, [...(m.get(t.task.printer_id) ?? []), t]);
+    for (const list of m.values()) list.sort((a, b) => a.task.name.localeCompare(b.task.name));
+    return m;
+  }, [tasks, printers]);
+
+  const phone = usePhone();
+  const filtered = (list: TaskView[]) =>
+    list.filter((t) => filter === "all" || (filter === "due" ? t.progress.state !== "ok" : t.progress.state === "overdue"));
   const dueShown = filtered(due);
 
   return (
@@ -222,22 +254,50 @@ export default function Service() {
         </button>
       )}
 
-      {portal &&
-        inspectorOpen &&
-        panel &&
-        createPortal(
-          panel.kind === "task" && cur ? (
-            <TaskInspector key={cur.task.id} v={cur} onClose={close} onDone={(n) => markDone(cur, n)} onChanged={load}
-              onDeleted={() => { close(); void load(); }} onError={setError} />
-          ) : panel.kind === "new" ? (
-            <NewTaskPanel printers={printers} printerId={panel.printerId} onClose={close}
-              onCreated={(id) => { void load().then(() => (id != null ? show({ kind: "task", id }) : close())); }} onError={setError} />
-          ) : panel.kind === "printer" ? (
-            <PrinterHistory printerId={panel.id} name={printerName(panel.id)} onClose={close} />
-          ) : null,
-          portal,
+      {panels}
+    </div>
+  );
+}
+
+
+const STATE_ORDER: Record<string, number> = { overdue: 0, soon: 1, ok: 2 };
+
+/** Printer page → Service: this printer's tasks, due first, with Done / Snooze and the same inspector. */
+export function PrinterServiceTab({ printerId }: { printerId: number }) {
+  const { tasks, error, ov, show, row, panels } = useService();
+  const mine = tasks
+    .filter((t) => t.task.printer_id === printerId)
+    .sort((a, b) => (STATE_ORDER[a.progress.state] ?? 3) - (STATE_ORDER[b.progress.state] ?? 3) || a.task.name.localeCompare(b.task.name));
+  const over = mine.filter((t) => t.progress.state === "overdue").length;
+  const soon = mine.filter((t) => t.progress.state !== "ok").length - over;
+  return (
+    <div className="svc svc--printer" role="tabpanel" aria-label="Service">
+      <section className="svc-sec page-fill page-fill--col" aria-label="Service tasks">
+        <div className="svc-sec__head">
+          <h2 className="svc-sec__title">
+            {ov ? `${over} overdue · ${soon} due soon · ${mine.length} task${mine.length === 1 ? "" : "s"}` : "Loading…"}
+          </h2>
+          <button type="button" className="svc-btn svc-btn--small" onClick={() => show({ kind: "printer", id: printerId })}>
+            History
+          </button>
+          <button type="button" className="svc-btn svc-btn--small" onClick={() => show({ kind: "new", printerId })}>
+            Add task
+          </button>
+        </div>
+        {error && (
+          <p className="svc-error" role="alert">
+            {error}
+          </p>
         )}
-      <ToastStack toasts={toasts} onDismiss={removeToast} />
+        <div className="svc-list page-fill">
+          {ov && mine.length === 0 ? (
+            <p className="svc-empty">No service tasks yet — add one or start from the common ones.</p>
+          ) : (
+            mine.map((v) => row(v, false))
+          )}
+        </div>
+      </section>
+      {panels}
     </div>
   );
 }

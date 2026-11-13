@@ -443,7 +443,7 @@
 
 /* ── Files / Terminal fill the content area's height ──────────────────── */
 
-.shell__work:has(> .printer-fill:not([hidden])) {
+.shell__work:has(> .printer-page > .printer-fill:not([hidden])) {
   display: flex;
   flex-direction: column;
   padding-bottom: var(--fw-space-4);

@@ -239,6 +239,8 @@
 /* ── History + Stats (docs/ui-ref/Jobs.dc.html lines 105–209) ─────────────── */
 
 .jh-layout { display: flex; align-items: stretch; gap: var(--fw-space-4); min-width: 0; }
+/* Printer page → History: the printer column is that printer (kept in the DOM so phone cell positions hold). */
+.jh-table .jh-col--off { display: none; }
 .jh-main { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; }
 .jh-main > .jh-table-wrap { flex: 1 1 auto; }
 
