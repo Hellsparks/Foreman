@@ -1,7 +1,28 @@
 /* Printer page — header, tabs, live tab layout */
 
+/* One root for the page: .shell__work > * grows (layout.css), so the header
+   and the tab panel must not both be its children (else they split the free
+   height and the tab row drops). The header keeps its height; the active tab
+   takes the rest (doc 06 §9). */
+.printer-page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.printer-page > :not(.printer-header):not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Queue / History: the Jobs components fill the tab (doc 06 §9). */
+.printer-tabfill {
+  display: flex;
+  flex-direction: column;
+}
+
 /* Tabs left, actions right, one row under the shell top bar. */
 .printer-header {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -60,6 +81,13 @@
   min-height: 32px;
   padding: 0 var(--fw-space-3);
   font-size: 13px;
+}
+
+.printer-header__nocontrol {
+  align-self: center;
+  font-size: 12px;
+  color: var(--fw-muted);
+  white-space: nowrap;
 }
 
 /* Tab bar */

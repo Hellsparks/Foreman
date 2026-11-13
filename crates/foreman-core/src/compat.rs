@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::{
-    domain::{FileMeta, Printer, ToolUsage},
+    domain::{FileMeta, FirmwareKind, Printer, ToolUsage},
     driver::PrinterCapabilities,
     events::{AmsTray, PrinterState, PrinterStatus},
     filament::{self, LoadedSlot, SpoolFacts},
@@ -40,6 +40,17 @@ pub enum Verdict {
     Nozzle,
     /// Printer is offline / unreachable.
     Offline,
+    /// Foreman can't start or control prints on this printer (Bambu in cloud mode).
+    Unsupported,
+}
+
+/// Reason shown wherever a cloud-mode printer's print controls are refused.
+pub const CLOUD_MODE: &str = "Not supported (cloud mode)";
+
+/// Why Foreman can't send, start, pause, resume or cancel prints on `p`, if it can't.
+pub fn control_unsupported(p: &Printer) -> Option<&'static str> {
+    // Bambu runs read-only until the cloud transport (doc 05, 2C.4) exists.
+    (p.firmware == FirmwareKind::Bambu).then_some(CLOUD_MODE)
 }
 
 /// How well what is loaded matches the file's filament, best first.
@@ -221,6 +232,16 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
         .map(|s| &s.state)
         .unwrap_or(&PrinterState::Offline);
     let (fil, loaded_note) = filament_check(file, snap);
+    if let Some(reason) = control_unsupported(p) {
+        return CompatResult {
+            printer_id: id,
+            printer_name: name,
+            verdict: Verdict::Unsupported,
+            reason: reason.into(),
+            quick_fix: None,
+            filament: fil,
+        };
+    }
     if *state == PrinterState::Offline {
         return CompatResult {
             printer_id: id,
@@ -415,7 +436,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
 /// Check all printers for one file.
 pub fn check_all(file: &FileMeta, printers: &[PrinterSnapshot]) -> Vec<CompatResult> {
     let mut results: Vec<CompatResult> = printers.iter().map(|snap| check(file, snap)).collect();
-    // Sort: Ready first, then Busy, Plate, Material, NoSpool, TooBig, Nozzle, Offline.
+    // Sort: Ready first, then Busy, Plate, Material, NoSpool, TooBig, Nozzle, Offline, Unsupported.
     results.sort_by_key(|r| verdict_order(&r.verdict));
     results
 }
@@ -430,6 +451,7 @@ fn verdict_order(v: &Verdict) -> u8 {
         Verdict::TooBig => 5,
         Verdict::Nozzle => 6,
         Verdict::Offline => 7,
+        Verdict::Unsupported => 8,
     }
 }
 

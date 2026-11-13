@@ -5,11 +5,14 @@ import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
-import { StatusChip, SectionLabel, Button, PhoneSheet, EdgePanel, HeaderActions, Menu } from "../ui";
+import { StatusChip, SectionLabel, Button, PhoneSheet, EdgePanel, HeaderActions, Menu, ToastStack, useToasts } from "../ui";
 import { createPortal } from "react-dom";
 import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import PrinterSpoolsTab from "../filament/PrinterSpoolsTab";
+import { QueueBoard, useQueueBoard } from "./QueueBoard";
+import { PrinterServiceTab } from "./Service";
+import { JobsHistory } from "./JobsHistory";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import { useSignedUrl } from "../hooks/useSignedUrl";
@@ -152,6 +155,7 @@ export default function Printer() {
   const liveStatus: PrinterStatus | null = statuses[printerId] ?? printer?.status ?? null;
   const state = liveStatus?.state ?? "offline";
   const isPrinting = state === "printing" || state === "paused";
+  const noControl = printer?.control_unsupported ?? null;
 
   // Temp input draft state (avoids WS overwriting while typing)
   const [nozzleDraft, setNozzleDraft] = useState("");
@@ -295,7 +299,7 @@ export default function Printer() {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <>
+    <div className="printer-page">
       {/* ── Header ─────────────────────────────────────────────── */}
       {topbarSlot &&
         createPortal(
@@ -347,8 +351,9 @@ export default function Printer() {
               items={[
                 ...(isPrinting
                   ? [
-                      { label: state === "paused" ? "Resume" : "Pause", onSelect: () => cmd(state === "paused" ? "resume" : "pause") },
-                      { label: "Cancel print…", danger: true, onSelect: () => setCancelOpen(true) },
+                      { label: state === "paused" ? "Resume" : "Pause", disabled: !!noControl, onSelect: () => cmd(state === "paused" ? "resume" : "pause") },
+                      { label: "Cancel print…", danger: true, disabled: !!noControl, onSelect: () => setCancelOpen(true) },
+                      ...(noControl ? [{ label: noControl, heading: true }] : []),
                     ]
                   : []),
                 ...(printer.primary_url
@@ -381,8 +386,11 @@ export default function Printer() {
         <div className="printer-header__actions">
             {isPrinting && (
               <>
+                {noControl && <span className="printer-header__nocontrol">{noControl}</span>}
                 <Button
                   variant="secondary"
+                  disabled={!!noControl}
+                  title={noControl ?? undefined}
                   onClick={() =>
                     cmd(state === "paused" ? "resume" : "pause")
                   }
@@ -391,6 +399,8 @@ export default function Printer() {
                 </Button>
                 <Button
                   variant="secondary"
+                  disabled={!!noControl}
+                  title={noControl ?? undefined}
                   onClick={() => setCancelOpen(true)}
                   style={{ borderColor: "var(--fw-danger)", color: "var(--fw-danger)" }}
                 >
@@ -824,12 +834,13 @@ export default function Printer() {
           overlayAlpha={overlayAlpha}
           onOverlayAlpha={setOverlayAlpha}
         />
-      ) : (
-        <div className="printer-placeholder" role="tabpanel" aria-label={activeTab}>
-          <p>{activeTab} — coming soon</p>
-          <p style={{ fontSize: 13 }}>This tab will be implemented in a future phase.</p>
-        </div>
-      )}
+      ) : activeTab === "Queue" ? (
+        <PrinterQueueTab printerId={printerId} />
+      ) : activeTab === "Service" ? (
+        <PrinterServiceTab printerId={printerId} />
+      ) : activeTab === "History" ? (
+        <PrinterHistoryTab printerId={printerId} />
+      ) : null}
 
       {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
       {visited.has("Files") && (
@@ -867,7 +878,32 @@ export default function Printer() {
           </div>
         </div>
       )}
-    </>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Queue / History tabs: the Jobs components, scoped to this printer
+// ---------------------------------------------------------------------------
+
+function PrinterQueueTab({ printerId }: { printerId: number }) {
+  const { board, loadErr, load } = useQueueBoard();
+  const { toasts, addToast, removeToast } = useToasts();
+  return (
+    <div className="printer-tabfill" role="tabpanel" aria-label="Queue">
+      <QueueBoard board={board} loadErr={loadErr} load={load} addToast={addToast} printerId={printerId} />
+      <ToastStack toasts={toasts} onDismiss={removeToast} />
+    </div>
+  );
+}
+
+function PrinterHistoryTab({ printerId }: { printerId: number }) {
+  const { toasts, addToast, removeToast } = useToasts();
+  return (
+    <div className="printer-tabfill" role="tabpanel" aria-label="History">
+      <JobsHistory notify={addToast} fixedPrinterId={printerId} />
+      <ToastStack toasts={toasts} onDismiss={removeToast} />
+    </div>
   );
 }
 

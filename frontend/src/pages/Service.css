@@ -117,3 +117,6 @@
 @media (max-width: 430px) {
   .svc-int { flex-wrap: wrap; }
 }
+
+/* Printer page → Service tab: same rows and inspector, one printer. */
+.svc--printer { padding-top: var(--fw-space-4); }

@@ -7,6 +7,10 @@ import type { QueueCard } from "./QueueCard";
  */
 export type QueueLane = { printer_id: number | null, name: string, plate_clear: boolean, auto_start: boolean, 
 /**
+ * Set when Foreman can't start prints on this printer (e.g. "Not supported (cloud mode)").
+ */
+control_unsupported: string | null, 
+/**
  * Last known printer status (clients prefer newer `printer_status` events).
  */
 status: PrinterStatus | null, items: Array<QueueCard>, };
