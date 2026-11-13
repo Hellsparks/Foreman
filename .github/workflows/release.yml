@@ -490,7 +490,7 @@ jobs:
           {
             echo "### Release files for $TAG ($( [[ $PRERELEASE == true ]] && echo pre-release || echo full release ))"
             echo '```'
-            (cd release && ls -l --time-style=+ | awk 'NR>1 {printf "%12s  %s\n", $5, $7}')
+            (cd release && ls -l --time-style=+ | awk 'NR>1 {printf "%12s  %s\n", $5, $NF}')
             echo '```'
             echo "Docker: $IMAGE:$VERSION (linux/amd64, linux/arm64)"
             echo
