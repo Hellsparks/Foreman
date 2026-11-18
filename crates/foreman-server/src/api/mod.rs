@@ -1,6 +1,7 @@
 pub mod attention;
 pub mod auth;
 pub mod backup;
+pub mod bambu_accounts;
 pub mod calibration;
 pub mod exports;
 pub mod filaments;

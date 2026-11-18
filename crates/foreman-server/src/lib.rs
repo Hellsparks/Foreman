@@ -5,6 +5,8 @@ mod auth_api_tests;
 mod backup;
 #[cfg(test)]
 mod backup_tests;
+#[cfg(test)]
+mod bambu_accounts_tests;
 mod calibration;
 #[cfg(test)]
 mod calibration_tests;
@@ -362,6 +364,7 @@ pub async fn serve_with(
         tracking: Arc::clone(&tracking),
         data_dir: cfg.data_dir.clone(),
         drivers_enabled: cfg.drivers_enabled,
+        bambu: Arc::new(api::bambu_accounts::BambuSignins::new()?),
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -1014,6 +1017,31 @@ fn api_routes() -> Router<AppState> {
         .route(
             "/api/exports/spoolman.json",
             get(api::exports::spoolman_json),
+        )
+        // Bambu Cloud accounts + sign-in (doc 07 §B)
+        .route(
+            "/api/bambu/accounts",
+            get(api::bambu_accounts::list).post(api::bambu_accounts::create),
+        )
+        .route(
+            "/api/bambu/accounts/{id}",
+            delete(api::bambu_accounts::remove),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/signin",
+            post(api::bambu_accounts::signin),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/code",
+            post(api::bambu_accounts::code),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/token",
+            post(api::bambu_accounts::paste_token),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/devices",
+            get(api::bambu_accounts::devices),
         )
         // Backup + restore (6.2, W14)
         .route("/api/backup", get(api::backup::overview))

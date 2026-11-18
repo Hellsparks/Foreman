@@ -178,6 +178,14 @@ const MIGRATIONS: &[&str] = &[
      AND id NOT IN (SELECT MIN(id) FROM job WHERE end_state = 'running' GROUP BY printer_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS ux_job_open_printer \
      ON job (printer_id) WHERE end_state = 'running'",
+    // 0019: Bambu Cloud accounts (doc 07 §B, see migrations/0019_bambu_account.sql).
+    "CREATE TABLE IF NOT EXISTS bambu_account (\
+       id INTEGER PRIMARY KEY NOT NULL, label TEXT NOT NULL, \
+       region TEXT NOT NULL CHECK (region IN ('global', 'china')), email TEXT NOT NULL, \
+       token TEXT, token_expires_at TEXT, last_ok_at TEXT, last_error TEXT, \
+       created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "ALTER TABLE printer ADD COLUMN bambu_account_id INTEGER \
+     REFERENCES bambu_account(id) ON DELETE SET NULL",
 ];
 
 /// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only

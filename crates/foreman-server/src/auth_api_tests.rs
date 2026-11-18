@@ -90,6 +90,7 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
         transfers,
         data_dir: dir.path().to_path_buf(),
         drivers_enabled: false,
+        bambu: Arc::new(crate::api::bambu_accounts::BambuSignins::new().expect("bambu")),
     };
     (
         build_router(state.clone(), std::path::PathBuf::from("frontend/dist")),

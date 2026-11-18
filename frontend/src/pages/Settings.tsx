@@ -8,6 +8,7 @@ import FilamentSettings from "../filament/FilamentSettings";
 import { useFilament } from "../filament/policy";
 import ThemeSettings from "../theme/ThemeSettings";
 import RerunSetup from "../setup/RerunSetup";
+import BambuCloudSettings from "../integrations/BambuCloudSettings";
 import { EdgePanel } from "../ui";
 import { AboutSettings, AppSettings } from "../desktop/AboutSettings";
 import { IS_TAURI } from "../shell/TopBar";
@@ -51,6 +52,7 @@ export default function Settings() {
             ["appearance-heading", "Appearance"],
             ["printers-heading", "Printers"],
             ["filament-heading", "Filament"],
+            ["integrations-heading", "Integrations"],
             ["security-heading", "Security"],
             ["backup-heading", "Backup"],
             ["setup-heading", "Setup"],
@@ -234,6 +236,17 @@ export default function Settings() {
       </section>
 
       <FilamentSettings />
+
+      {/* Integrations ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="integrations-heading">
+        <h2
+          id="integrations-heading"
+          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
+        >
+          Integrations
+        </h2>
+        <BambuCloudSettings />
+      </section>
 
       <SecuritySettings />
 

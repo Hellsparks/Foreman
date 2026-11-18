@@ -578,6 +578,7 @@ mod tests {
             plate_clear: true,
             auto_start_from_queue: true,
             usage_reporter: Default::default(),
+            bambu_account_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }
