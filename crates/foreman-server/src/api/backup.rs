@@ -33,7 +33,7 @@ static BUSY: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Where this server's data lives (Spoolman only when it runs on SQLite).
 pub fn sources(state: &AppState) -> svc::Sources {
-    let spoolman_db = state.spoolman.get().and_then(|sm| {
+    let spoolman_db = state.tracking.store().and_then(|sm| {
         (sm.config.db_type == spoolman_rs::config::DbType::Sqlite).then(|| sm.config.sqlite_path())
     });
     svc::Sources {
@@ -495,7 +495,7 @@ pub async fn restore(
             tokio::time::sleep(Duration::from_millis(500)).await;
             let _guard = BUSY.lock().await;
             state.foreman_db.pool.close().await;
-            if let Some(sm) = state.spoolman.get() {
+            if let Some(sm) = state.tracking.store() {
                 sm.db.pool.close().await;
             }
             svc::restart_process();

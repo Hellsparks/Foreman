@@ -46,7 +46,7 @@ async fn filament(app: &Router, t: &str, f: Value) -> i64 {
 /// Three filaments: a calibrated ASA with TD, a two-colour PLA with TD, a PETG HF without TD.
 async fn seed() -> (tempfile::TempDir, Router, String, [i64; 3]) {
     let (dir, app, state, t) = setup().await;
-    let sm = state.spoolman.get().expect("spoolman");
+    let sm = state.tracking.store().expect("spoolman");
     extra_field::ensure_foreman_defaults(&sm.db.pool, &sm.db.engine)
         .await
         .expect("fields");

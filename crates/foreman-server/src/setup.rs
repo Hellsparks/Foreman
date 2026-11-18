@@ -137,7 +137,7 @@ impl WizardState {
 
 /// Built-in Spoolman's current rows (zeros when it is off).
 pub async fn current_counts(state: &AppState) -> ImportCounts {
-    match state.spoolman.get() {
+    match state.tracking.store() {
         Some(sm) => sm_import::counts(&sm.db)
             .await
             .map(Into::into)
@@ -279,8 +279,11 @@ pub async fn checklist(state: &AppState, ws: &WizardState) -> Result<Checklist, 
     }];
 
     let spools = plural(counts.spools, "spool", "spools");
-    let filament_done = ws.data_source.is_some() || !counts.is_empty();
-    let filament_detail = match (&ws.data_source, state.spoolman.get().is_some()) {
+    let filament_done =
+        ws.data_source.is_some() || !counts.is_empty() || !state.tracking.mode().tracks_spools();
+    let tracked = state.tracking.mode().tracks_spools();
+    let filament_detail = match (&ws.data_source, state.tracking.store().is_some()) {
+        _ if !tracked => "Filament tracking off".into(),
         (_, false) => "Built-in Spoolman is off (FOREMAN__SPOOLMAN_ENABLED=false)".into(),
         (Some(ds), _) => match ds.kind {
             DataSourceKind::Fresh if counts.is_empty() => "Fresh start · no spools yet".into(),

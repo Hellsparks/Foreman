@@ -14,6 +14,7 @@ import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
+import { useFilament } from "../filament/policy";
 import { StatusChip, ProgressBar, Swatch, Menu, type MenuItem } from "../ui";
 import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
@@ -176,13 +177,17 @@ export default function Fleet() {
     }
   }, []);
 
+  // Loaded spools only exist while spools are tracked; without them the cards
+  // show the printer's own AMS trays and no load action.
+  const { spools: tracksSpools } = useFilament();
   const loadSlots = useCallback(async () => {
+    if (!tracksSpools) return setSlots([]);
     try {
       setSlots(await spools.loaded());
     } catch (e) {
       console.error("Failed to load spools:", e);
     }
-  }, []);
+  }, [tracksSpools]);
 
   useEffect(() => {
     loadPrinters();

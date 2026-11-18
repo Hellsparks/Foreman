@@ -163,3 +163,39 @@ export default function Exports({ rows, onError }: { rows: ExportRow[]; onError:
     </div>
   );
 }
+
+/** Tools → Export while filament tracking is Off: Orca profiles from what the
+ *  Library's sliced files say (material and colour), nothing else. */
+export function FileOrcaExport({ onError }: { onError: (e: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    onError(null);
+    try {
+      await exportsApi.orca(null);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="tl-cal">
+      <div className="ex-cards">
+        <section className="tl-sec ex-card">
+          <h2 className="tl-h2">OrcaSlicer filament profiles</h2>
+          <p className="tl-muted tl-small ex-grow">
+            One profile per material and colour found in your Library{"’"}s sliced files, with that material{"’"}s usual
+            temperatures, on the matching Orca {"“"}Generic{"”"} preset.
+          </p>
+          <button type="button" className="tl-btn" disabled={busy} onClick={() => void run()}>
+            Export profiles
+          </button>
+          <p className="tl-small tl-muted">
+            In OrcaSlicer: <b>File → Import → Import Configs…</b> and pick the zip.
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}

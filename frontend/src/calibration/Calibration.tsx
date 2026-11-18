@@ -3,6 +3,7 @@
  * skew belongs to a printer (Klipper), shrinkage to a filament.
  * Nothing here talks to a printer unless the owner presses a button that says so.
  */
+import { useFilament } from "../filament/policy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calibrationApi,
@@ -44,6 +45,8 @@ export default function Calibration() {
   const [error, setError] = useState<string | null>(null);
   const [skewP, setSkewP] = useState<number | null>(null);
   const { toasts, addToast, removeToast } = useToasts();
+  // Shrinkage is stored on filament records; without tracking only skew remains.
+  const { filamentRecords } = useFilament();
 
   const load = useCallback(async () => {
     try {
@@ -54,13 +57,14 @@ export default function Calibration() {
     } catch (e) {
       setError(errText(e));
     }
+    if (!filamentRecords) return setFilaments([]);
     try {
       setFilaments(await calibrationApi.shrinkFilaments());
     } catch (e) {
       setFilaments([]);
       setError(errText(e));
     }
-  }, []);
+  }, [filamentRecords]);
   useEffect(() => void load(), [load]);
   // Printer state changes (idle ↔ printing) decide whether Apply is allowed.
   const lastRefresh = useRef(0);
@@ -76,7 +80,7 @@ export default function Calibration() {
   const corrected = klipper.filter((p) => p.applied).length;
   const calibrated = (filaments ?? []).filter((f) => f.shrinkage_xy != null || f.shrinkage_z != null).length;
 
-  const cards: { id: Mode; kicker: string; title: string; desc: string; status: string; tone: string }[] = [
+  const allCards: { id: Mode; kicker: string; title: string; desc: string; status: string; tone: string }[] = [
     {
       id: "skew",
       kicker: "Per printer · do first",
@@ -94,6 +98,7 @@ export default function Calibration() {
       tone: "muted",
     },
   ];
+  const cards = allCards.filter((c) => filamentRecords || c.id !== "shr");
 
   return (
     <div className="tl-cal">
@@ -107,16 +112,16 @@ export default function Calibration() {
           </button>
         ))}
       </div>
-      <p className="tl-muted tl-small">
+      {filamentRecords && <p className="tl-muted tl-small">
         Order matters: skew is a frame error, so fix it once per printer first. Shrinkage is a material property, stored per
         filament and measured on a printer that is already square, or the skew error leaks into the shrinkage number.
-      </p>
+      </p>}
       {error && (
         <p className="tl-error" role="alert">
           {error}
         </p>
       )}
-      {mode === "skew" ? (
+      {mode === "skew" || !filamentRecords ? (
         <SkewFlow printers={printers} selected={skewP} onSelect={setSkewP} onChanged={load} toast={addToast} onError={setError} />
       ) : (
         <ShrinkFlow

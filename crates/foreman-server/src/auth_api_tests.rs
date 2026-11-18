@@ -51,7 +51,10 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
         driver_manager.clone(),
         Arc::clone(&tx),
     );
-    let spoolman = Arc::new(std::sync::OnceLock::new());
+    let tracking = Arc::new(crate::tracking::Tracking::new(
+        Default::default(),
+        Arc::new(std::sync::OnceLock::new()),
+    ));
     let scheduler = crate::scheduler::Scheduler::new(
         db.pool.clone(),
         Arc::clone(&tx),
@@ -59,11 +62,11 @@ pub(crate) async fn app(dir: &tempfile::TempDir, with_admin: bool) -> (Router, A
             pool: db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
-            spoolman: Arc::clone(&spoolman),
+            tracking: Arc::clone(&tracking),
         }),
     );
     let state = AppState {
-        spoolman,
+        tracking,
         scheduler,
         driver_manager,
         bus_tx: tx,

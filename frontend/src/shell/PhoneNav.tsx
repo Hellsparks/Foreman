@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { OverlayPortal } from "../ui/Popover";
+import { useFilament } from "../filament/policy";
 
 // Icons from PhoneFleet.dc.html (viewBox 24, stroke 1.8).
 const ICONS: Record<string, string> = {
@@ -60,7 +61,11 @@ export default function PhoneNav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [moreOpen]);
 
-  const inMore = MORE_ITEMS.some((i) => pathname === i.to || pathname.startsWith(i.to + "/"));
+  // The fourth tab is Filament while spools are tracked, else Library (doc 07 §A).
+  const { spools } = useFilament();
+  const fourth = spools ? { to: "/filament", label: "Filament" } : MORE_ITEMS[0];
+  const more = MORE_ITEMS.filter((i) => i.to !== fourth.to);
+  const inMore = more.some((i) => pathname === i.to || pathname.startsWith(i.to + "/"));
 
   return (
     <>
@@ -74,8 +79,8 @@ export default function PhoneNav() {
         <NavLink to="/start" className="phone-nav__btn phone-nav__btn--start">
           <Icon name="Start" size={24} sw={2} />Start print
         </NavLink>
-        <NavLink to="/filament" className="phone-nav__btn">
-          <Icon name="Filament" />Filament
+        <NavLink to={fourth.to} className="phone-nav__btn">
+          <Icon name={fourth.label} />{fourth.label}
         </NavLink>
         <button
           ref={moreRef}
@@ -113,7 +118,7 @@ export default function PhoneNav() {
           </button>
         </div>
         <ul className="phone-sheet__list" role="list">
-          {MORE_ITEMS.map(({ to, label }) => (
+          {more.map(({ to, label }) => (
             <li key={to}>
               <NavLink to={to} className="phone-sheet__link">
                 <Icon name={label} />

@@ -15,6 +15,7 @@ use foreman_core::{
     error::AppError,
     events::{AmsTray, PrinterState, PrinterStatus, ServerEvent},
     repo,
+    tracking::FilamentMode,
 };
 use tokio::sync::{broadcast, Notify};
 
@@ -35,6 +36,7 @@ struct Mock {
     deductions: Vec<(i64, f64)>,
     /// Printers whose Moonraker active spool was released.
     released: Vec<i64>,
+    mode: FilamentMode,
 }
 
 struct MockEnv {
@@ -68,6 +70,7 @@ impl SchedEnv for MockEnv {
                 caps: m.caps.get(&p.id).cloned(),
                 printer: p,
                 loaded: vec![],
+                mode: m.mode,
             })
             .collect()
     }
@@ -96,6 +99,9 @@ impl SchedEnv for MockEnv {
     async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
         self.lock().deductions.push((spool_id, grams));
         Ok(())
+    }
+    fn filament_mode(&self) -> FilamentMode {
+        self.lock().mode
     }
     async fn release_active_spool(&self, printer_id: i64) -> Result<(), AppError> {
         self.lock().released.push(printer_id);
@@ -652,6 +658,31 @@ mod jobs {
             .await
             .expect("rate");
         assert_eq!(rated.outcome, Some(JobOutcome::Good));
+    }
+
+    #[tokio::test]
+    async fn tracking_off_records_grams_with_no_spool_and_deducts_nothing() {
+        let r = rig(None).await;
+        r.env.lock().mode = FilamentMode::Off;
+        r.start_one().await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.usage_reporter, job_engine::NO_REPORTER);
+        assert_eq!(j.tools[0].spool_id, None, "the preset's spool is ignored");
+        assert_eq!(j.grams_planned, Some(12.5));
+        r.push(1, st(PrinterState::Printing, None)).await;
+        assert!(
+            r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+                .await
+        );
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Complete);
+        assert_eq!(j.grams_used, Some(12.5), "history keeps the file's grams");
+        assert_eq!(j.grams_deducted, 0.0);
+        assert!(r.deductions().is_empty());
+        assert_eq!(
+            repo::job::deduct_state(&r.pool, j.id).await.expect("state"),
+            "skipped"
+        );
     }
 
     #[tokio::test]

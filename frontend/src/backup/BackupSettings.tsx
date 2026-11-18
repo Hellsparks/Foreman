@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { backupApi, type BackupEntry, type BackupOverview, type BackupSettingsDto, type InspectResult } from "../api/backup";
 import Button from "../ui/Button";
+import { useFilament } from "../filament/policy";
 import { compareRows, countsLine, fmtBytes, fmtWhen, scheduleText, WEEKDAYS } from "./backupLogic";
 import "./Backup.css";
 
@@ -24,6 +25,7 @@ export default function BackupSettings() {
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState<string | null>(null);
   const [otherPath, setOtherPath] = useState("");
+  const { spools } = useFilament();
 
   const load = useCallback(async () => {
     try {
@@ -100,7 +102,7 @@ export default function BackupSettings() {
       </div>
 
       <p className="auth__hint" style={{ margin: "0 0 var(--fw-space-3)" }}>
-        Each backup holds the Foreman database{ov.spoolman_included ? ", the Spoolman database" : ""}, secret.key, settings and
+        Each backup holds the Foreman database{ov.spoolman_included ? (spools ? ", the Spoolman database" : ", the filament records") : ""}, secret.key, settings and
         theme files (fonts, custom.css). Data folder: <span className="auth__mono">{ov.data_dir}</span>
       </p>
 
