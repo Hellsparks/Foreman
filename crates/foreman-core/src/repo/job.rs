@@ -89,14 +89,20 @@ pub struct NewJob {
     pub thumb_url: Option<String>,
 }
 
-/// Open a running job.
-pub async fn open(pool: &SqlitePool, j: &NewJob) -> Result<Job, AppError> {
+/// Open a running job, or attach to the printer's existing one.
+///
+/// This is the one place that decides "this printer already has an open job": the
+/// database allows a single running job per printer (`ux_job_open_printer`), so when
+/// the start path and the status-observed path race, the second insert loses at the
+/// database and attaches to the winner's row instead. Returns the job and whether
+/// this call created it.
+pub async fn open_exclusive(pool: &SqlitePool, j: &NewJob) -> Result<(Job, bool), AppError> {
     let planned: Option<f64> = {
         let g: Vec<f64> = j.tools.iter().filter_map(|t| t.grams_planned).collect();
         (!g.is_empty()).then(|| g.iter().sum())
     };
     let material = j.tools.first().and_then(|t| t.material.clone());
-    let id = sqlx::query(
+    let res = sqlx::query(
         "INSERT INTO job (printer_id, printer_name, file_id, file_name, queue_item_id, \
          started_at, usage_reporter, grams_planned, material, tools_json, thumb_url) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -113,10 +119,73 @@ pub async fn open(pool: &SqlitePool, j: &NewJob) -> Result<Job, AppError> {
     .bind(tools_json(&j.tools))
     .bind(&j.thumb_url)
     .execute(pool)
-    .await
-    .map_err(db)?
-    .last_insert_rowid();
-    get(pool, id).await
+    .await;
+    match res {
+        Ok(r) => Ok((get(pool, r.last_insert_rowid()).await?, true)),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            let existing = running_for_printer(pool, j.printer_id)
+                .await?
+                .ok_or_else(|| AppError::Database("open job vanished during attach".into()))?;
+            Ok((attach(pool, existing, j).await?, false))
+        }
+        Err(e) => Err(db(e)),
+    }
+}
+
+/// Open a running job (or attach to the printer's open one); see [`open_exclusive`].
+pub async fn open(pool: &SqlitePool, j: &NewJob) -> Result<Job, AppError> {
+    Ok(open_exclusive(pool, j).await?.0)
+}
+
+/// Fill in what the second arrival knows and the first did not: a job the status
+/// path opened from the printer's file name gets the Library file, plan and queue
+/// item the start path has (and the other way round). Nothing already known is
+/// overwritten.
+pub async fn attach(pool: &SqlitePool, existing: Job, j: &NewJob) -> Result<Job, AppError> {
+    let mut changed = false;
+    if existing.file_id.is_none() && j.file_id.is_some() {
+        let planned: Option<f64> = {
+            let g: Vec<f64> = j.tools.iter().filter_map(|t| t.grams_planned).collect();
+            (!g.is_empty()).then(|| g.iter().sum())
+        };
+        let material = j.tools.first().and_then(|t| t.material.clone());
+        let n = sqlx::query(
+            "UPDATE job SET file_id = ?, file_name = ?, usage_reporter = ?, grams_planned = ?, \
+             material = ?, tools_json = ?, thumb_url = COALESCE(thumb_url, ?) \
+             WHERE id = ? AND file_id IS NULL AND end_state = 'running'",
+        )
+        .bind(j.file_id)
+        .bind(&j.file_name)
+        .bind(&j.usage_reporter)
+        .bind(planned)
+        .bind(material)
+        .bind(tools_json(&j.tools))
+        .bind(&j.thumb_url)
+        .bind(existing.id)
+        .execute(pool)
+        .await
+        .map_err(db)?
+        .rows_affected();
+        changed |= n == 1;
+    }
+    if existing.queue_item_id.is_none() && j.queue_item_id.is_some() {
+        let n = sqlx::query(
+            "UPDATE job SET queue_item_id = ? \
+             WHERE id = ? AND queue_item_id IS NULL AND end_state = 'running'",
+        )
+        .bind(j.queue_item_id)
+        .bind(existing.id)
+        .execute(pool)
+        .await
+        .map_err(db)?
+        .rows_affected();
+        changed |= n == 1;
+    }
+    if changed {
+        get(pool, existing.id).await
+    } else {
+        Ok(existing)
+    }
 }
 
 pub async fn get(pool: &SqlitePool, id: i64) -> Result<Job, AppError> {
@@ -917,6 +986,50 @@ mod tests {
         assert!(e.grams.is_sign_positive(), "no -0.0 in the JSON");
         assert_eq!(e.success_rate, None);
         assert!(e.printers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn database_refuses_a_second_open_job_for_a_printer() {
+        let (db, _t) = setup().await;
+        let p = &db.pool;
+        let nj = NewJob {
+            printer_id: 1,
+            printer_name: "Alpha".into(),
+            file_name: "a.gcode".into(),
+            usage_reporter: "foreman".into(),
+            ..Default::default()
+        };
+        let (a, created_a) = open_exclusive(p, &nj).await.expect("first");
+        let (b, created_b) = open_exclusive(p, &nj).await.expect("second");
+        assert!(created_a && !created_b);
+        assert_eq!(a.id, b.id, "second open attaches to the first");
+        // Raw insert: the constraint itself, not just the Rust path.
+        let raw = sqlx::query(
+            "INSERT INTO job (printer_id, printer_name, file_name, started_at) \
+             VALUES (1, 'Alpha', 'x', 'now')",
+        )
+        .execute(p)
+        .await;
+        assert!(
+            raw.is_err(),
+            "unique index must refuse a second running job"
+        );
+        // Once closed, a new job may open.
+        close(
+            p,
+            a.id,
+            &JobClose {
+                end: JobEnd::Complete,
+                duration_secs: Some(1),
+                error: None,
+                outcome: None,
+                tools: vec![],
+            },
+        )
+        .await
+        .expect("close");
+        let (c, created_c) = open_exclusive(p, &nj).await.expect("third");
+        assert!(created_c && c.id != a.id);
     }
 
     #[tokio::test]
