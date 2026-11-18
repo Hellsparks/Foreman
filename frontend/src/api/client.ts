@@ -133,6 +133,17 @@ export interface PrinterWithStatus {
   active_path_name?: string | null;
   /** Set when Foreman can't send, start, pause, resume or cancel prints here. */
   control_unsupported?: string | null;
+  /** Kind of the active connection path: "cloud" = Bambu Cloud (watch only). */
+  reach?: "lan" | "cloud";
+  /** Bambu Cloud account this printer is linked to (it then has a cloud path). */
+  bambu_account_id?: number | null;
+}
+
+/** "via <path>" label: a backup path, or Bambu Cloud even when it is the only path. */
+export function viaPath(p: Pick<PrinterWithStatus, "active_path_index" | "active_path_name" | "reach">): string | null {
+  if (!p.active_path_name) return null;
+  if (p.reach === "cloud" || (p.active_path_index != null && p.active_path_index > 0)) return p.active_path_name;
+  return null;
 }
 
 /** An active attention item. */

@@ -6,7 +6,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, viaPath } from "../api/client";
 import { useEventStream } from "../hooks/useEventStream";
 import type { PrinterWithStatus } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
@@ -482,13 +482,17 @@ export function PrinterCard({
           {printer.name}
         </button>
         <span className="fleet-card__fw">{fwLabel(printer.firmware)}</span>
-        {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+        {viaPath(printer) && (
           <span
             className="fleet-card__path-label"
-            title={`Connected via backup path: ${printer.active_path_name}`}
+            title={
+              printer.reach === "cloud"
+                ? "Watched over Bambu Cloud: status only, can't send"
+                : `Connected via backup path: ${printer.active_path_name}`
+            }
             style={{ fontSize: 11, color: "var(--fw-warning)", fontFamily: "var(--fw-mono)" }}
           >
-            via {printer.active_path_name}
+            via {viaPath(printer)}
           </span>
         )}
         <div style={{ flex: 1 }} />

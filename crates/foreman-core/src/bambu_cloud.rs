@@ -143,8 +143,10 @@ pub enum LoginOutcome {
     NeedsCode(SecondFactor),
 }
 
-/// Why a Bambu call failed. `Rejected` = Bambu said no (wrong password/code, expired
-/// token); `Unreachable` = network/Cloudflare/unexpected response.
+/// Why a Bambu call failed. `Rejected` = Bambu said no (wrong password/code);
+/// `Unauthorized` = HTTP 401, the token is dead; `Forbidden` = HTTP 403, Bambu refused
+/// this request (kept verbatim, never retried, never treated as an expired token);
+/// `Unreachable` = network / unexpected response.
 #[derive(Debug, thiserror::Error)]
 pub enum CloudError {
     #[error("{0}")]
@@ -152,7 +154,97 @@ pub enum CloudError {
     #[error("token rejected by Bambu (HTTP {0}); re-authenticate")]
     Unauthorized(u16),
     #[error("{0}")]
+    Forbidden(Refusal),
+    #[error("{0}")]
     Unreachable(String),
+}
+
+/// A 403 from Bambu, as Bambu sent it.
+#[derive(Debug, Clone)]
+pub struct Refusal {
+    /// `GET` / `POST`: a refused read and a refused send look different.
+    pub method: &'static str,
+    /// Request path, without the query string.
+    pub path: String,
+    /// Bambu's `code` (e.g. -3120), when the body is JSON and has one.
+    pub code: Option<i64>,
+    /// Bambu's `message` / `error` / `msg` (e.g. "internal blocking").
+    pub reason: Option<String>,
+    /// The response body verbatim (at most [`REFUSAL_BODY_MAX`] bytes).
+    pub body: String,
+}
+
+/// Longest 403 body kept.
+pub const REFUSAL_BODY_MAX: usize = 2000;
+
+impl Refusal {
+    /// "read" for GET, "send" otherwise.
+    pub fn kind(&self) -> &'static str {
+        if self.method == "GET" {
+            "read"
+        } else {
+            "send"
+        }
+    }
+
+    /// `code -3120 "internal blocking"` (whatever of it Bambu gave).
+    pub fn summary(&self) -> String {
+        match (self.code, self.reason.as_deref()) {
+            (Some(c), Some(r)) => format!("code {c} \"{r}\""),
+            (Some(c), None) => format!("code {c}"),
+            (None, Some(r)) => format!("\"{r}\""),
+            (None, None) => "no code".into(),
+        }
+    }
+}
+
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Bambu refused a {} ({} {}): HTTP 403, {}; body: {}",
+            self.kind(),
+            self.method,
+            self.path,
+            self.summary(),
+            self.body
+        )
+    }
+}
+
+/// Build a [`Refusal`] from a 403 response. Nothing in the body is reinterpreted.
+fn forbidden(method: &'static str, url: &str, text: &str) -> CloudError {
+    let path = reqwest::Url::parse(url)
+        .map(|u| u.path().to_owned())
+        .unwrap_or_else(|_| url.split('?').next().unwrap_or(url).to_owned());
+    let v: Option<Value> = serde_json::from_str(text).ok();
+    let code = v.as_ref().and_then(|v| v.get("code")).and_then(|c| {
+        c.as_i64()
+            .or_else(|| c.as_str().and_then(|s| s.trim().parse().ok()))
+    });
+    let reason = v.as_ref().and_then(|v| {
+        ["message", "error", "msg"]
+            .iter()
+            .filter_map(|k| v.get(*k).and_then(Value::as_str))
+            .find(|m| !m.is_empty())
+            .map(str::to_owned)
+    });
+    let mut body = text.trim().to_owned();
+    if body.len() > REFUSAL_BODY_MAX {
+        let mut cut = REFUSAL_BODY_MAX;
+        while !body.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        body.truncate(cut);
+        body.push('…');
+    }
+    CloudError::Forbidden(Refusal {
+        method,
+        path,
+        code,
+        reason,
+        body,
+    })
 }
 
 /// One printer from `GET /v1/iot-service/api/user/bind`.
@@ -169,6 +261,70 @@ pub struct CloudDevice {
     pub dev_product_name: Option<String>,
     pub print_status: Option<String>,
     pub nozzle_diameter: Option<f64>,
+}
+
+/// One print from the account's cloud history (`GET /v1/user-service/my/tasks`).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CloudTask {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub title: String,
+    /// Serial of the printer.
+    pub device_id: String,
+    pub device_name: Option<String>,
+    /// Bambu's task status: 1 running, 2 finished, 3 failed / cancelled (others kept raw).
+    #[ts(type = "number | null")]
+    pub status: Option<i64>,
+    pub outcome: TaskOutcome,
+    pub start_time: Option<DateTime<Utc>>,
+    pub end_time: Option<DateTime<Utc>>,
+    /// Planned filament for the whole job, grams (the slice estimate).
+    pub weight_g: Option<f64>,
+    pub plate_name: Option<String>,
+    /// Cover image URL on Bambu's CDN.
+    pub cover: Option<String>,
+}
+
+/// What a cloud task's status means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskOutcome {
+    Printing,
+    Finished,
+    Failed,
+    Unknown,
+}
+
+fn parse_task(t: &Value) -> Option<CloudTask> {
+    let s = |k: &str| {
+        t.get(k)
+            .and_then(Value::as_str)
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+    };
+    let time = |k: &str| s(k).and_then(|v| v.parse::<DateTime<Utc>>().ok());
+    let status = t.get("status").and_then(Value::as_i64);
+    let outcome = match status {
+        Some(1) => TaskOutcome::Printing,
+        Some(2) => TaskOutcome::Finished,
+        Some(3) => TaskOutcome::Failed,
+        _ => TaskOutcome::Unknown,
+    };
+    Some(CloudTask {
+        id: t.get("id")?.as_i64()?,
+        title: s("title").unwrap_or_default(),
+        device_id: s("deviceId").unwrap_or_default(),
+        device_name: s("deviceName"),
+        status,
+        outcome,
+        start_time: time("startTime"),
+        end_time: time("endTime"),
+        weight_g: t.get("weight").and_then(Value::as_f64),
+        plate_name: s("plateName"),
+        cover: s("cover"),
+    })
 }
 
 /// The parts of `GET /v1/user-service/my/profile` we use.
@@ -326,6 +482,54 @@ impl BambuCloud {
         Ok(list.iter().filter_map(parse_device).collect())
     }
 
+    /// `GET /v1/iot-service/api/user/print` — each bound printer's LAN access code
+    /// (`dev_access_code`), keyed by serial. Used once when a device becomes a printer.
+    pub async fn access_codes(
+        &self,
+        region: Region,
+        token: &Token,
+    ) -> Result<std::collections::HashMap<String, String>, CloudError> {
+        let url = format!(
+            "{}/v1/iot-service/api/user/print?force=true",
+            self.api(region)
+        );
+        let v = self.get_json(&url, token).await?;
+        Ok(v.get("devices")
+            .and_then(Value::as_array)
+            .map(|list| {
+                list.iter()
+                    .filter_map(|d| {
+                        let id = d.get("dev_id")?.as_str()?;
+                        let code = d.get("dev_access_code")?.as_str()?;
+                        (!code.is_empty()).then(|| (id.to_owned(), code.to_owned()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// `GET /v1/user-service/my/tasks?deviceId=<serial>&limit=N` — the printer's cloud
+    /// print history, newest first.
+    pub async fn tasks(
+        &self,
+        region: Region,
+        token: &Token,
+        serial: &str,
+        limit: u32,
+    ) -> Result<Vec<CloudTask>, CloudError> {
+        let url = format!("{}/v1/user-service/my/tasks", self.api(region));
+        let url = reqwest::Url::parse_with_params(
+            &url,
+            &[("deviceId", serial), ("limit", &limit.to_string())],
+        )
+        .map_err(|e| CloudError::Unreachable(format!("bad URL: {e}")))?;
+        let v = self.get_json(url.as_str(), token).await?;
+        Ok(v.get("hits")
+            .and_then(Value::as_array)
+            .map(|h| h.iter().filter_map(parse_task).collect())
+            .unwrap_or_default())
+    }
+
     async fn get_json(&self, url: &str, token: &Token) -> Result<Value, CloudError> {
         let resp = self
             .http
@@ -336,11 +540,11 @@ impl BambuCloud {
             .map_err(net_err)?;
         let status = resp.status();
         let text = resp.text().await.map_err(net_err)?;
-        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-            // A Cloudflare block is also 403 but HTML; tell the two apart.
-            if serde_json::from_str::<Value>(&text).is_ok() || text.trim().is_empty() {
-                return Err(CloudError::Unauthorized(status.as_u16()));
-            }
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(forbidden("GET", url, &text));
+        }
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(CloudError::Unauthorized(status.as_u16()));
         }
         let v: Value = serde_json::from_str(&text).map_err(|_| unexpected(status, &text))?;
         if !status.is_success() || is_error_body(&v) {
@@ -363,6 +567,9 @@ impl BambuCloud {
         let status = resp.status();
         let headers = resp.headers().clone();
         let text = resp.text().await.map_err(net_err)?;
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(forbidden("POST", url, &text));
+        }
         let v = if text.trim().is_empty() {
             Value::Null
         } else {
@@ -494,6 +701,62 @@ mod tests {
         let t = Token::new(format!("h.{payload}.s"));
         assert_eq!(jwt_expiry(&t).map(|d| d.timestamp()), Some(1_900_000_000));
         assert!(jwt_expiry(&Token::new("opaque".into())).is_none());
+    }
+
+    #[test]
+    fn a_403_keeps_bambus_code_reason_and_body_verbatim() {
+        let body = r#"{"code":-3120,"error":"internal blocking","message":"internal blocking"}"#;
+        let e = forbidden(
+            "GET",
+            "https://api.bambulab.com/v1/user-service/my/tasks?deviceId=X&limit=20",
+            body,
+        );
+        let CloudError::Forbidden(r) = &e else {
+            panic!("not Forbidden: {e:?}");
+        };
+        assert_eq!(r.code, Some(-3120));
+        assert_eq!(r.reason.as_deref(), Some("internal blocking"));
+        assert_eq!(r.body, body);
+        assert_eq!(r.path, "/v1/user-service/my/tasks");
+        assert_eq!(r.kind(), "read");
+        let text = e.to_string();
+        assert!(
+            text.contains("refused a read (GET /v1/user-service/my/tasks)"),
+            "{text}"
+        );
+        assert!(text.contains("code -3120 \"internal blocking\""), "{text}");
+        assert!(text.contains(body), "{text}");
+
+        // A POST refusal reads as a send; a non-JSON (Cloudflare) body is kept as sent.
+        let e = forbidden(
+            "POST",
+            "https://api.bambulab.com/v1/x",
+            "<html>blocked</html>",
+        );
+        let CloudError::Forbidden(r) = e else {
+            panic!("not Forbidden");
+        };
+        assert_eq!(
+            (r.kind(), r.code, r.body.as_str()),
+            ("send", None, "<html>blocked</html>")
+        );
+    }
+
+    #[test]
+    fn task_rows_parse() {
+        let t = serde_json::json!({
+            "id": 1397810730_i64, "title": "_KX139_BodyCentre", "status": 3,
+            "startTime": "2026-11-01T19:24:11Z", "endTime": "2026-11-01T19:52:49Z",
+            "deviceId": "03919C461200718", "deviceName": "Hellspark A1",
+            "weight": 49.74, "plateName": "", "cover": "https://example.invalid/c.png"
+        });
+        let task = parse_task(&t).expect("task");
+        assert_eq!(task.outcome, TaskOutcome::Failed);
+        assert_eq!(task.device_id, "03919C461200718");
+        assert_eq!(task.plate_name, None);
+        assert_eq!(task.weight_g, Some(49.74));
+        assert!(task.end_time > task.start_time);
+        assert!(parse_task(&serde_json::json!({"title": "no id"})).is_none());
     }
 
     #[test]

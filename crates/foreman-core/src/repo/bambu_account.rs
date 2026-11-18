@@ -25,6 +25,8 @@ pub struct BambuAccount {
     pub token_expires_at: Option<DateTime<Utc>>,
     pub last_ok_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
+    /// Bambu refused the stored token: the cloud connection stopped until a new one is stored.
+    pub token_rejected_at: Option<DateTime<Utc>>,
     /// Printers that reference this account.
     #[ts(type = "number")]
     pub printer_count: i64,
@@ -41,6 +43,7 @@ struct Row {
     token_expires_at: Option<String>,
     last_ok_at: Option<String>,
     last_error: Option<String>,
+    token_rejected_at: Option<String>,
     printer_count: i64,
     created_at: String,
 }
@@ -61,6 +64,7 @@ impl Row {
             token_expires_at: dt(self.token_expires_at),
             last_ok_at: dt(self.last_ok_at),
             last_error: self.last_error,
+            token_rejected_at: dt(self.token_rejected_at),
             printer_count: self.printer_count,
             created_at: dt(Some(self.created_at)).unwrap_or_else(Utc::now),
         })
@@ -69,7 +73,7 @@ impl Row {
 
 const SELECT: &str =
     "SELECT a.id, a.label, a.region, a.email, (a.token IS NOT NULL) AS has_token, \
-     a.token_expires_at, a.last_ok_at, a.last_error, \
+     a.token_expires_at, a.last_ok_at, a.last_error, a.token_rejected_at, \
      (SELECT COUNT(*) FROM printer p WHERE p.bambu_account_id = a.id) AS printer_count, \
      a.created_at FROM bambu_account a";
 
@@ -158,7 +162,7 @@ pub async fn set_token(
     let now = Utc::now().to_rfc3339();
     sqlx::query(
         "UPDATE bambu_account SET token = ?, token_expires_at = ?, last_ok_at = ?, \
-         last_error = NULL, updated_at = ? WHERE id = ?",
+         last_error = NULL, token_rejected_at = NULL, updated_at = ? WHERE id = ?",
     )
     .bind(sealed_token)
     .bind(expires_at.map(|d| d.to_rfc3339()))
@@ -178,6 +182,24 @@ pub async fn mark_ok(pool: &SqlitePool, id: i64) -> Result<(), AppError> {
         "UPDATE bambu_account SET last_ok_at = ?, last_error = NULL, updated_at = ? WHERE id = ?",
     )
     .bind(&now)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(db)?;
+    Ok(())
+}
+
+/// Bambu refused this account's token (MQTT `BadUserNamePassword` / REST 401). The
+/// cloud connection stops until [`set_token`] stores a new one. Touches only this row.
+pub async fn mark_token_rejected(pool: &SqlitePool, id: i64, error: &str) -> Result<(), AppError> {
+    let now = Utc::now().to_rfc3339();
+    sqlx::query(
+        "UPDATE bambu_account SET token_rejected_at = COALESCE(token_rejected_at, ?), \
+         last_error = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(&now)
+    .bind(error)
     .bind(&now)
     .bind(id)
     .execute(pool)

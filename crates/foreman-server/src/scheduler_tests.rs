@@ -74,6 +74,7 @@ impl SchedEnv for MockEnv {
                 printer: p,
                 loaded: vec![],
                 mode: m.mode,
+                reach: foreman_core::compat::Reach::Lan,
             })
             .collect()
     }
@@ -764,6 +765,21 @@ mod jobs {
         ps.sort();
         assert_eq!(ps, vec![1, 2]);
         assert!(jobs.iter().all(|j| j.end == JobEnd::Running));
+    }
+
+    /// A print seen on LAN, then (LAN lost) on the Bambu Cloud path, then on LAN again:
+    /// the path switch goes printing → offline → printing, and stays one job.
+    #[tokio::test]
+    async fn print_seen_over_lan_then_cloud_then_lan_is_one_job() {
+        let r = rig(None).await;
+        r.env.set_state(2, PrinterState::Offline);
+        r.push(1, st(PrinterState::Printing, None)).await; // LAN
+        r.push(1, st(PrinterState::Offline, None)).await; // LAN driver lost the printer
+        r.push(1, st(PrinterState::Printing, None)).await; // cloud path took over
+        r.push(1, st(PrinterState::Printing, None)).await; // back on LAN (no offline gap)
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 1, "one job across the path switches");
+        assert_eq!(jobs[0].end, JobEnd::Running);
     }
 
     /// A job finishes and a new print starts on the same printer: a second job.

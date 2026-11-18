@@ -186,6 +186,9 @@ const MIGRATIONS: &[&str] = &[
        created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
     "ALTER TABLE printer ADD COLUMN bambu_account_id INTEGER \
      REFERENCES bambu_account(id) ON DELETE SET NULL",
+    // 0020: Bambu Cloud transport (doc 07 §B session 3, see migrations/0020_bambu_token_rejected.sql).
+    // Set when Bambu refuses the stored token; nothing retries until it is replaced.
+    "ALTER TABLE bambu_account ADD COLUMN token_rejected_at TEXT",
 ];
 
 /// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only

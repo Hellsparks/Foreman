@@ -271,9 +271,25 @@ pub async fn serve_with(
         });
     }
 
+    // Secrets master key lives next to the DB, outside it.
+    let secrets = Arc::new(foreman_core::secrets::SecretBox::load_or_create(
+        &cfg.data_dir.join("secret.key"),
+    )?);
+
     // Driver manager: load printers from DB and spawn drivers.
     let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
     if cfg.drivers_enabled {
+        // Bambu Cloud: one MQTT connection per account with linked printers (doc 07 §B).
+        let hub = foreman_core::drivers::bambu_cloud::CloudHub::new(
+            foreman_db.pool.clone(),
+            Arc::clone(&secrets),
+            foreman_core::bambu_cloud::BambuCloud::new()?,
+            Arc::clone(&tx),
+        );
+        if let Err(e) = hub.sync().await {
+            warn!("bambu cloud: initial sync failed: {e}");
+        }
+        driver_manager.set_cloud(hub).await;
         driver_manager.start_all(&foreman_db.pool).await;
     } else {
         warn!("printer drivers disabled (FOREMAN__DRIVERS_ENABLED=false): every printer stays offline");
@@ -283,11 +299,6 @@ pub async fn serve_with(
         .timeout(Duration::from_secs(10))
         .build()
         .unwrap_or_default();
-
-    // Secrets master key lives next to the DB, outside it.
-    let secrets = Arc::new(foreman_core::secrets::SecretBox::load_or_create(
-        &cfg.data_dir.join("secret.key"),
-    )?);
     // SSH identity: generated once, stored encrypted in `setting`.
     let (ssh_key, ssh_pub) =
         foreman_core::ssh_client::ensure_identity(&foreman_db.pool, &secrets).await?;
@@ -1034,6 +1045,14 @@ fn api_routes() -> Router<AppState> {
         .route(
             "/api/bambu/accounts/{id}/code",
             post(api::bambu_accounts::code),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/devices/{serial}/link",
+            post(api::bambu_accounts::link).delete(api::bambu_accounts::unlink),
+        )
+        .route(
+            "/api/printers/{id}/cloud-history",
+            get(api::bambu_accounts::printer_history),
         )
         .route(
             "/api/bambu/accounts/{id}/token",

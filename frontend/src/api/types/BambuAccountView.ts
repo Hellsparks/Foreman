@@ -20,6 +20,10 @@ code_channel: CodeChannel | null, id: number, label: string, region: Region, ema
  */
 has_token: boolean, token_expires_at: string | null, last_ok_at: string | null, last_error: string | null, 
 /**
+ * Bambu refused the stored token: the cloud connection stopped until a new one is stored.
+ */
+token_rejected_at: string | null, 
+/**
  * Printers that reference this account.
  */
 printer_count: number, created_at: string, };

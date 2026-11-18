@@ -271,6 +271,25 @@ pub async fn clear_tls_fingerprint(pool: &SqlitePool, id: i64) -> Result<(), App
     Ok(())
 }
 
+/// Link the printer to a Bambu Cloud account (its cloud path), or unlink with `None`.
+pub async fn set_bambu_account(
+    pool: &SqlitePool,
+    id: i64,
+    account_id: Option<i64>,
+) -> Result<(), AppError> {
+    let done = sqlx::query("UPDATE printer SET bambu_account_id=?, updated_at=? WHERE id=?")
+        .bind(account_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    if done.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("printer {id}")));
+    }
+    Ok(())
+}
+
 /// Set the plate_clear flag on a printer (used by attention actions and the scheduler).
 pub async fn set_plate_clear(pool: &SqlitePool, id: i64, clear: bool) -> Result<(), AppError> {
     let now = Utc::now().to_rfc3339();

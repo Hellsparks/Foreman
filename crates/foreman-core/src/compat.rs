@@ -43,15 +43,49 @@ pub enum Verdict {
     Offline,
     /// Foreman can't start or control prints on this printer (Bambu in cloud mode).
     Unsupported,
+    /// Foreman reaches this printer only over Bambu Cloud: it can be watched, not sent to.
+    CloudOnly,
 }
 
 /// Reason shown wherever a cloud-mode printer's print controls are refused.
 pub const CLOUD_MODE: &str = "Not supported (cloud mode)";
 
-/// Why Foreman can't send, start, pause, resume or cancel prints on `p`, if it can't.
-pub fn control_unsupported(p: &Printer) -> Option<&'static str> {
-    // Bambu runs read-only until the cloud transport (doc 05, 2C.4) exists.
-    (p.firmware == FirmwareKind::Bambu).then_some(CLOUD_MODE)
+/// Reason shown when the printer's only live path is Bambu Cloud (monitoring only).
+pub const CLOUD_ONLY: &str = "Cloud only: watch, can't send";
+
+/// How Foreman reaches a printer right now: the kind of its active connection path.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "snake_case")]
+pub enum Reach {
+    /// A LAN / VPN path (or no path information: the printer's own address).
+    #[default]
+    Lan,
+    /// Bambu Cloud MQTT: status only, no upload, start or commands.
+    Cloud,
+}
+
+impl Reach {
+    /// What can be done over this kind of path.
+    pub fn can_send(self) -> bool {
+        self == Reach::Lan
+    }
+}
+
+/// Why Foreman can't send, start, pause, resume or cancel prints on `p`, if it can't,
+/// with the verdict that says so. The one place that decides it: compat, Send, the
+/// queue, Start next, printer commands and the UI flags all ask here.
+pub fn control_refusal(p: &Printer, reach: Reach) -> Option<(Verdict, &'static str)> {
+    if !reach.can_send() {
+        return Some((Verdict::CloudOnly, CLOUD_ONLY));
+    }
+    // Bambu over LAN stays read-only until signed / Developer-Mode dispatch exists.
+    (p.firmware == FirmwareKind::Bambu).then_some((Verdict::Unsupported, CLOUD_MODE))
+}
+
+/// The reason alone (see [`control_refusal`]).
+pub fn control_unsupported(p: &Printer, reach: Reach) -> Option<&'static str> {
+    control_refusal(p, reach).map(|(_, r)| r)
 }
 
 /// How well what is loaded matches the file's filament, best first.
@@ -104,6 +138,8 @@ pub struct PrinterSnapshot {
     pub loaded: Vec<LoadedSlot>,
     /// Filament tracking mode; decides which verdicts exist.
     pub mode: FilamentMode,
+    /// Kind of the printer's active connection path; decides what can be sent.
+    pub reach: Reach,
 }
 
 impl PrinterSnapshot {
@@ -124,6 +160,7 @@ impl PrinterSnapshot {
             status,
             loaded: vec![],
             mode: self.mode,
+            reach: self.reach,
         })
     }
 
@@ -274,11 +311,11 @@ fn check_view(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
         .map(|s| &s.state)
         .unwrap_or(&PrinterState::Offline);
     let (fil, loaded_note) = filament_check(file, snap);
-    if let Some(reason) = control_unsupported(p) {
+    if let Some((verdict, reason)) = control_refusal(p, snap.reach) {
         return CompatResult {
             printer_id: id,
             printer_name: name,
-            verdict: Verdict::Unsupported,
+            verdict,
             reason: reason.into(),
             quick_fix: None,
             filament: fil,
@@ -494,6 +531,7 @@ fn verdict_order(v: &Verdict) -> u8 {
         Verdict::Nozzle => 6,
         Verdict::Offline => 7,
         Verdict::Unsupported => 8,
+        Verdict::CloudOnly => 9,
     }
 }
 
@@ -622,6 +660,7 @@ mod tests {
             status: None,
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Offline);
@@ -638,6 +677,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::TooBig);
@@ -653,6 +693,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
@@ -670,6 +711,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -686,6 +728,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Plate);
@@ -701,6 +744,7 @@ mod tests {
             status: Some(make_status(PrinterState::Printing)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Busy);
@@ -722,6 +766,7 @@ mod tests {
             status: Some(status),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Material);
@@ -743,6 +788,7 @@ mod tests {
             status: Some(status),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -757,6 +803,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -772,6 +819,7 @@ mod tests {
                 status: None,
                 loaded: vec![],
                 mode: FilamentMode::Full,
+                reach: Reach::Lan,
             },
             PrinterSnapshot {
                 printer: make_printer(2, "Idle"),
@@ -779,6 +827,7 @@ mod tests {
                 status: Some(make_status(PrinterState::Idle)),
                 loaded: vec![],
                 mode: FilamentMode::Full,
+                reach: Reach::Lan,
             },
             PrinterSnapshot {
                 printer: make_printer(3, "Printing"),
@@ -786,6 +835,7 @@ mod tests {
                 status: Some(make_status(PrinterState::Printing)),
                 loaded: vec![],
                 mode: FilamentMode::Full,
+                reach: Reach::Lan,
             },
         ];
         let results = check_all(&meta, &snaps);
@@ -808,6 +858,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
@@ -838,6 +889,40 @@ mod tests {
         }
     }
 
+    #[test]
+    fn reach_decides_what_can_be_sent_in_one_place() {
+        let klipper = idle_klipper(vec![]);
+        let meta = make_meta();
+        assert_eq!(check(&meta, &klipper).verdict, Verdict::Ready);
+
+        let mut bambu = idle_klipper(vec![]);
+        bambu.printer.firmware = FirmwareKind::Bambu;
+        let r = check(&meta, &bambu);
+        assert_eq!(
+            (r.verdict, r.reason.as_str()),
+            (Verdict::Unsupported, CLOUD_MODE)
+        );
+
+        // Same printer, reachable only over Bambu Cloud: watch, can't send.
+        bambu.reach = Reach::Cloud;
+        let r = check(&meta, &bambu);
+        assert_eq!(
+            (r.verdict, r.reason.as_str()),
+            (Verdict::CloudOnly, CLOUD_ONLY)
+        );
+        // ...even while it reports offline or busy: the path decides first.
+        bambu.status = None;
+        assert_eq!(check(&meta, &bambu).verdict, Verdict::CloudOnly);
+        // The verdict exists in every filament mode.
+        for m in [
+            FilamentMode::Full,
+            FilamentMode::External,
+            FilamentMode::Off,
+        ] {
+            assert!(m.policy().verdicts.contains(&Verdict::CloudOnly));
+        }
+    }
+
     fn idle_klipper(loaded: Vec<LoadedSlot>) -> PrinterSnapshot {
         PrinterSnapshot {
             printer: make_printer(1, "V0"),
@@ -845,6 +930,7 @@ mod tests {
             status: Some(make_status(PrinterState::Idle)),
             loaded,
             mode: FilamentMode::Full,
+            reach: Reach::Lan,
         }
     }
 

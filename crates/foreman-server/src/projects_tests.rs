@@ -904,7 +904,8 @@ async fn tracking_off_releases_reservations_and_clears_project_spools() {
             "too_big",
             "nozzle",
             "offline",
-            "unsupported"
+            "unsupported",
+            "cloud_only"
         ])
     );
     let v = w.get(id).await;

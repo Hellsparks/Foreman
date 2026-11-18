@@ -258,12 +258,14 @@ pub async fn snapshot(
     let caps = drivers.get_capabilities(printer.id).await;
     let status = drivers.get_status(printer.id).await;
     let loaded = slots_for(drivers, tracking.spools(), &printer).await;
+    let reach = drivers.reach(printer.id).await;
     PrinterSnapshot {
         printer,
         caps,
         status,
         loaded,
         mode: tracking.mode(),
+        reach,
     }
 }
 

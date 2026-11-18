@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAppearance, THEMES, MODES, type Theme, type Mode } from "../hooks/useAppearance";
-import { api } from "../api/client";
+import { api, viaPath } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
 import SecuritySettings from "../auth/SecuritySettings";
 import BackupSettings from "../backup/BackupSettings";
@@ -195,7 +195,7 @@ export default function Settings() {
                   >
                     {p.firmware}
                   </span>
-                  {p.active_path_index != null && p.active_path_index > 0 && p.active_path_name && (
+                  {viaPath(p) && (
                     <span style={{ fontSize: 11, color: "var(--fw-warning)", fontFamily: "var(--fw-mono)" }}>
                       via {p.active_path_name}
                     </span>

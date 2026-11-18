@@ -40,6 +40,7 @@ const ALL_VERDICTS: &[Verdict] = &[
     Verdict::Nozzle,
     Verdict::Offline,
     Verdict::Unsupported,
+    Verdict::CloudOnly,
 ];
 
 /// What a mode allows, sent to the UI as-is so it never re-derives it.

@@ -17,10 +17,14 @@ use std::time::{Duration, Instant};
 type PathCheckEntry = (i64, bool, u64);
 
 use foreman_core::{
+    compat::Reach,
     domain::{FirmwareKind, Printer, PrinterPath},
     driver::{PrinterCapabilities, PrinterCommand, PrinterDriver},
     drivers::{
-        bambu::{BambuConfig, BambuDriver},
+        bambu::{mqtt_host_port, BambuConfig, BambuDriver},
+        bambu_cloud::{
+            cloud_account_of, cloud_path_url, BambuCloudDriver, CloudHub, CLOUD_PATH_NAME,
+        },
         moonraker::{MoonrakerConfig, MoonrakerDriver},
     },
     error::AppError,
@@ -78,7 +82,18 @@ pub struct DriverManager {
     path_health_cache: RwLock<HashMap<i64, Vec<PathCheckEntry>>>,
     /// Open "path_switched" attention items: printer_id → attention_item_id.
     path_switched_attention: RwLock<HashMap<i64, i64>>,
+    // ── Bambu Cloud (doc 07 §B) ──────────────────────────────────────────
+    /// One MQTT connection per Bambu account; None until the server wires it in.
+    cloud: RwLock<Option<Arc<CloudHub>>>,
+    /// Printers linked to a Bambu account: printer_id → (account_id, serial).
+    cloud_links: RwLock<HashMap<i64, (i64, String)>>,
 }
+
+/// Synthetic path ids (real `printer_path` ids start at 1).
+/// The printer's own address, when a cloud-linked printer has no stored paths.
+const OWN_ADDRESS_PATH_ID: i64 = 0;
+/// The Bambu Cloud path, always the last tier.
+const CLOUD_PATH_ID: i64 = -1;
 
 impl DriverManager {
     pub fn new(bus_tx: Arc<broadcast::Sender<ServerEvent>>, pool: SqlitePool) -> Arc<Self> {
@@ -97,6 +112,8 @@ impl DriverManager {
             higher_path_healthy_since: RwLock::new(HashMap::new()),
             path_health_cache: RwLock::new(HashMap::new()),
             path_switched_attention: RwLock::new(HashMap::new()),
+            cloud: RwLock::new(None),
+            cloud_links: RwLock::new(HashMap::new()),
         });
 
         // ── Task 1: status event listener ────────────────────────────────────
@@ -111,6 +128,7 @@ impl DriverManager {
                                 .write()
                                 .await
                                 .insert(printer_id, status.clone());
+                            mgr2.seed_cloud(printer_id, &status).await;
                             // Only refresh the heartbeat timer when the printer is
                             // actually reachable. Offline events are self-published
                             // by the driver on disconnect — counting them would
@@ -319,22 +337,6 @@ impl DriverManager {
                         { mgr4.drivers.read().await.keys().copied().collect() };
 
                     for printer_id in driver_ids {
-                        // Load paths from DB.
-                        let paths =
-                            match foreman_core::repo::printer_path::list(&mgr4.pool, printer_id)
-                                .await
-                            {
-                                Ok(p) => p,
-                                Err(e) => {
-                                    warn!(printer_id, "path health: load paths: {e}");
-                                    continue;
-                                }
-                            };
-
-                        if paths.is_empty() {
-                            continue;
-                        }
-
                         // Load printer for fail_after_checks / return_after_secs.
                         let printer =
                             match foreman_core::repo::printer::get(&mgr4.pool, printer_id).await {
@@ -344,12 +346,25 @@ impl DriverManager {
                                     continue;
                                 }
                             };
+                        // Stored paths, plus the Bambu Cloud path last when linked.
+                        let paths = match mgr4.effective_paths(&printer).await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                warn!(printer_id, "path health: load paths: {e}");
+                                continue;
+                            }
+                        };
 
-                        // TCP-ping each path.
+                        if paths.is_empty() {
+                            continue;
+                        }
+
+                        // Check each path the way its kind is reached.
                         let mut health: Vec<(i64, bool, u64)> = Vec::new();
                         for path in &paths {
-                            let (reachable, latency_ms) =
-                                tcp_check(&path.url, Duration::from_secs(2)).await;
+                            let (reachable, latency_ms) = mgr4
+                                .check_path(&printer, path, Duration::from_secs(2))
+                                .await;
                             health.push((path.id, reachable, latency_ms));
                         }
                         mgr4.path_health_cache
@@ -524,13 +539,15 @@ impl DriverManager {
 
         // Manage path_switched attention.
         // Dismiss any existing path_switched attention.
-        if let Some(att_id) = self
+        // Copy the id out first: a guard in an `if let` scrutinee lives for the whole
+        // block, and the block takes the write lock (it deadlocked on the way back).
+        let existing = self
             .path_switched_attention
             .read()
             .await
             .get(&printer_id)
-            .copied()
-        {
+            .copied();
+        if let Some(att_id) = existing {
             if let Err(e) = foreman_core::repo::attention::dismiss(&self.pool, att_id).await {
                 warn!(
                     printer_id,
@@ -632,6 +649,116 @@ impl DriverManager {
         }
     }
 
+    // ── Bambu Cloud ─────────────────────────────────────────────────────
+
+    /// Wire in the Bambu Cloud connections (server start).
+    pub async fn set_cloud(&self, hub: Arc<CloudHub>) {
+        *self.cloud.write().await = Some(hub);
+    }
+
+    /// The Bambu Cloud connections, when wired in.
+    pub async fn cloud(&self) -> Option<Arc<CloudHub>> {
+        self.cloud.read().await.clone()
+    }
+
+    /// A printer's link to a Bambu account changed: re-sync the account connections and
+    /// restart its driver so the path list includes (or drops) the cloud path.
+    pub async fn cloud_link_changed(&self, printer_id: i64) -> Result<(), AppError> {
+        if let Some(hub) = self.cloud().await {
+            hub.sync().await?;
+        }
+        let printer = foreman_core::repo::printer::get(&self.pool, printer_id).await?;
+        self.stop_driver(printer_id).await;
+        self.start_driver(&printer)
+            .await
+            .map_err(AppError::Driver)?;
+        Ok(())
+    }
+
+    /// The printer's paths in failover order: stored paths first (or, for a printer linked
+    /// to Bambu Cloud with no stored paths, its own LAN address), then the Bambu Cloud
+    /// path last, below every LAN path. Printers without a cloud link: stored paths only.
+    pub async fn effective_paths(&self, printer: &Printer) -> Result<Vec<PrinterPath>, AppError> {
+        let mut paths = foreman_core::repo::printer_path::list(&self.pool, printer.id).await?;
+        let Some(account_id) = cloud_link(printer).map(|(a, _)| a) else {
+            return Ok(paths);
+        };
+        let now = chrono::Utc::now();
+        let has_lan_creds = printer
+            .access_code
+            .as_deref()
+            .is_some_and(|c| !c.is_empty());
+        if paths.is_empty() && has_lan_creds {
+            if let Some(url) = printer.primary_url.as_deref().filter(|u| !u.is_empty()) {
+                paths.push(PrinterPath {
+                    id: OWN_ADDRESS_PATH_ID,
+                    printer_id: printer.id,
+                    name: "LAN".into(),
+                    url: url.to_owned(),
+                    priority: 0,
+                    created_at: now,
+                    updated_at: now,
+                });
+            }
+        }
+        paths.retain(|p| cloud_account_of(&p.url).is_none());
+        paths.push(PrinterPath {
+            id: CLOUD_PATH_ID,
+            printer_id: printer.id,
+            name: CLOUD_PATH_NAME.into(),
+            url: cloud_path_url(account_id),
+            priority: i64::MAX,
+            created_at: now,
+            updated_at: now,
+        });
+        Ok(paths)
+    }
+
+    /// Is this path usable now? Cloud: the account's connection is up and the printer
+    /// reported recently. Bambu LAN: its MQTT port answers. Others: TCP to the URL.
+    async fn check_path(
+        &self,
+        printer: &Printer,
+        path: &PrinterPath,
+        timeout: Duration,
+    ) -> (bool, u64) {
+        if let Some(account_id) = cloud_account_of(&path.url) {
+            let ok = match (self.cloud().await, printer.serial_number.as_deref()) {
+                (Some(hub), Some(serial)) => hub.path_healthy(account_id, serial).await,
+                _ => false,
+            };
+            return (ok, 0);
+        }
+        if printer.firmware == FirmwareKind::Bambu {
+            let (host, port) = mqtt_host_port(&path.url);
+            return tcp_check(&format!("{host}:{port}"), timeout).await;
+        }
+        tcp_check(&path.url, timeout).await
+    }
+
+    /// How Foreman reaches the printer now (its active path's kind).
+    pub async fn reach(&self, printer_id: i64) -> Reach {
+        match self.get_active_path(printer_id).await {
+            Some((_, p)) if cloud_account_of(&p.url).is_some() => Reach::Cloud,
+            _ => Reach::Lan,
+        }
+    }
+
+    /// A status from the printer's LAN path tells the cloud feed the print state it
+    /// can't ask for (no `pushall` over cloud).
+    async fn seed_cloud(&self, printer_id: i64, status: &PrinterStatus) {
+        let Some((account_id, serial)) = self.cloud_links.read().await.get(&printer_id).cloned()
+        else {
+            return;
+        };
+        if self.reach(printer_id).await == Reach::Cloud {
+            return;
+        }
+        if let Some(hub) = self.cloud().await {
+            hub.seed(account_id, &serial, status).await;
+        }
+    }
+
     /// Return the current active path index + record for a printer.
     pub async fn get_active_path(&self, printer_id: i64) -> Option<(usize, PrinterPath)> {
         let idx = *self
@@ -641,22 +768,26 @@ impl DriverManager {
             .get(&printer_id)
             .unwrap_or(&0);
 
-        let paths = foreman_core::repo::printer_path::list(&self.pool, printer_id)
+        let printer = foreman_core::repo::printer::get(&self.pool, printer_id)
             .await
             .ok()?;
+        let paths = self.effective_paths(&printer).await.ok()?;
 
         paths.into_iter().nth(idx).map(|p| (idx, p))
     }
 
-    /// TCP-ping all paths for a printer and return results.
+    /// Check all paths for a printer and return results.
     pub async fn test_all_paths(&self, printer_id: i64) -> Vec<PathTestResult> {
-        let paths = foreman_core::repo::printer_path::list(&self.pool, printer_id)
-            .await
-            .unwrap_or_default();
+        let Ok(printer) = foreman_core::repo::printer::get(&self.pool, printer_id).await else {
+            return Vec::new();
+        };
+        let paths = self.effective_paths(&printer).await.unwrap_or_default();
 
         let mut results = Vec::new();
         for path in paths {
-            let (reachable, latency_ms) = tcp_check(&path.url, Duration::from_secs(5)).await;
+            let (reachable, latency_ms) = self
+                .check_path(&printer, &path, Duration::from_secs(5))
+                .await;
             results.push(PathTestResult {
                 id: path.id,
                 name: path.name,
@@ -670,7 +801,8 @@ impl DriverManager {
 
     /// Manually switch back to path 0, only if path 0 is healthy.
     pub async fn switch_back_to_primary(&self, printer_id: i64) -> Result<(), AppError> {
-        let paths = foreman_core::repo::printer_path::list(&self.pool, printer_id).await?;
+        let printer = foreman_core::repo::printer::get(&self.pool, printer_id).await?;
+        let paths = self.effective_paths(&printer).await?;
         if paths.is_empty() {
             return Err(AppError::InvalidInput(
                 "no paths defined for this printer".into(),
@@ -678,7 +810,9 @@ impl DriverManager {
         }
 
         let first = &paths[0];
-        let (reachable, _) = tcp_check(&first.url, Duration::from_secs(5)).await;
+        let (reachable, _) = self
+            .check_path(&printer, first, Duration::from_secs(5))
+            .await;
         if !reachable {
             return Err(AppError::InvalidInput(
                 "path 0 is not reachable; cannot switch back".into(),
@@ -719,16 +853,44 @@ impl DriverManager {
             .get(&printer.id)
             .unwrap_or(&0);
 
-        let paths = foreman_core::repo::printer_path::list(&self.pool, printer.id)
-            .await
-            .unwrap_or_default();
+        let paths = self.effective_paths(printer).await.unwrap_or_default();
 
         let effective_url: Option<String> = paths
             .get(active_idx)
             .map(|p| p.url.clone())
             .or_else(|| printer.primary_url.clone());
 
+        match cloud_link(printer) {
+            Some(link) => {
+                self.cloud_links.write().await.insert(printer.id, link);
+            }
+            None => {
+                self.cloud_links.write().await.remove(&printer.id);
+            }
+        }
+        let cloud_account = effective_url.as_deref().and_then(cloud_account_of);
+
         let driver: Arc<dyn PrinterDriver> = match printer.firmware {
+            FirmwareKind::Bambu if cloud_account.is_some() => {
+                let hub = self
+                    .cloud()
+                    .await
+                    .ok_or_else(|| "Bambu Cloud is not available".to_owned())?;
+                let serial = printer
+                    .serial_number
+                    .clone()
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| "bambu printer has no serial_number".to_owned())?;
+                let account_id = cloud_account.unwrap_or_default();
+                info!(printer_id = printer.id, name = %printer.name, account_id, "starting bambu cloud driver");
+                Arc::new(BambuCloudDriver::new(
+                    printer.id,
+                    account_id,
+                    serial,
+                    hub,
+                    Arc::clone(&self.bus_tx),
+                ))
+            }
             FirmwareKind::Moonraker => {
                 let url = match effective_url {
                     Some(u) if !u.is_empty() => u,
@@ -820,7 +982,9 @@ impl DriverManager {
 
     /// Stop the driver for a printer and clear any attention items it raised.
     pub async fn stop_driver(&self, printer_id: i64) {
-        if let Some(handle) = self.drivers.write().await.remove(&printer_id) {
+        // Take the handle out before awaiting disconnect (don't hold the map lock).
+        let removed = self.drivers.write().await.remove(&printer_id);
+        if let Some(handle) = removed {
             info!(printer_id, "stopping driver");
             if let Err(e) = handle.driver.disconnect().await {
                 warn!(printer_id, "disconnect error: {e}");
@@ -828,13 +992,15 @@ impl DriverManager {
         }
         self.status_cache.write().await.remove(&printer_id);
         self.capabilities_cache.write().await.remove(&printer_id);
+        self.cloud_links.write().await.remove(&printer_id);
         self.last_status_at.write().await.remove(&printer_id);
         self.driver_started_at.write().await.remove(&printer_id);
 
         // Clear any auto-raised attention items for this printer.
         for kind in &["offline", "error"] {
             let key = (printer_id, kind.to_string());
-            if let Some(att_id) = self.open_attention.write().await.remove(&key) {
+            let open = self.open_attention.write().await.remove(&key);
+            if let Some(att_id) = open {
                 if let Err(e) = foreman_core::repo::attention::dismiss(&self.pool, att_id).await {
                     warn!(printer_id, att_id, "clear attention on stop: {e}");
                 }
@@ -850,12 +1016,12 @@ impl DriverManager {
             .remove(&printer_id);
         self.path_health_cache.write().await.remove(&printer_id);
 
-        if let Some(att_id) = self
+        let switched = self
             .path_switched_attention
             .write()
             .await
-            .remove(&printer_id)
-        {
+            .remove(&printer_id);
+        if let Some(att_id) = switched {
             if let Err(e) = foreman_core::repo::attention::dismiss(&self.pool, att_id).await {
                 warn!(
                     printer_id,
@@ -1033,7 +1199,8 @@ impl DriverManager {
         };
 
         let printer = foreman_core::repo::printer::get(&self.pool, printer_id).await?;
-        if let Some(reason) = foreman_core::compat::control_unsupported(&printer) {
+        let reach = self.reach(printer_id).await;
+        if let Some(reason) = foreman_core::compat::control_unsupported(&printer, reach) {
             return Err(AppError::InvalidInput(reason.into()));
         }
 
@@ -1073,6 +1240,15 @@ impl DriverManager {
         // Dispatch.
         driver.send_command(cmd).await
     }
+}
+
+/// (account, serial) when the printer is a Bambu linked to a cloud account.
+fn cloud_link(p: &Printer) -> Option<(i64, String)> {
+    if p.firmware != FirmwareKind::Bambu {
+        return None;
+    }
+    let serial = p.serial_number.clone().filter(|s| !s.is_empty())?;
+    Some((p.bambu_account_id?, serial))
 }
 
 // ---------------------------------------------------------------------------
@@ -1654,6 +1830,28 @@ mod tests {
                 .any(|a| a.printer_id == Some(1) && a.kind == "path_switched"),
             "path_switched attention should be cleared after return to primary"
         );
+    }
+
+    /// Fail over (raises "using backup path") and come back: the way back dismisses
+    /// that item. This deadlocked when the read guard outlived its `if let`.
+    #[tokio::test]
+    async fn switch_there_and_back_does_not_deadlock() {
+        let (mgr, _tmp) = setup_with_paths().await;
+        let paths = foreman_core::repo::printer_path::list(&mgr.pool, 1)
+            .await
+            .expect("paths");
+        let done = tokio::time::timeout(Duration::from_secs(20), async {
+            mgr.switch_to_path(1, 1, &paths).await;
+            assert!(mgr.path_switched_attention.read().await.contains_key(&1));
+            mgr.switch_to_path(1, 0, &paths).await;
+            mgr.stop_driver(1).await;
+        })
+        .await;
+        assert!(done.is_ok(), "switching back to the primary path hung");
+        let attn = foreman_core::repo::attention::list_active(&mgr.pool)
+            .await
+            .expect("attention");
+        assert!(!attn.iter().any(|a| a.kind == "path_switched"));
     }
 
     #[tokio::test]

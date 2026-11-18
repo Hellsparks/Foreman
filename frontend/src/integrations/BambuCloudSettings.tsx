@@ -5,9 +5,9 @@
  * sees the token, only "connected until <date>".
  */
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { bambuApi, type BambuAccountView, type CloudDevice, type Region } from "../api/bambu";
+import { bambuApi, type BambuAccountView, type DeviceRow, type Region } from "../api/bambu";
 import { Button, StatusChip } from "../ui";
-import { canListDevices, codePrompt, isSixDigits, removeWarning, stateChip } from "./bambuLogic";
+import { canListDevices, codePrompt, deviceAction, isSixDigits, removeWarning, stateChip } from "./bambuLogic";
 import "./BambuCloud.css";
 
 function errText(e: unknown): string {
@@ -377,7 +377,23 @@ function CodeForm({
 }
 
 function Devices({ account, onReload }: { account: BambuAccountView; onReload: () => Promise<void> }) {
-  const [devices, setDevices] = useState<CloudDevice[] | null>(null);
+  const [devices, setDevices] = useState<DeviceRow[] | null>(null);
+  const [linking, setLinking] = useState<string | null>(null);
+
+  const link = async (d: DeviceRow, on: boolean) => {
+    setLinking(d.dev_id);
+    setErr("");
+    try {
+      if (on) await bambuApi.link(account.id, d.dev_id);
+      else await bambuApi.unlink(account.id, d.dev_id);
+      setDevices(await bambuApi.devices(account.id));
+      await onReload();
+    } catch (e) {
+      setErr(errText(e));
+    } finally {
+      setLinking(null);
+    }
+  };
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -424,6 +440,7 @@ function Devices({ account, onReload }: { account: BambuAccountView; onReload: (
               <th scope="col">Model</th>
               <th scope="col">Serial</th>
               <th scope="col">Online</th>
+              <th scope="col">Foreman printer</th>
             </tr>
           </thead>
           <tbody>
@@ -438,6 +455,41 @@ function Devices({ account, onReload }: { account: BambuAccountView; onReload: (
                   ) : (
                     <StatusChip tone="off" symbol="○" word="Offline" />
                   )}
+                </td>
+                <td>
+                  {(() => {
+                    const act = deviceAction(d);
+                    const busyRow = linking === d.dev_id;
+                    if (act.kind === "linked") {
+                      return (
+                        <span className="bc__linked">
+                          <span>{act.label}</span>
+                          <Button
+                            variant="small"
+                            disabled={linking !== null}
+                            title="Remove this printer's Bambu Cloud path (the printer stays)"
+                            onClick={() => void link(d, false)}
+                          >
+                            {busyRow ? "…" : "Unlink"}
+                          </Button>
+                        </span>
+                      );
+                    }
+                    return (
+                      <Button
+                        variant="small"
+                        disabled={linking !== null}
+                        title={
+                          act.kind === "attach"
+                            ? "Give this printer a Bambu Cloud path (last, after its LAN paths)"
+                            : "Add a Bambu printer for this device, watched over Bambu Cloud"
+                        }
+                        onClick={() => void link(d, true)}
+                      >
+                        {busyRow ? "…" : act.label}
+                      </Button>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}

@@ -25,6 +25,7 @@ futures-util = { workspace = true }
 
 # MQTT (Bambu LAN driver)
 rumqttc = { workspace = true }
+rustls-native-certs = "0.7"
 
 # TLS cert fingerprinting (TOFU pinning)
 sha2 = { workspace = true }

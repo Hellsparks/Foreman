@@ -1,5 +1,5 @@
 /** Pure helpers for Settings → Integrations → Bambu Cloud. */
-import type { BambuAccountView, CodeChannel } from "../api/bambu";
+import type { BambuAccountView, CodeChannel, DeviceRow } from "../api/bambu";
 import type { Tone } from "../ui/StatusChip";
 
 export interface StateChip {
@@ -37,7 +37,11 @@ export function stateChip(a: BambuAccountView): StateChip {
         tone: "bad",
         symbol: "✖",
         word: "Expired",
-        detail: a.token_expires_at ? `on ${fmtDate(a.token_expires_at)} — re-authenticate` : "re-authenticate",
+        detail: a.token_rejected_at
+          ? `Bambu refused the sign-in on ${fmtDate(a.token_rejected_at)} — re-authenticate`
+          : a.token_expires_at
+            ? `on ${fmtDate(a.token_expires_at)} — re-authenticate`
+            : "re-authenticate",
       };
     case "error":
       return { tone: "bad", symbol: "✖", word: "Error", detail: a.last_error };
@@ -64,6 +68,14 @@ export function removeWarning(a: BambuAccountView): string {
 /** Can this account's device list be fetched? */
 export function canListDevices(a: BambuAccountView): boolean {
   return a.has_token && a.state !== "expired";
+}
+
+/** What a device row offers: already a Foreman printer on this account, attach to the
+ *  printer with its serial, or create a printer. */
+export function deviceAction(d: DeviceRow): { kind: "linked" | "attach" | "create"; label: string } {
+  if (d.linked) return { kind: "linked", label: d.printer_name ?? "Linked" };
+  if (d.printer_id != null) return { kind: "attach", label: `Attach to ${d.printer_name ?? "printer"}` };
+  return { kind: "create", label: "Create printer" };
 }
 
 export function isSixDigits(s: string): boolean {
