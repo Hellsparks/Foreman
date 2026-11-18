@@ -72,8 +72,14 @@ pub async fn job_started(
     file_name: Option<&str>,
     queue_item: Option<&QueueItem>,
 ) -> Result<Job, AppError> {
+    // Fast path: already open and nothing new to add (a restart or a printer coming
+    // back online mid-print). The real guarantee is the database's: see below.
     if let Some(j) = repo::job::running_for_printer(pool, printer_id).await? {
-        return Ok(j);
+        let adds_file = j.file_id.is_none() && (file_id.is_some() || queue_item.is_some());
+        let adds_item = j.queue_item_id.is_none() && queue_item.is_some();
+        if !adds_file && !adds_item {
+            return Ok(j);
+        }
     }
     let snap = env
         .snapshots()
@@ -186,7 +192,7 @@ pub async fn job_started(
         Some(id) => env.thumb_url(id).await,
         None => None,
     };
-    let job = repo::job::open(
+    let (job, created) = repo::job::open_exclusive(
         pool,
         &NewJob {
             printer_id,
@@ -200,6 +206,14 @@ pub async fn job_started(
         },
     )
     .await?;
+    if !created {
+        // The other path opened it first (or won the race): we attached to its job.
+        info!(
+            job = job.id,
+            printer_id, "attached to the printer's open job"
+        );
+        return Ok(job);
+    }
     info!(job = job.id, printer_id, file = %job.file_name, reporter, "job started");
     emit(bus, printer_id, "started", job.id);
     Ok(job)
