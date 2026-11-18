@@ -21,4 +21,5 @@ pub mod spools;
 pub mod ssh;
 pub mod storage;
 pub mod terminal_ws;
+pub mod tracking;
 pub mod ws;

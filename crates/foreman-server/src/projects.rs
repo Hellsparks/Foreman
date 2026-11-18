@@ -314,10 +314,17 @@ pub struct Stock {
 
 impl Stock {
     pub async fn load(state: &AppState) -> Result<Self, AppError> {
-        let sm = state
-            .spoolman
-            .get()
-            .ok_or_else(|| AppError::NotImplemented("Spoolman is not running".into()))?;
+        let Some(sm) = state.tracking.spools() else {
+            // Tracking off: slots are plain named slots with nothing to pick from.
+            if !state.tracking.mode().tracks_spools() {
+                return Ok(Self {
+                    all: vec![],
+                    reserved: HashMap::new(),
+                    loaded: vec![],
+                });
+            }
+            return Err(AppError::NotImplemented("Spoolman is not running".into()));
+        };
         let all = spools::all(sm, false).await?;
         let res = inventory::reservations(
             &state.foreman_db.pool,
@@ -545,7 +552,7 @@ pub async fn create_project(
     }
     let t = &view.template;
     let due = check_date(&req.due_date)?;
-    if let Some(sm) = state.spoolman.get() {
+    if let Some(sm) = state.tracking.spools() {
         for s in &req.spools {
             if let Some(id) = s.spool_id {
                 spools::spool(sm, id).await?;
@@ -573,7 +580,7 @@ pub async fn create_project(
                 .spools
                 .iter()
                 .find(|x| slot_key(&x.key) == s.key)
-                .and_then(|x| x.spool_id);
+                .and_then(|x| state.tracking.keep_spool(x.spool_id));
             (s.key.clone(), s.label.clone(), s.hex.clone(), spool)
         })
         .collect();
@@ -768,7 +775,7 @@ pub async fn create_from_files(
         entries.push(pf);
     }
     let map = check_groups(&facts, &req.slots)?;
-    if let Some(sm) = state.spoolman.get() {
+    if let Some(sm) = state.tracking.spools() {
         for g in &req.slots {
             if let Some(id) = g.spool_id {
                 spools::spool(sm, id).await?;
@@ -816,7 +823,7 @@ pub async fn create_from_files(
                 slot_key(&g.key),
                 g.label.clone(),
                 clean_hex(&g.hex),
-                g.spool_id,
+                state.tracking.keep_spool(g.spool_id),
             )
         })
         .collect();
@@ -858,7 +865,7 @@ pub async fn manual_swap_colours(state: &AppState, file_id: i64) -> Option<usize
 pub fn manual_swaps_body(file: &str, colours: usize) -> serde_json::Value {
     serde_json::json!({
         "error": format!(
-            "{file} changes filament by hand ({colours} colours, M600): someone has to swap spools during the print. Send again with accept_manual_swaps to queue it anyway."
+            "{file} changes filament by hand ({colours} colours, M600): someone has to change filament during the print. Send again with accept_manual_swaps to queue it anyway."
         ),
         "code": "manual_swaps",
         "colours": colours,
@@ -1045,7 +1052,7 @@ pub async fn project(state: &AppState, id: i64) -> Result<ProjectView, AppError>
             grams,
         });
     }
-    let sm = state.spoolman.get();
+    let sm = state.tracking.spools();
     let (spool_list, reservations) = match sm {
         Some(sm) => {
             let all = spools::all(sm, false).await?;
@@ -1139,12 +1146,12 @@ pub struct ProjectSummary {
 }
 
 async fn currency_of(state: &AppState) -> Option<String> {
-    inventory::currency(state.spoolman.get()?).await.ok()
+    inventory::currency(state.tracking.spools()?).await.ok()
 }
 
 /// Filament cost of a project's finished prints, per slot spool's price per gram.
 async fn cost_used(state: &AppState, project_id: i64) -> Option<f64> {
-    let sm = state.spoolman.get()?;
+    let sm = state.tracking.spools()?;
     let jobs = repo::project::job_tools(&state.foreman_db.pool, project_id)
         .await
         .ok()?;
@@ -1201,7 +1208,7 @@ pub async fn list(state: &AppState) -> Result<Vec<ProjectSummary>, AppError> {
         }
         let mut swatches = Vec::new();
         for s in repo::project::slots(pool, r.id).await? {
-            let from_spool = match (state.spoolman.get(), s.spool_id) {
+            let from_spool = match (state.tracking.spools(), s.spool_id) {
                 (Some(sm), Some(id)) => spools::spool(sm, id).await.ok().and_then(|f| f.color_hex),
                 _ => None,
             };
@@ -1432,7 +1439,12 @@ pub async fn set_slot_spool(
 ) -> Result<(), AppError> {
     let pool = &state.foreman_db.pool;
     active(&repo::project::get_project(pool, project_id).await?)?;
-    let label = match (state.spoolman.get(), spool_id) {
+    if spool_id.is_some() && state.tracking.keep_spool(spool_id).is_none() {
+        return Err(AppError::InvalidInput(
+            "filament tracking is off: project slots have no spools".into(),
+        ));
+    }
+    let label = match (state.tracking.spools(), spool_id) {
         (Some(sm), Some(id)) => {
             let s = spools::spool(sm, id).await?;
             format!("#{} {}", s.id, s.name)

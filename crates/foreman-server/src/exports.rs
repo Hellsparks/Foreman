@@ -150,6 +150,86 @@ pub async fn orca_zip(
     ex::orca_zip(&fs)
 }
 
+/// Filaments as the Library's files know them (filament tracking Off): one per
+/// distinct material + colour across every sliced file, with the material's
+/// usual temperatures and density.
+pub async fn file_filaments(pool: &sqlx::SqlitePool) -> Result<Vec<ExportFilament>, AppError> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT m.tools_json FROM file_meta m JOIN library_entry e ON e.id = m.entry_id \
+         WHERE e.deleted_at IS NULL",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AppError::Database(e.to_string()))?;
+    let mut seen: Vec<(String, String)> = Vec::new();
+    for (json,) in rows {
+        let tools: Vec<foreman_core::domain::ToolUsage> =
+            serde_json::from_str(&json).unwrap_or_default();
+        for t in tools {
+            let Some(mat) = t
+                .material
+                .map(|m| m.trim().to_owned())
+                .filter(|m| !m.is_empty())
+            else {
+                continue;
+            };
+            let hex = t
+                .colour
+                .map(|c| c.trim_start_matches('#').to_ascii_uppercase())
+                .unwrap_or_default();
+            if !seen
+                .iter()
+                .any(|(m, c)| m.eq_ignore_ascii_case(&mat) && *c == hex)
+            {
+                seen.push((mat, hex));
+            }
+        }
+    }
+    seen.sort();
+    Ok(seen
+        .into_iter()
+        .enumerate()
+        .map(|(i, (mat, hex))| {
+            let base = materials::normalize_filament_type(&mat);
+            let info = materials::material_info(&base);
+            ExportFilament {
+                id: i as i64 + 1,
+                name: if hex.is_empty() {
+                    mat.clone()
+                } else {
+                    format!("{mat} #{hex}")
+                },
+                vendor: None,
+                material: Some(mat),
+                modifiers: vec![],
+                colours: if hex.is_empty() { vec![] } else { vec![hex] },
+                density: info.as_ref().map_or(1.24, |m| m.density),
+                diameter: 1.75,
+                extruder_temp: info.as_ref().map(|m| m.nozzle_temp),
+                bed_temp: info.as_ref().map(|m| m.bed_temp),
+                price: None,
+                weight: None,
+                orca_config: None,
+                hue_td: None,
+                owned: false,
+            }
+        })
+        .collect())
+}
+
+/// OrcaSlicer profiles for the Library's own materials and colours.
+pub async fn orca_zip_from_files(
+    pool: &sqlx::SqlitePool,
+) -> Result<(Vec<u8>, Vec<OrcaProfileInfo>), AppError> {
+    let fs = file_filaments(pool).await?;
+    if fs.is_empty() {
+        return Err(AppError::InvalidInput(
+            "no sliced file in the Library names a material yet".into(),
+        ));
+    }
+    ex::orca_zip(&fs)
+}
+
 pub async fn hueforge(
     sm: &Spoolman,
     ids: Option<&[i64]>,

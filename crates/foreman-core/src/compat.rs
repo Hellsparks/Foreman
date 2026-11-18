@@ -13,6 +13,7 @@ use crate::{
     driver::PrinterCapabilities,
     events::{AmsTray, PrinterState, PrinterStatus},
     filament::{self, LoadedSlot, SpoolFacts},
+    tracking::FilamentMode,
 };
 
 // ---------------------------------------------------------------------------
@@ -94,15 +95,38 @@ pub struct CompatResult {
 // ---------------------------------------------------------------------------
 
 /// Everything the compatibility check needs for one printer.
+#[derive(Clone)]
 pub struct PrinterSnapshot {
     pub printer: Printer,
     pub caps: Option<PrinterCapabilities>,
     pub status: Option<PrinterStatus>,
     /// Loaded spools per tool / slot (Klipper: Moonraker's active spool).
     pub loaded: Vec<LoadedSlot>,
+    /// Filament tracking mode; decides which verdicts exist.
+    pub mode: FilamentMode,
 }
 
 impl PrinterSnapshot {
+    /// What the engine may look at in this mode: without spool tracking it sees
+    /// no loaded spools and no AMS trays, so only file facts and printer state
+    /// decide.
+    fn for_mode(&self) -> std::borrow::Cow<'_, PrinterSnapshot> {
+        if self.mode.tracks_spools() {
+            return std::borrow::Cow::Borrowed(self);
+        }
+        let mut status = self.status.clone();
+        if let Some(s) = status.as_mut() {
+            s.ams_trays.clear();
+        }
+        std::borrow::Cow::Owned(PrinterSnapshot {
+            printer: self.printer.clone(),
+            caps: self.caps.clone(),
+            status,
+            loaded: vec![],
+            mode: self.mode,
+        })
+    }
+
     /// The printer tracks a loaded spool (Moonraker with a `[spoolman]` link).
     fn tracks_spools(&self) -> bool {
         self.loaded.iter().any(|s| s.writable)
@@ -159,6 +183,11 @@ fn worst(ms: impl Iterator<Item = FilamentMatch>) -> Option<FilamentMatch> {
 
 /// Filament match for a file on a printer, plus a short "what's loaded" note.
 fn filament_check(file: &FileMeta, snap: &PrinterSnapshot) -> (FilamentMatch, Option<String>) {
+    // Without spool tracking there is nothing to match, and the preset's spool
+    // hint means nothing either.
+    if !snap.mode.tracks_spools() {
+        return (FilamentMatch::Unknown, None);
+    }
     let tools: Vec<&ToolUsage> = file.tools.iter().filter(|t| t.material.is_some()).collect();
     let has_guess =
         file.tools.iter().any(|t| t.spool_id.is_some()) || file.suggested_spool_id.is_some();
@@ -219,8 +248,21 @@ fn filament_check(file: &FileMeta, snap: &PrinterSnapshot) -> (FilamentMatch, Op
 // Engine
 // ---------------------------------------------------------------------------
 
-/// Check one file against one printer.
+/// Check one file against one printer. The result's verdict is always one the
+/// snapshot's mode allows ([`FilamentMode::allows`]).
 pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
+    let view = snap.for_mode();
+    let r = check_view(file, &view);
+    debug_assert!(
+        snap.mode.allows(&r.verdict),
+        "{:?} in {:?}",
+        r.verdict,
+        snap.mode
+    );
+    r
+}
+
+fn check_view(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
     let p = &snap.printer;
     let name = p.name.clone();
     let id = p.id;
@@ -356,7 +398,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
             .to_owned()
     };
     match fil {
-        FilamentMatch::Mismatch => {
+        FilamentMatch::Mismatch if snap.mode.allows(&Verdict::Material) => {
             let reason = match &loaded_note {
                 Some(n) => format!("file wants {}; {n}", wanted()),
                 None => format!("{} not loaded", wanted()),
@@ -370,7 +412,7 @@ pub fn check(file: &FileMeta, snap: &PrinterSnapshot) -> CompatResult {
                 filament: fil,
             };
         }
-        FilamentMatch::Empty => {
+        FilamentMatch::Empty if snap.mode.allows(&Verdict::NoSpool) => {
             return CompatResult {
                 printer_id: id,
                 printer_name: name,
@@ -459,6 +501,8 @@ fn verdict_order(v: &Verdict) -> u8 {
 /// +3 material and colour, +2 material. 0 when nothing loaded is known.
 /// The fleet queue prefers the highest score.
 pub fn filament_score(file: &FileMeta, snap: &PrinterSnapshot) -> u32 {
+    let view = snap.for_mode();
+    let snap: &PrinterSnapshot = &view;
     let trays = snap
         .status
         .as_ref()
@@ -576,6 +620,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: None,
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Offline);
@@ -591,6 +636,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::TooBig);
@@ -605,6 +651,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
@@ -621,6 +668,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -636,6 +684,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Plate);
@@ -650,6 +699,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Printing)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Busy);
@@ -670,6 +720,7 @@ mod tests {
             caps: Some(make_caps(256.0, 256.0)),
             status: Some(status),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Material);
@@ -690,6 +741,7 @@ mod tests {
             caps: Some(make_caps(256.0, 256.0)),
             status: Some(status),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -703,6 +755,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Ready);
@@ -717,18 +770,21 @@ mod tests {
                 caps: None,
                 status: None,
                 loaded: vec![],
+                mode: FilamentMode::Full,
             },
             PrinterSnapshot {
                 printer: make_printer(2, "Idle"),
                 caps: Some(make_caps(120.0, 120.0)),
                 status: Some(make_status(PrinterState::Idle)),
                 loaded: vec![],
+                mode: FilamentMode::Full,
             },
             PrinterSnapshot {
                 printer: make_printer(3, "Printing"),
                 caps: Some(make_caps(120.0, 120.0)),
                 status: Some(make_status(PrinterState::Printing)),
                 loaded: vec![],
+                mode: FilamentMode::Full,
             },
         ];
         let results = check_all(&meta, &snaps);
@@ -750,6 +806,7 @@ mod tests {
             }),
             status: Some(make_status(PrinterState::Idle)),
             loaded: vec![],
+            mode: FilamentMode::Full,
         };
         let r = check(&meta, &snap);
         assert_eq!(r.verdict, Verdict::Nozzle);
@@ -786,6 +843,7 @@ mod tests {
             caps: Some(make_caps(120.0, 120.0)),
             status: Some(make_status(PrinterState::Idle)),
             loaded,
+            mode: FilamentMode::Full,
         }
     }
 
@@ -893,5 +951,76 @@ mod tests {
             r.reason
         );
         assert_eq!(r.quick_fix.as_deref(), Some("Load a fuller spool"));
+    }
+
+    fn off(mut snap: PrinterSnapshot) -> PrinterSnapshot {
+        snap.mode = FilamentMode::Off;
+        snap
+    }
+
+    #[test]
+    fn tracking_off_never_produces_a_spool_verdict_or_mentions_a_spool() {
+        let mut petg = make_meta();
+        petg.tools[0].material = Some("PETG".into());
+        petg.tools[0].spool_id = Some(9);
+        let mut low = make_meta();
+        low.tools[0].grams = Some(5000.0);
+        let mut tray_pla = make_status(PrinterState::Idle);
+        tray_pla.ams_trays = vec![AmsTray {
+            slot: 0,
+            color: None,
+            material: Some("PLA".into()),
+            remaining: None,
+        }];
+        let cases = [
+            (
+                petg.clone(),
+                idle_klipper(vec![klipper_slot(Some(pla_white(1, 800.0)))]),
+            ),
+            (make_meta(), idle_klipper(vec![klipper_slot(None)])),
+            (petg.clone(), idle_klipper(vec![])),
+            (
+                low,
+                idle_klipper(vec![klipper_slot(Some(pla_white(1, 30.0)))]),
+            ),
+            (
+                petg.clone(),
+                PrinterSnapshot {
+                    status: Some(tray_pla),
+                    ..idle_klipper(vec![])
+                },
+            ),
+        ];
+        for (meta, snap) in cases {
+            let full = check(&meta, &snap);
+            let r = check(&meta, &off(snap.clone()));
+            assert_eq!(
+                r.verdict,
+                Verdict::Ready,
+                "full was {:?}: {}",
+                full.verdict,
+                r.reason
+            );
+            assert!(FilamentMode::Off.policy().verdicts.contains(&r.verdict));
+            assert_eq!(r.filament, FilamentMatch::Unknown);
+            assert_eq!(r.quick_fix, None);
+            assert!(!r.reason.to_lowercase().contains("spool"), "{}", r.reason);
+            assert_eq!(filament_score(&meta, &off(snap)), 0);
+        }
+    }
+
+    #[test]
+    fn tracking_off_still_blocks_abrasive_files_from_file_metadata() {
+        let mut cf = make_meta();
+        cf.tools[0].material = Some("PETG-CF".into());
+        // A spool flagged non-abrasive no longer counts: the file decides.
+        let mut petg = pla_white(2, 800.0);
+        petg.material = Some("PETG".into());
+        petg.abrasive = false;
+        let snap = off(idle_klipper(vec![klipper_slot(Some(petg))]));
+        assert_eq!(check(&cf, &snap).verdict, Verdict::Nozzle);
+        let mut hardened = snap;
+        hardened.printer.hardened_nozzle = true;
+        assert_eq!(check(&cf, &hardened).verdict, Verdict::Ready);
     }
 }

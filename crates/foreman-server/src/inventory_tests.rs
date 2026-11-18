@@ -17,7 +17,7 @@ use crate::{
 };
 
 fn sm(state: &AppState) -> &Spoolman {
-    state.spoolman.get().expect("spoolman")
+    state.tracking.store().expect("spoolman")
 }
 
 async fn filament_of(sm: &Spoolman, spool: i64) -> i64 {

@@ -391,6 +391,27 @@ pub async fn set_slot_spool(
     )
 }
 
+/// Slots with a spool assigned: (slots, projects).
+pub async fn count_slot_spools(pool: &SqlitePool) -> Result<(i64, i64), AppError> {
+    sqlx::query_as(
+        "SELECT COUNT(*), COUNT(DISTINCT project_id) FROM project_slot WHERE spool_id IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(db)
+}
+
+/// Drop every slot's spool assignment (filament tracking turned off).
+pub async fn clear_slot_spools(pool: &SqlitePool) -> Result<u64, AppError> {
+    Ok(
+        sqlx::query("UPDATE project_slot SET spool_id = NULL WHERE spool_id IS NOT NULL")
+            .execute(pool)
+            .await
+            .map_err(db)?
+            .rows_affected(),
+    )
+}
+
 pub async fn set_status(pool: &SqlitePool, id: i64, status: &str) -> Result<(), AppError> {
     let closed = (status != "active").then(now);
     sqlx::query("UPDATE project SET status = ?, closed_at = ? WHERE id = ?")

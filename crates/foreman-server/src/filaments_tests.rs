@@ -21,7 +21,7 @@ async fn ready() -> (tempfile::TempDir, Router, AppState, String) {
 }
 
 fn sm(state: &AppState) -> &Spoolman {
-    state.spoolman.get().expect("spoolman")
+    state.tracking.store().expect("spoolman")
 }
 
 /// Spoolman extra value → decoded JSON.

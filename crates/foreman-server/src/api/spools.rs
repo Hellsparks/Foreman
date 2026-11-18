@@ -44,11 +44,17 @@ pub(crate) fn err(e: AppError) -> ApiErr {
     (status, Json(json!({ "error": e.to_string() })))
 }
 
+/// Spoolman for the spool and filament routes; 503 while tracking is Off.
 pub(crate) fn sm(state: &AppState) -> Result<&Spoolman, ApiErr> {
-    state.spoolman.get().ok_or_else(|| {
+    state.tracking.spools().ok_or_else(|| {
+        let msg = if state.tracking.mode().tracks_spools() {
+            "Spoolman is not running"
+        } else {
+            "filament tracking is off (Settings → Filament)"
+        };
         (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({ "error": "Spoolman is not running" })),
+            Json(json!({ "error": msg })),
         )
     })
 }
@@ -204,7 +210,7 @@ pub async fn list(
 
 /// `GET /api/spools/loaded`.
 pub async fn loaded(State(state): State<AppState>) -> Result<Json<Vec<LoadedSlot>>, ApiErr> {
-    let sm = state.spoolman.get();
+    let sm = state.tracking.spools();
     spools::all_slots(&state.foreman_db.pool, &state.driver_manager, sm)
         .await
         .map(Json)
@@ -218,7 +224,7 @@ pub async fn printer_slots(
 ) -> Result<Json<Vec<LoadedSlot>>, ApiErr> {
     let p = printer(&state, id).await?;
     Ok(Json(
-        spools::slots_for(&state.driver_manager, state.spoolman.get(), &p).await,
+        spools::slots_for(&state.driver_manager, state.tracking.spools(), &p).await,
     ))
 }
 
@@ -427,7 +433,7 @@ pub async fn unload(
 ) -> Result<Json<LoadedSlot>, ApiErr> {
     let p = printer(&state, id).await?;
     let drivers = &state.driver_manager;
-    let sm = state.spoolman.get();
+    let sm = state.tracking.spools();
     let slot = spools::slots_for(drivers, sm, &p)
         .await
         .into_iter()

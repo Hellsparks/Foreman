@@ -249,7 +249,7 @@ async fn non_klipper_is_not_supported() {
 #[tokio::test]
 async fn shrinkage_round_trips_through_spoolman_extra_field() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     extra_field::ensure_foreman_defaults(&sm.db.pool, &sm.db.engine)
         .await
         .expect("fields");

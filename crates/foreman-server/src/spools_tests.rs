@@ -233,7 +233,7 @@ pub(crate) async fn setup() -> (tempfile::TempDir, Router, AppState, String) {
     let dir = tempfile::TempDir::new().expect("dir");
     let (router, state) = app(&dir, true).await;
     let sm = spoolman(&dir).await;
-    assert!(state.spoolman.set(sm).is_ok());
+    assert!(state.tracking.cell().set(sm).is_ok());
     let token = login(&router).await;
     (dir, router, state, token)
 }
@@ -295,7 +295,7 @@ async fn audit_lines(state: &AppState) -> Vec<String> {
 #[tokio::test]
 async fn load_and_unload_on_a_klipper_printer() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PLA", "1d1d22", 800.0).await;
     let pid = add_printer(&state, "HellV0", FirmwareKind::Moonraker).await;
     let mock = MockKlipper::new(Some(true));
@@ -376,7 +376,7 @@ async fn load_and_unload_on_a_klipper_printer() {
 #[tokio::test]
 async fn blocking_guard_needs_an_override_reason_and_is_audited() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PA12-CF", "2b2b2b", 480.0).await;
     let pid = add_printer(&state, "HellV0", FirmwareKind::Moonraker).await;
     let mock = MockKlipper::new(Some(true));
@@ -443,7 +443,7 @@ async fn blocking_guard_needs_an_override_reason_and_is_audited() {
 #[tokio::test]
 async fn low_spool_warns_but_loads_and_candidates_are_guarded() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let low = add_spool(sm, "PLA", "ffffff", 40.0).await;
     let ok = add_spool(sm, "PLA", "ffffff", 900.0).await;
     let cf = add_spool(sm, "PLA-CF", "000000", 900.0).await;
@@ -550,7 +550,7 @@ async fn job_need_comes_from_the_next_queued_job() {
 #[tokio::test]
 async fn loading_moves_a_spool_off_another_printer() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PETG", "ff0000", 700.0).await;
     let a = add_printer(&state, "Alpha", FirmwareKind::Moonraker).await;
     let b = add_printer(&state, "Beta", FirmwareKind::Moonraker).await;
@@ -590,7 +590,7 @@ async fn loading_moves_a_spool_off_another_printer() {
 #[tokio::test]
 async fn no_spoolman_link_or_offline_is_read_only() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PLA", "ffffff", 900.0).await;
     let pid = add_printer(&state, "NoLink", FirmwareKind::Moonraker).await;
     let mock = MockKlipper::new(None);
@@ -638,7 +638,7 @@ async fn no_spoolman_link_or_offline_is_read_only() {
 #[tokio::test]
 async fn bambu_trays_are_read_only_in_cloud_mode() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PLA", "ffffff", 900.0).await;
     let pid = add_printer(&state, "A1", FirmwareKind::Bambu).await;
     let status = PrinterStatus {
@@ -715,7 +715,7 @@ async fn bambu_trays_are_read_only_in_cloud_mode() {
 #[tokio::test]
 async fn compat_improves_with_a_loaded_spool() {
     let (_d, _app, state, _auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PLA", "fafafa", 800.0).await;
     let pid = add_printer(&state, "HellV0", FirmwareKind::Moonraker).await;
     let mock = MockKlipper::new(Some(true));
@@ -742,14 +742,14 @@ async fn compat_improves_with_a_loaded_spool() {
         .await
         .expect("p");
 
-    let snap = spools::snapshot(&state.driver_manager, Some(sm), printer.clone()).await;
+    let snap = spools::snapshot(&state.driver_manager, &state.tracking, printer.clone()).await;
     let before = compat::check(&meta, &snap);
     assert_eq!(before.verdict, Verdict::NoSpool, "{}", before.reason);
 
     spools::set_slot(&state.driver_manager, pid, 0, Some(sid))
         .await
         .expect("load");
-    let snap = spools::snapshot(&state.driver_manager, Some(sm), printer).await;
+    let snap = spools::snapshot(&state.driver_manager, &state.tracking, printer).await;
     let after = compat::check(&meta, &snap);
     assert_eq!(after.verdict, Verdict::Ready, "{}", after.reason);
     assert_eq!(after.filament, FilamentMatch::Colour);
@@ -763,7 +763,7 @@ async fn compat_improves_with_a_loaded_spool() {
 #[tokio::test]
 async fn edit_spool_fields() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let sid = add_spool(sm, "PLA", "ffffff", 900.0).await;
     let (s, v) = call(
         &app,

@@ -28,7 +28,7 @@ const REAL_FIXTURE: &str = "../spoolman-rs/tests/fixtures/real-spoolman-2026-04-
 async fn server(dir: &tempfile::TempDir, first: bool) -> (Router, AppState, String) {
     let (router, state) = app(dir, first).await;
     let sm = spoolman(dir).await;
-    assert!(state.spoolman.set(sm).is_ok());
+    assert!(state.tracking.cell().set(sm).is_ok());
     let token = login(&router).await;
     (router, state, token)
 }
@@ -90,7 +90,7 @@ fn sha(path: &Path) -> String {
 }
 
 async fn live_counts(state: &AppState) -> sm_import::Counts {
-    sm_import::counts(&state.spoolman.get().expect("sm").db)
+    sm_import::counts(&state.tracking.store().expect("sm").db)
         .await
         .expect("counts")
 }
@@ -306,7 +306,7 @@ async fn old_revision_file_is_detected_migrated_and_imported() {
     assert_eq!(sha(&file), before, "the user's file is never changed");
 
     // Rows come back through the Spoolman API path with ids kept.
-    let sm = s.spoolman.get().expect("sm");
+    let sm = s.tracking.store().expect("sm");
     let spool = spoolman_rs::db::spool::find_by_id(&sm.db.pool, 7)
         .await
         .expect("spool 7");
@@ -430,7 +430,7 @@ async fn import_over_existing_data_needs_confirmation() {
     let file = dir.path().join("old.db");
     old_revision_db(&file).await;
     let (app, s, t) = server(&dir, true).await;
-    crate::spools_tests::add_spool(s.spoolman.get().expect("sm"), "ABS", "000000", 1000.0).await;
+    crate::spools_tests::add_spool(s.tracking.store().expect("sm"), "ABS", "000000", 1000.0).await;
     let (st, _) = call(
         &app,
         "POST",
@@ -624,7 +624,7 @@ async fn external_spoolman_by_url_is_copied_once() {
         (c.vendors, c.filaments, c.spools, c.archived_spools),
         (2, 3, 4, 1)
     );
-    let spool = spoolman_rs::db::spool::find_by_id(&s.spoolman.get().expect("sm").db.pool, 3)
+    let spool = spoolman_rs::db::spool::find_by_id(&s.tracking.store().expect("sm").db.pool, 3)
         .await
         .expect("spool 3");
     assert_eq!(spool.location.as_deref(), Some("Dry box"));

@@ -47,6 +47,7 @@ mod state;
 mod theme_files;
 #[cfg(test)]
 mod theme_files_tests;
+pub mod tracking;
 #[cfg(test)]
 mod transfer_tests;
 mod transfers;
@@ -59,7 +60,6 @@ use axum::{
 };
 use foreman_core::{db::ForemanDb, events::ServerEvent, repo};
 use spoolman_rs::{
-    api as spoolman_api,
     config::SpoolmanConfig,
     db::{extra_field, Db as SpoolmanDb},
     state::AppState as SpoolmanState,
@@ -316,6 +316,10 @@ pub async fn serve_with(
     );
 
     let spoolman = Arc::new(std::sync::OnceLock::new());
+    let tracking = Arc::new(tracking::Tracking::new(
+        tracking::load_mode(&foreman_db.pool).await?,
+        Arc::clone(&spoolman),
+    ));
     let scheduler = scheduler::Scheduler::new(
         foreman_db.pool.clone(),
         Arc::clone(&tx),
@@ -323,7 +327,7 @@ pub async fn serve_with(
             pool: foreman_db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
-            spoolman: Arc::clone(&spoolman),
+            tracking: Arc::clone(&tracking),
         }),
     );
     scheduler.spawn();
@@ -355,7 +359,7 @@ pub async fn serve_with(
         library,
         transfers,
         scheduler,
-        spoolman: Arc::clone(&spoolman),
+        tracking: Arc::clone(&tracking),
         data_dir: cfg.data_dir.clone(),
         drivers_enabled: cfg.drivers_enabled,
     };
@@ -391,7 +395,23 @@ pub async fn serve_with(
     let app = build_router(app_state.clone(), frontend_dist);
 
     let stop = tokio_util::sync::CancellationToken::new();
-    spawn_spoolman(&cfg, &spoolman, stop.clone()).await;
+    tracking.set_shutdown(stop.clone());
+    spawn_spoolman(&cfg, &spoolman).await;
+    match tracking::serve_api(&app_state.foreman_db.pool, tracking.mode()).await {
+        Ok(true) if spoolman.get().is_some() => {
+            info!(
+                "Spoolman-compatible API is unauthenticated by design (Moonraker and slicers expect that)"
+            );
+            if let Err(e) = tracking.serve_api(true).await {
+                warn!("spoolman-rs API: {e}");
+            }
+        }
+        Ok(_) => info!(
+            mode = tracking.mode().as_str(),
+            "Spoolman API not served (Settings → Filament)"
+        ),
+        Err(e) => warn!("filament.serve_api: {e}"),
+    }
 
     if let Some(outcome) = restore_outcome {
         api::backup::report_restore(&app_state, outcome).await;
@@ -477,6 +497,7 @@ pub async fn serve_with(
     // checkpoints its WAL before the process goes away.
     stop.cancel();
     app_state.foreman_db.pool.close().await;
+    let _ = tracking.serve_api(false).await;
     if let Some(sm) = spoolman.get() {
         sm.db.pool.close().await;
     }
@@ -708,59 +729,24 @@ pub async fn restore_cli(cfg: config::ServerConfig, file: PathBuf) -> anyhow::Re
     }
 }
 
-/// The Spoolman-compatible API on its own port (default 7912).
-async fn spawn_spoolman(
-    cfg: &config::ServerConfig,
-    shared: &std::sync::OnceLock<SpoolmanState>,
-    stop: tokio_util::sync::CancellationToken,
-) {
+/// Connect the built-in Spoolman database (its API is started separately, see
+/// [`tracking::Tracking::serve_api`]).
+async fn spawn_spoolman(cfg: &config::ServerConfig, shared: &std::sync::OnceLock<SpoolmanState>) {
     if !cfg.spoolman_enabled {
         return;
     }
-    info!(
-        "Spoolman-compatible API is unauthenticated by design (Moonraker and slicers expect that)"
-    );
     match SpoolmanConfig::from_env() {
-        Ok(spoolman_cfg) => {
-            let spoolman_addr: SocketAddr = format!("{}:{}", spoolman_cfg.host, spoolman_cfg.port)
-                .parse()
-                .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 7912)));
-            match SpoolmanDb::connect(&spoolman_cfg).await {
-                Ok(db) => {
-                    if let Err(e) = extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await
-                    {
-                        warn!("could not create Foreman default extra fields: {e}");
-                    }
-                    let state = SpoolmanState::new(db, spoolman_cfg.clone());
-                    // The job engine deducts filament through the same DB + events.
-                    let _ = shared.set(state.clone());
-                    let spoolman_router =
-                        spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
-                    match tokio::net::TcpListener::bind(spoolman_addr).await {
-                        Ok(spoolman_listener) => {
-                            info!(%spoolman_addr, "spoolman-rs API listening");
-                            tokio::spawn(async move {
-                                if let Err(e) = axum::serve(spoolman_listener, spoolman_router)
-                                    .with_graceful_shutdown(stop.cancelled_owned())
-                                    .await
-                                {
-                                    tracing::error!("spoolman-rs server error: {e}");
-                                }
-                            });
-                        }
-                        Err(e) => {
-                            warn!("could not bind spoolman-rs to {spoolman_addr}: {e}");
-                        }
-                    }
+        Ok(spoolman_cfg) => match SpoolmanDb::connect(&spoolman_cfg).await {
+            Ok(db) => {
+                if let Err(e) = extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await {
+                    warn!("could not create Foreman default extra fields: {e}");
                 }
-                Err(e) => {
-                    warn!("spoolman-rs database connect failed: {e}");
-                }
+                // The job engine deducts filament through the same DB + events.
+                let _ = shared.set(SpoolmanState::new(db, spoolman_cfg));
             }
-        }
-        Err(e) => {
-            warn!("spoolman-rs config error (spoolman-rs disabled): {e}");
-        }
+            Err(e) => warn!("spoolman-rs database connect failed: {e}"),
+        },
+        Err(e) => warn!("spoolman-rs config error (spoolman-rs disabled): {e}"),
     }
 }
 
@@ -1039,6 +1025,14 @@ fn api_routes() -> Router<AppState> {
         .route("/api/swatch/fit", post(api::exports::swatch_fit))
         .route("/api/swatch/stl", post(api::exports::swatch_stl))
         .route("/api/swatch/batch", post(api::exports::swatch_batch))
+        .route(
+            "/api/settings/filament",
+            get(api::tracking::get_settings).put(api::tracking::put_settings),
+        )
+        .route(
+            "/api/settings/filament/preview",
+            get(api::tracking::get_preview),
+        )
         .route("/api/maintenance", get(api::maintenance::overview))
         .route(
             "/api/maintenance/settings",
