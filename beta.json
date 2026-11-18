@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "notes": "Foreman 0.1.0 — first release: headless server (archives, .deb, Docker) and desktop app (Windows, Linux AppImage/.deb/.rpm) with signed updates.\n\nFull notes: https://github.com/Hellsparks/Foreman/releases/tag/v0.1.0",
+  "pub_date": "2026-11-18T16:38:10Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRW8rWWdrU09TcDg3bFc0bUs2WC9iRzlYcGNweHR6Sk10cCtPUW4xeWZnSVRZM2hmY2ZkdFQ2bDh5b1Z4OVlTRlFNdmorWFRDcXFNZi85N3lVS1liMmdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5ODIwCWZpbGU6Rm9yZW1hbl8wLjEuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjAKWUwwbm16aWMwUjB2TFpUbnRISUQ0V2llR0JMRTZGY0IyVnhjLzNuTGlIQlRyK2FPbmRoMWcxa21nM1pyUTFiR1hEOFpwUnBUSzdrOXRhUGdOMnZHRGc9PQo=",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_windows_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRW8rWWdrU09TcDg3bFc0bUs2WC9iRzlYcGNweHR6Sk10cCtPUW4xeWZnSVRZM2hmY2ZkdFQ2bDh5b1Z4OVlTRlFNdmorWFRDcXFNZi85N3lVS1liMmdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5ODIwCWZpbGU6Rm9yZW1hbl8wLjEuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4xLjAKWUwwbm16aWMwUjB2TFpUbnRISUQ0V2llR0JMRTZGY0IyVnhjLzNuTGlIQlRyK2FPbmRoMWcxa21nM1pyUTFiR1hEOFpwUnBUSzdrOXRhUGdOMnZHRGc9PQo=",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_windows_x64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRW9pNzVldkVLM3JPazBrdzNRN083QWVwU3JTVW9tc0JJb3lxQVhHR1VLN3pKWjNSL0IrWCtNYWJLdXRLNXN0aGkzVkFTNkVPM2d3VFVSV0JzT0x3WFFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NjczCWZpbGU6Rm9yZW1hbl8wLjEuMF9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjAuMS4wCkMxa2d5ZDd1Q3ZJQlFVb1A0YnBwOGxsTkJWTFVjc2ZNaEhTSDNWYkswYlNML0hHaDIvRDVVcnUzbXVRYzJ3SWU1WnltclNqL2lWdFRDYzU2QU1kVURRPT0K",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_x86_64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRW9pNzVldkVLM3JPazBrdzNRN083QWVwU3JTVW9tc0JJb3lxQVhHR1VLN3pKWjNSL0IrWCtNYWJLdXRLNXN0aGkzVkFTNkVPM2d3VFVSV0JzT0x3WFFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NjczCWZpbGU6Rm9yZW1hbl8wLjEuMF9hbWQ2NC5BcHBJbWFnZQl2ZXJzaW9uOjAuMS4wCkMxa2d5ZDd1Q3ZJQlFVb1A0YnBwOGxsTkJWTFVjc2ZNaEhTSDNWYkswYlNML0hHaDIvRDVVcnUzbXVRYzJ3SWU1WnltclNqL2lWdFRDYzU2QU1kVURRPT0K",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_x86_64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRWdaY1dPTGtialM3WDMvbSs0QTNPWFJJVklWZnN6NFRCY01uSDV4S0ZXUEV6ZDhCS0FlZTdNdnVSL0JBQ1MyNXBMMS9PVTNuS0pPaXlLOGpwZWI4V0FjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NjczCWZpbGU6Rm9yZW1hbl8wLjEuMF9hbWQ2NC5kZWIJdmVyc2lvbjowLjEuMApRTnVsZUxrY3FuTHJQa0cwenBRd21VVUtKZFFQcjZGNFlQZlI4eHlOSE5FK0w2ckkralA5U2JDaE05QUZPMThUeG1sWDdNTjZwNzhiZzdpL3M4OFZCZz09Cg==",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRW5lb0d0ZHRxWGhwYVVPSVNvL2ZZYmtOS3RYOU5IWXdpaXA4UlowY3JWREkycFNQbHVxeSt2dG1KNzlUNmJZMlptMk01OTV5Tzh4cVlTS2tvY0pPclFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NjczCWZpbGU6Rm9yZW1hbi0wLjEuMC0xLng4Nl82NC5ycG0JdmVyc2lvbjowLjEuMAo0bDF5M1J3cHZqN1ZCZEkwbStmc2ZzL01PUjFRVTZweXZyYVRod3NTSXJOVmNpblQ3dVYyM0VocmFmLzl6TlMyeC8xem9NZDYwMWwyT3h4WmpIQ21CUT09Cg==",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_x86_64.rpm"
+    },
+    "linux-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRXFRellITEFXczVJRkpSLzJnd3hXbWY0Y2pHd25YZ1BJZitGUjVWZVhTd05lTWxsRmJEaTVyM2k1bFVNeFZIeko4RitISUdQRDdjb2RjVW9wVktLZ0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NTUyCWZpbGU6Rm9yZW1hbl8wLjEuMF9hYXJjaDY0LkFwcEltYWdlCXZlcnNpb246MC4xLjAKQ3ozaVlxbktWWitlZnQwQUx3aU1Jb1IvRzNYT1FTYjZRWHYwTG15TFhaYzdrSm5tN1BQZWpsQTNjN0s2UVNFdmtyTHVjL1RpaDgzd2hwTU1mSE81Q1E9PQo=",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_aarch64.AppImage"
+    },
+    "linux-aarch64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRXFRellITEFXczVJRkpSLzJnd3hXbWY0Y2pHd25YZ1BJZitGUjVWZVhTd05lTWxsRmJEaTVyM2k1bFVNeFZIeko4RitISUdQRDdjb2RjVW9wVktLZ0FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NTUyCWZpbGU6Rm9yZW1hbl8wLjEuMF9hYXJjaDY0LkFwcEltYWdlCXZlcnNpb246MC4xLjAKQ3ozaVlxbktWWitlZnQwQUx3aU1Jb1IvRzNYT1FTYjZRWHYwTG15TFhaYzdrSm5tN1BQZWpsQTNjN0s2UVNFdmtyTHVjL1RpaDgzd2hwTU1mSE81Q1E9PQo=",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_aarch64.AppImage"
+    },
+    "linux-aarch64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRWd6a0x0ejVvYUhoNlNBZCttZjRaeHBIWVRSRlVxSzVtdjh0MHI4UnRXRkZKSlBlVy9VaWdiTGQvaldFN3VFQnVhTzhyMHFMUnhIeFQzUDFLajEzcGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NTUyCWZpbGU6Rm9yZW1hbl8wLjEuMF9hcm02NC5kZWIJdmVyc2lvbjowLjEuMApGbW1qQldPWlJnZzI5RWg4d2VVck9CWEhydVdyb3RmdWRrMUZpUklBMGxVbGJISU9IR0tUZnc1YWMyMTRwQXYvb1grVlZIeDdTWkY0ZUNoVWtKbDBDQT09Cg==",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_arm64.deb"
+    },
+    "linux-aarch64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRZC9tT1Zzc2dWRXZVbHFROVhGL2hWVTVqaVM4M2p2dWZnNExMTVJRNnRacTR6WlVOMkNrRVJTTHdIMFNOR2h6ZDFGWmJZN1NabHhadjMrT2Y4WVRISU1BbytOaW9zeHdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE5NTUyCWZpbGU6Rm9yZW1hbi0wLjEuMC0xLmFhcmNoNjQucnBtCXZlcnNpb246MC4xLjAKRGxTcDd1TmptQjhOR1QrRUZVekdVd040bmViV24vUlUxQXFGaFE4ODY0bTdtdFBVZVMwTDJ4SWdEMGF4ZVRvSDJZaElaK0w5RFhtN3hUMTB2NHJ2QUE9PQo=",
+      "url": "https://github.com/Hellsparks/Foreman/releases/download/v0.1.0/Foreman_0.1.0_linux_aarch64.rpm"
+    }
+  }
+}
