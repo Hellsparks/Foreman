@@ -522,8 +522,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # --global: the commit below happens in a fresh clone/init under $dir, not this checkout.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           dir=$(mktemp -d)
           if git ls-remote --exit-code --heads origin update-channels >/dev/null; then
             git clone --quiet --depth 1 --branch update-channels \
