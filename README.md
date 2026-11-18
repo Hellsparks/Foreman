@@ -96,6 +96,7 @@ with *publish* off, or `gh workflow run release.yml -f version=0.4.0-rc.1`.
 | `*.sig`, `latest.json` | Updater signatures and manifest |
 | `foreman-server_<v>_{amd64,arm64}.deb` | Headless server as a systemd service |
 | `foreman-server-{x86_64,aarch64}-unknown-linux-gnu.tar.xz` (+ `.sha256`) | Headless server binary + web UI (built with dist) |
+| `foreman-server-x86_64-pc-windows-msvc.zip` (+ `.sha256`) | Headless server for Windows: `foreman-server.exe` + web UI |
 | `SHA256SUMS` | Checksums of every file |
 | `ghcr.io/hellsparks/foreman:<v>` | Docker image, linux/amd64 + linux/arm64 (`latest` = newest full release) |
 
@@ -162,6 +163,15 @@ WantedBy=multi-user.target
 
 Then `sudo systemctl enable --now foreman` and `journalctl -u foreman` for the setup
 code. No `FOREMAN__HOST` is needed.
+
+### Windows (archive)
+
+Unzip `foreman-server-x86_64-pc-windows-msvc.zip` and keep `foreman-server.exe` and its
+`frontend\` folder together. Run `foreman-server.exe`; the setup code is printed in its
+window. It is not a Windows service: to start it at boot with nobody signed in, add a
+Task Scheduler task ("At startup", "Run whether user is logged on or not"). For a
+server that runs while you're signed in, the desktop installer (tray, keep running,
+start with the computer) is simpler.
 
 ### Firewall
 
