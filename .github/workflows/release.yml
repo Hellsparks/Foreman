@@ -135,8 +135,15 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04-arm
             deb_arch: arm64
+          # Headless server zip for Windows (no .deb; the desktop installer also embeds the server).
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            deb_arch: ""
     env:
       VERSION: ${{ needs.plan.outputs.version }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -172,21 +179,30 @@ jobs:
           cp -r frontend/dist target/release-web/frontend
 
       - name: Install dist and cargo-deb
+        if: runner.os == 'Linux'
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/axodotdev/cargo-dist/releases/download/v${DIST_VERSION}/cargo-dist-installer.sh" | sh
           cargo install cargo-deb --version "$CARGO_DEB_VERSION" --locked
 
+      - name: Install dist (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm "https://github.com/axodotdev/cargo-dist/releases/download/v$env:DIST_VERSION/cargo-dist-installer.ps1" | iex
+
       - name: Archive (dist)
         run: dist build --tag "v$VERSION" --artifacts=local --target "${{ matrix.target }}"
 
       - name: Debian package (cargo-deb)
+        if: runner.os == 'Linux'
         run: |
           cargo deb -p foreman-server --no-build --profile dist --target "${{ matrix.target }}" \
             --output "target/distrib/foreman-server_${VERSION}_${{ matrix.deb_arch }}.deb"
           dpkg-deb --info "target/distrib/foreman-server_${VERSION}_${{ matrix.deb_arch }}.deb"
 
       - name: Smoke test the archive
+        if: runner.os == 'Linux'
         run: |
           d=$(mktemp -d)
           tar -xJf "target/distrib/foreman-server-${{ matrix.target }}.tar.xz" -C "$d"
@@ -199,12 +215,34 @@ jobs:
           curl -fsS http://127.0.0.1:19090/ | grep -o '<title>[^<]*</title>'
           kill %1
 
+      - name: Smoke test the archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $d = Join-Path $env:RUNNER_TEMP 'smoke'
+          Expand-Archive "target/distrib/foreman-server-${{ matrix.target }}.zip" -DestinationPath $d
+          Get-ChildItem -Recurse $d | Select-Object -First 20 FullName
+          $bin = (Get-ChildItem -Recurse $d -Filter foreman-server.exe | Select-Object -First 1).FullName
+          $env:FOREMAN__DATA_DIR = "$d\data"; $env:FOREMAN__PORT = '19090'; $env:FOREMAN__SPOOLMAN_ENABLED = 'false'
+          $p = Start-Process $bin -PassThru -NoNewWindow -RedirectStandardOutput "$d\out.log" -RedirectStandardError "$d\err.log"
+          $h = $null
+          for ($i = 0; $i -lt 30 -and -not $h; $i++) {
+            try { $h = Invoke-RestMethod http://127.0.0.1:19090/api/health } catch { Start-Sleep 1 }
+          }
+          if (-not $h) { Get-Content "$d\out.log", "$d\err.log"; throw 'server did not answer /api/health' }
+          $h | ConvertTo-Json -Compress
+          if ($h.version -ne $env:VERSION) { throw "version $($h.version) != $env:VERSION" }
+          $page = (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:19090/).Content
+          if ($page -notmatch '<title>[^<]*</title>') { throw 'no web UI at /' }
+          $Matches[0]
+          Stop-Process -Id $p.Id
+
       - uses: actions/upload-artifact@v4
         with:
           name: server-${{ matrix.target }}
           path: |
-            target/distrib/foreman-server-${{ matrix.target }}.tar.xz
-            target/distrib/foreman-server-${{ matrix.target }}.tar.xz.sha256
+            target/distrib/foreman-server-${{ matrix.target }}.*
             target/distrib/foreman-server_*.deb
           if-no-files-found: error
 
@@ -522,8 +560,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # --global: the commit below happens in a fresh clone/init under $dir, not this checkout.
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           dir=$(mktemp -d)
           if git ls-remote --exit-code --heads origin update-channels >/dev/null; then
             git clone --quiet --depth 1 --branch update-channels \

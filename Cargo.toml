@@ -121,7 +121,8 @@ ci = "github"
 # No installers: dist's shell installer copies only the binary, and the server
 # needs its frontend/ folder beside it. The .deb and Docker image cover installs.
 installers = []
-targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+windows-archive = ".zip"
 # .github/workflows/release.yml is hand-written (it also builds the desktop app,
 # the .deb and the Docker image); dist builds the server archives inside it.
 allow-dirty = ["ci"]

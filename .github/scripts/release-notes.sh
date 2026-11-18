@@ -53,6 +53,7 @@ printf '%s\n\nFull notes: %s/releases/tag/%s\n' "$summary" "$repo_url" "$tag" >"
 | Linux desktop (x86_64 / ARM64) | \`Foreman_${version}_linux_x86_64.AppImage\`, \`.deb\`, \`.rpm\` (and the \`aarch64\` / \`arm64\` ones) |
 | Headless server, Debian/Ubuntu/Raspberry Pi OS | \`foreman-server_${version}_amd64.deb\` / \`_arm64.deb\`: systemd service \`foreman\` on port 9090, data in \`/var/lib/foreman\` |
 | Headless server, any Linux | \`foreman-server-x86_64-unknown-linux-gnu.tar.xz\` / \`aarch64\`: binary + \`frontend/\` folder, keep them together |
+| Headless server, Windows (x64) | \`foreman-server-x86_64-pc-windows-msvc.zip\`: \`foreman-server.exe\` + \`frontend/\` folder, keep them together |
 | Docker (amd64 / arm64) | \`docker run -d -p 9090:9090 -p 7912:7912 -v foreman-data:/data ghcr.io/hellsparks/foreman:${version}\` |
 
 The desktop app updates itself from Settings → About. Every installer is signed for
