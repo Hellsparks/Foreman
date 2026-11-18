@@ -203,3 +203,17 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **Ambiguous column in ORDER BY across JOINs:** Unqualified sort columns (e.g. `id`) in multi-table JOINs trigger "ambiguous column name". Fix: `qualify_sort()` helper maps bare column names to qualified names (e.g. `id` → `s.id`) before `order_by_sql()`.
 
 **SQLite BOOLEAN NULL default for spool:** The `archived` column has no DEFAULT in the schema, so new spools without an explicit `archived` value are stored as NULL. The `archived = 0` filter then excludes them. Fix: default `archived` to `0` in the spool create function (matching upstream Spoolman's Python model default of `False`).
+
+### Doc 07 §A (filament tracking optional) — 2026-11-18
+
+**No "Colour" verdict exists.** Doc 07 lists Colour, Material and No spool as the verdicts Off drops. `compat::Verdict` has only `Material` and `NoSpool`; colour is a `FilamentMatch` level on the result, not a verdict. Off drops those two verdicts (`FilamentMode::policy().verdicts`) and reports `FilamentMatch::Unknown` for every file.
+
+**No "profile match levels" in the engine.** The compat engine has no slicer-profile match levels to keep. The only match levels are `FilamentMatch`, which are spool and tray based and are always `Unknown` in Off.
+
+**No spool Attention items exist yet.** There is no runout-to-load-spool or low-spool Attention kind to switch off; "paused" and "error" come from the printer and are unchanged.
+
+**External = Full after the import.** External tracks spools exactly as Full; the one-time import is the existing Setup → Filament data flow. Its Spoolman API default is on, as in Full.
+
+**Spoolman API switch on a mode change.** The switch defaults to the mode (on in Full/External, off in Off) only while it has never been set. The first mode change pins it to its current value, so an existing install that turns tracking Off keeps answering on 7912 (doc 07: "silently dropping that is worse"), and the confirm text says so. The setup wizard's "No filament tracking" choice sets Off with the API off, since nothing points at a fresh install yet. The listener now starts and stops live (`Tracking::serve_api`), not only at startup.
+
+**Settings → Filament names Spoolman.** With tracking Off, the only UI text that mentions Spoolman is the Settings → Filament section itself (the Full/External descriptions and the API switch).
