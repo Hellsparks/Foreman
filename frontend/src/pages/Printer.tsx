@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
-import { api } from "../api/client";
+import { api, viaPath } from "../api/client";
 import type { PrinterWithStatus, PrinterCapabilities, MacroFavourite, PrinterPath, PathTestResult } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
 import type { ShellContext } from "../shell/Shell";
@@ -10,9 +10,11 @@ import { createPortal } from "react-dom";
 import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import PrinterSpoolsTab from "../filament/PrinterSpoolsTab";
+import { useFilament } from "../filament/policy";
 import { QueueBoard, useQueueBoard } from "./QueueBoard";
 import { PrinterServiceTab } from "./Service";
 import { JobsHistory } from "./JobsHistory";
+import { CloudHistoryPanel } from "../integrations/CloudHistory";
 import type { SshSettingsHandle } from "./PrinterFiles";
 import type { Tone } from "../ui/StatusChip";
 import { useSignedUrl } from "../hooks/useSignedUrl";
@@ -60,6 +62,8 @@ const BABY_STEPS = [-0.05, -0.01, 0.01, 0.05];
 const EXT_LENGTHS = [10, 25, 50, 100];
 const EXT_SPEEDS = [2, 5, 10];
 const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Terminal", "Config"] as const;
+/** Tabs that exist only while spools are tracked (doc 07 §A). */
+const SPOOL_TABS: readonly string[] = ["Spools"];
 const DEFAULT_PRESETS = [
   { label: "PLA",  nozzle: 215, bed: 60 },
   { label: "PETG", nozzle: 245, bed: 85 },
@@ -133,6 +137,7 @@ export default function Printer() {
 
   // Tab
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Live");
+  const filament = useFilament();
   const [visited, setVisited] = useState<Set<string>>(() => new Set(["Live"]));
   useEffect(() => {
     setVisited((v) => (v.has(activeTab) ? v : new Set(v).add(activeTab)));
@@ -317,9 +322,13 @@ export default function Printer() {
             </button>
             <h1 className="printer-title__name">{printer.name}</h1>
             {fwTag && <span className="printer-header__fw">{fwTag}</span>}
-            {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
-              <span className="printer-header__via" style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}>
-                via {printer.active_path_name}
+            {viaPath(printer) && (
+              <span
+                className="printer-header__via"
+                title={printer.reach === "cloud" ? "Watched over Bambu Cloud: status only, can't send" : undefined}
+                style={{ color: "var(--fw-warning)", fontSize: 12, whiteSpace: "nowrap" }}
+              >
+                via {viaPath(printer)}
               </span>
             )}
             <StatusChip tone={statusTone(state)} symbol={statusSymbol(state)} word={statusWord(state)} />
@@ -329,7 +338,9 @@ export default function Printer() {
       <header className="printer-header">
         <EdgePanel side="left" label="Printer sections" storageKey="printer.sections">
         <div className="printer-tabs" role="tablist" aria-label="Printer sections" ref={tabsRef}>
-          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
+          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu")
+            .filter((t) => filament.spools || !SPOOL_TABS.includes(t))
+            .map((t) => (
             <button
               key={t}
               role="tab"
@@ -839,7 +850,7 @@ export default function Printer() {
       ) : activeTab === "Service" ? (
         <PrinterServiceTab printerId={printerId} />
       ) : activeTab === "History" ? (
-        <PrinterHistoryTab printerId={printerId} />
+        <PrinterHistoryTab printerId={printerId} cloudLinked={printer?.bambu_account_id != null} />
       ) : null}
 
       {/* Files and Terminal stay mounted once opened so SFTP state and the SSH shell survive tab switches. */}
@@ -897,10 +908,11 @@ function PrinterQueueTab({ printerId }: { printerId: number }) {
   );
 }
 
-function PrinterHistoryTab({ printerId }: { printerId: number }) {
+function PrinterHistoryTab({ printerId, cloudLinked }: { printerId: number; cloudLinked: boolean }) {
   const { toasts, addToast, removeToast } = useToasts();
   return (
     <div className="printer-tabfill" role="tabpanel" aria-label="History">
+      {cloudLinked && <CloudHistoryPanel printerId={printerId} />}
       <JobsHistory notify={addToast} fixedPrinterId={printerId} />
       <ToastStack toasts={toasts} onDismiss={removeToast} />
     </div>

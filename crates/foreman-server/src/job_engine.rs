@@ -32,6 +32,9 @@ use tracing::{info, warn};
 
 use crate::scheduler::SchedEnv;
 
+/// Reporter of a job recorded while filament tracking was Off: no deduction.
+pub const NO_REPORTER: &str = "none";
+
 /// Who reports this printer's filament use, given its setting and live link.
 pub fn resolve_reporter(snap: &PrinterSnapshot) -> &'static str {
     match snap.printer.usage_reporter {
@@ -72,8 +75,14 @@ pub async fn job_started(
     file_name: Option<&str>,
     queue_item: Option<&QueueItem>,
 ) -> Result<Job, AppError> {
+    // Fast path: already open and nothing new to add (a restart or a printer coming
+    // back online mid-print). The real guarantee is the database's: see below.
     if let Some(j) = repo::job::running_for_printer(pool, printer_id).await? {
-        return Ok(j);
+        let adds_file = j.file_id.is_none() && (file_id.is_some() || queue_item.is_some());
+        let adds_item = j.queue_item_id.is_none() && queue_item.is_some();
+        if !adds_file && !adds_item {
+            return Ok(j);
+        }
     }
     let snap = env
         .snapshots()
@@ -124,58 +133,67 @@ pub async fn job_started(
                 .collect()
         })
         .unwrap_or_default();
-    // A single-tool file whose preset names a Spoolman spool.
-    if let (Some(m), [t]) = (&meta, tools.as_mut_slice()) {
-        if t.spool_id.is_none() {
-            t.spool_id = m.suggested_spool_id;
+    if env.filament_mode().tracks_spools() {
+        // A single-tool file whose preset names a Spoolman spool.
+        if let (Some(m), [t]) = (&meta, tools.as_mut_slice()) {
+            if t.spool_id.is_none() {
+                t.spool_id = m.suggested_spool_id;
+            }
         }
-    }
-    // A project print draws each slot from the project's spool for it.
-    if let Some(plate) = queue_item.and_then(|q| q.project_plate_id) {
-        match crate::projects::plate_spools(pool).await {
-            Ok(map) => {
-                if let Some(m) = map.get(&plate) {
-                    for t in tools.iter_mut() {
-                        if let Some(sp) = m.get(&t.index) {
-                            t.spool_id = Some(*sp);
+        // A project print draws each slot from the project's spool for it.
+        if let Some(plate) = queue_item.and_then(|q| q.project_plate_id) {
+            match crate::projects::plate_spools(pool).await {
+                Ok(map) => {
+                    if let Some(m) = map.get(&plate) {
+                        for t in tools.iter_mut() {
+                            if let Some(sp) = m.get(&t.index) {
+                                t.spool_id = Some(*sp);
+                            }
                         }
                     }
                 }
+                Err(e) => warn!(printer_id, "project slot spools: {e}"),
             }
-            Err(e) => warn!(printer_id, "project slot spools: {e}"),
         }
-    }
-    // Moonraker's [spoolman] link tracks one active spool, so it can't report a
-    // job that uses several. Foreman deducts per slot instead, and Moonraker's
-    // active spool is released so the same filament isn't counted twice.
-    let multi = is_multi_slot(&tools);
-    if multi && reporter == "moonraker" {
-        reporter = "foreman";
-        match env.release_active_spool(printer_id).await {
-            Ok(()) => info!(
-                printer_id,
-                "multi-filament job: Foreman deducts per slot; Moonraker active spool released"
-            ),
-            Err(e) => warn!(
-                printer_id,
-                "multi-filament job: could not release Moonraker's active spool: {e}"
-            ),
+        // Moonraker's [spoolman] link tracks one active spool, so it can't report a
+        // job that uses several. Foreman deducts per slot instead, and Moonraker's
+        // active spool is released so the same filament isn't counted twice.
+        let multi = is_multi_slot(&tools);
+        if multi && reporter == "moonraker" {
+            reporter = "foreman";
+            match env.release_active_spool(printer_id).await {
+                Ok(()) => info!(
+                    printer_id,
+                    "multi-filament job: Foreman deducts per slot; Moonraker active spool released"
+                ),
+                Err(e) => warn!(
+                    printer_id,
+                    "multi-filament job: could not release Moonraker's active spool: {e}"
+                ),
+            }
         }
-    }
-    // Moonraker's active spool (recorded for history; it reports use itself).
-    if let Some(active) = snap
-        .as_ref()
-        .and_then(|s| s.caps.as_ref())
-        .and_then(|c| c.spoolman_spool_id)
-        .filter(|_| !multi)
-    {
-        match tools.first_mut() {
-            Some(t) if t.spool_id.is_none() => t.spool_id = Some(active),
-            None => tools.push(JobTool {
-                spool_id: Some(active),
-                ..Default::default()
-            }),
-            _ => {}
+        // Moonraker's active spool (recorded for history; it reports use itself).
+        if let Some(active) = snap
+            .as_ref()
+            .and_then(|s| s.caps.as_ref())
+            .and_then(|c| c.spoolman_spool_id)
+            .filter(|_| !multi)
+        {
+            match tools.first_mut() {
+                Some(t) if t.spool_id.is_none() => t.spool_id = Some(active),
+                None => tools.push(JobTool {
+                    spool_id: Some(active),
+                    ..Default::default()
+                }),
+                _ => {}
+            }
+        }
+    } else {
+        // Filament tracking is Off: the job keeps the file's grams for history
+        // and statistics, names no spool, and nothing is deducted.
+        reporter = NO_REPORTER;
+        for t in tools.iter_mut() {
+            t.spool_id = None;
         }
     }
     let name = file_name
@@ -186,7 +204,7 @@ pub async fn job_started(
         Some(id) => env.thumb_url(id).await,
         None => None,
     };
-    let job = repo::job::open(
+    let (job, created) = repo::job::open_exclusive(
         pool,
         &NewJob {
             printer_id,
@@ -200,6 +218,14 @@ pub async fn job_started(
         },
     )
     .await?;
+    if !created {
+        // The other path opened it first (or won the race): we attached to its job.
+        info!(
+            job = job.id,
+            printer_id, "attached to the printer's open job"
+        );
+        return Ok(job);
+    }
     info!(job = job.id, printer_id, file = %job.file_name, reporter, "job started");
     emit(bus, printer_id, "started", job.id);
     Ok(job)
@@ -331,6 +357,10 @@ pub async fn deduct_once(
             "deduction already claimed; not deducting again"
         );
         return Ok(());
+    }
+    if reporter == NO_REPORTER {
+        info!(job = job_id, "filament tracking off; nothing deducted");
+        return repo::job::finish_deduction(pool, job_id, &tools, "skipped").await;
     }
     if reporter != "foreman" && is_multi_slot(&tools) {
         // Never left to Moonraker: it tracks one spool. (job_started already

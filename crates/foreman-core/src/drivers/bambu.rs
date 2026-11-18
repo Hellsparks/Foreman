@@ -61,6 +61,44 @@ pub struct BambuConfig {
 // Serial → model mapping
 // ---------------------------------------------------------------------------
 
+/// TCP + TLS + CONNACK budget. rumqttc's default (5 s) is too tight for a printer on
+/// Wi-Fi with power save (the A1 answers ping in ~2 s) and for a debug build's TLS.
+pub(crate) const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+
+pub(crate) fn network_options() -> rumqttc::NetworkOptions {
+    let mut n = rumqttc::NetworkOptions::new();
+    n.set_connection_timeout(CONNECT_TIMEOUT.as_secs());
+    n
+}
+
+/// Capabilities the serial number alone tells (model, bed, enclosure, max temp).
+pub(crate) fn caps_from_serial(serial: &str, c: &mut PrinterCapabilities) {
+    let model = model_from_serial(serial);
+    c.printer_model = model.map(|s| s.to_owned());
+    if let Some(m) = model {
+        c.bed_size = bed_size_from_model(m);
+        c.enclosed = enclosed_from_model(m);
+        c.max_nozzle_temp = max_nozzle_temp_from_model(m);
+    }
+    c.extruder_count = 1;
+}
+
+/// `host` or `host:port` → (host, port). Port defaults to 8883 (Bambu LAN MQTT).
+pub fn mqtt_host_port(host: &str) -> (String, u16) {
+    let h = host.trim();
+    let h = h
+        .strip_prefix("mqtts://")
+        .or_else(|| h.strip_prefix("mqtt://"))
+        .unwrap_or(h);
+    match h.rsplit_once(':') {
+        Some((name, port)) if !name.contains(':') => match port.parse() {
+            Ok(p) => (name.to_owned(), p),
+            Err(_) => (h.to_owned(), 8883),
+        },
+        _ => (h.to_owned(), 8883),
+    }
+}
+
 /// Derive printer model from serial number prefix.
 pub fn model_from_serial(serial: &str) -> Option<&'static str> {
     if serial.len() < 3 {
@@ -130,9 +168,15 @@ fn parse_fan_percent(val: &Value) -> Option<u8> {
 // Cached state
 // ---------------------------------------------------------------------------
 
+/// The merged printer state. LAN and cloud reports have the same shape, so both
+/// paths feed this one parser ([`CachedStatus::merge_report`]).
 #[derive(Debug, Clone, Default)]
-struct CachedStatus {
+pub(crate) struct CachedStatus {
     state: PrinterState,
+    /// A report carried `gcode_state`. Until then `state` is only the default:
+    /// P1/A1 send deltas, so a subscriber that can't ask for `pushall` (cloud)
+    /// may not know whether the printer is printing.
+    pub(crate) state_known: bool,
     nozzle_actual: f64,
     nozzle_target: f64,
     bed_actual: f64,
@@ -158,7 +202,7 @@ struct CachedStatus {
 }
 
 impl CachedStatus {
-    fn to_printer_status(&self) -> PrinterStatus {
+    pub(crate) fn to_printer_status(&self) -> PrinterStatus {
         PrinterStatus {
             state: self.state.clone(),
             nozzle: Some(TempReading {
@@ -185,8 +229,39 @@ impl CachedStatus {
         }
     }
 
+    /// Take the print state from a status another path reported (the printer's
+    /// last known status), for a subscriber that has not seen `gcode_state` yet.
+    /// Later deltas move it on as usual.
+    pub(crate) fn seed_state(&mut self, st: &PrinterStatus) {
+        self.state = st.state.clone();
+        self.print_end = st.print_end;
+        if self.filename.is_none() {
+            self.filename = st.filename.clone();
+        }
+        if let Some(p) = st.progress {
+            self.progress = p;
+        }
+        self.layer = self.layer.or(st.layer);
+        self.total_layers = self.total_layers.or(st.total_layers);
+        self.remaining_time = self.remaining_time.or(st.remaining_time);
+        self.state_known = true;
+    }
+
+    /// Fill the capabilities a report can tell (nozzle, AMS size, camera).
+    pub(crate) fn update_caps(&self, c: &mut PrinterCapabilities) {
+        if let Some(d) = self.nozzle_diameter {
+            c.nozzle_diameter = Some(d);
+        }
+        if self.ams_count > 0 {
+            c.ams_slot_count = Some(self.ams_count * 4);
+        }
+        if self.has_camera == Some(true) {
+            c.camera_type = Some(if self.has_xcam { "ai" } else { "basic" }.to_owned());
+        }
+    }
+
     /// Merge a partial `print` report payload into this cached status.
-    fn merge_report(&mut self, print: &Value) {
+    pub(crate) fn merge_report(&mut self, print: &Value) {
         // HMS error codes — parse before gcode_state so FAILED can check them.
         if let Some(hms) = print.get("hms").and_then(|v| v.as_array()) {
             self.hms_codes = hms
@@ -207,6 +282,7 @@ impl CachedStatus {
         // it does NOT mean the printer is currently faulted.  Only treat it
         // as Error when there are active HMS codes.
         if let Some(s) = print.get("gcode_state").and_then(|v| v.as_str()) {
+            self.state_known = true;
             self.state = match s {
                 "RUNNING" | "PREPARE" => PrinterState::Printing,
                 "PAUSE" => PrinterState::Paused,
@@ -529,8 +605,10 @@ fn ftps_connect_sync(
             .map_err(|e| AppError::Driver(format!("ftps tls: {e}")))?,
     );
 
+    // A path may carry the MQTT port (`host:8883`); FTPS is always on 990.
+    let (host, _) = mqtt_host_port(host);
     let addr = format!("{host}:990");
-    let mut ftp = NativeTlsFtpStream::connect_secure_implicit(addr, connector, host)
+    let mut ftp = NativeTlsFtpStream::connect_secure_implicit(addr, connector, &host)
         .map_err(|e| AppError::Driver(format!("ftps connect: {e}")))?;
 
     ftp.login("bblp", access_code)
@@ -771,7 +849,8 @@ impl BambuDriver {
 
         // Build MQTT options with TOFU cert capture.
         let client_id = format!("foreman-{printer_id}-{}", uuid::Uuid::new_v4().simple());
-        let mut opts = MqttOptions::new(&client_id, host, 8883);
+        let (mqtt_host, mqtt_port) = mqtt_host_port(host);
+        let mut opts = MqttOptions::new(&client_id, mqtt_host, mqtt_port);
         opts.set_credentials("bblp", access_code);
         opts.set_keep_alive(Duration::from_secs(30));
 
@@ -779,6 +858,7 @@ impl BambuDriver {
         opts.set_transport(Transport::tls_with_config(tls_config));
 
         let (client, mut eventloop) = AsyncClient::new(opts, 64);
+        eventloop.set_network_options(network_options());
 
         // Subscribe to report topic.
         client
@@ -788,7 +868,7 @@ impl BambuDriver {
 
         // Drive the event loop briefly to complete the TLS handshake + CONNACK.
         // We need to poll until we see the SubAck (which means TLS + MQTT are done).
-        let handshake_deadline = Instant::now() + Duration::from_secs(10);
+        let handshake_deadline = Instant::now() + CONNECT_TIMEOUT;
         let mut connected = false;
         while Instant::now() < handshake_deadline {
             tokio::select! {
@@ -892,18 +972,13 @@ impl BambuDriver {
             .map_err(|e| AppError::Driver(format!("mqtt pushall: {e}")))?;
 
         // Init capabilities from serial.
-        {
-            let model = model_from_serial(serial);
-            let mut caps = capabilities.write().await;
-            let c = caps.get_or_insert_with(PrinterCapabilities::default);
-            c.printer_model = model.map(|s| s.to_owned());
-            if let Some(m) = model {
-                c.bed_size = bed_size_from_model(m);
-                c.enclosed = enclosed_from_model(m);
-                c.max_nozzle_temp = max_nozzle_temp_from_model(m);
-            }
-            c.extruder_count = 1;
-        }
+        caps_from_serial(
+            serial,
+            capabilities
+                .write()
+                .await
+                .get_or_insert_with(PrinterCapabilities::default),
+        );
 
         // Throttle: max 2 status events per second.
         let min_interval = Duration::from_millis(500);
@@ -956,25 +1031,12 @@ impl BambuDriver {
                                     let ps = s.to_printer_status();
 
                                     // Update capabilities from dynamic status fields.
-                                    {
-                                        let mut caps = capabilities.write().await;
-                                        let c = caps.get_or_insert_with(PrinterCapabilities::default);
-                                        if let Some(d) = s.nozzle_diameter {
-                                            c.nozzle_diameter = Some(d);
-                                        }
-                                        if s.ams_count > 0 {
-                                            c.ams_slot_count = Some(s.ams_count * 4);
-                                        }
-                                        if let Some(cam) = s.has_camera {
-                                            if cam {
-                                                c.camera_type = Some(if s.has_xcam {
-                                                    "ai".to_owned()
-                                                } else {
-                                                    "basic".to_owned()
-                                                });
-                                            }
-                                        }
-                                    }
+                                    s.update_caps(
+                                        capabilities
+                                            .write()
+                                            .await
+                                            .get_or_insert_with(PrinterCapabilities::default),
+                                    );
 
                                     let _ = bus_tx.send(ServerEvent::PrinterStatus {
                                         printer_id,

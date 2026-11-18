@@ -203,3 +203,33 @@ After that, `cargo` and `rustc` resolve to the working toolchain.
 **Ambiguous column in ORDER BY across JOINs:** Unqualified sort columns (e.g. `id`) in multi-table JOINs trigger "ambiguous column name". Fix: `qualify_sort()` helper maps bare column names to qualified names (e.g. `id` → `s.id`) before `order_by_sql()`.
 
 **SQLite BOOLEAN NULL default for spool:** The `archived` column has no DEFAULT in the schema, so new spools without an explicit `archived` value are stored as NULL. The `archived = 0` filter then excludes them. Fix: default `archived` to `0` in the spool create function (matching upstream Spoolman's Python model default of `False`).
+
+### Doc 07 §A (filament tracking optional) — 2026-11-18
+
+**No "Colour" verdict exists.** Doc 07 lists Colour, Material and No spool as the verdicts Off drops. `compat::Verdict` has only `Material` and `NoSpool`; colour is a `FilamentMatch` level on the result, not a verdict. Off drops those two verdicts (`FilamentMode::policy().verdicts`) and reports `FilamentMatch::Unknown` for every file.
+
+**No "profile match levels" in the engine.** The compat engine has no slicer-profile match levels to keep. The only match levels are `FilamentMatch`, which are spool and tray based and are always `Unknown` in Off.
+
+**No spool Attention items exist yet.** There is no runout-to-load-spool or low-spool Attention kind to switch off; "paused" and "error" come from the printer and are unchanged.
+
+**External = Full after the import.** External tracks spools exactly as Full; the one-time import is the existing Setup → Filament data flow. Its Spoolman API default is on, as in Full.
+
+**Spoolman API switch on a mode change.** The switch defaults to the mode (on in Full/External, off in Off) only while it has never been set. The first mode change pins it to its current value, so an existing install that turns tracking Off keeps answering on 7912 (doc 07: "silently dropping that is worse"), and the confirm text says so. The setup wizard's "No filament tracking" choice sets Off with the API off, since nothing points at a fresh install yet. The listener now starts and stops live (`Tracking::serve_api`), not only at startup.
+
+**Settings → Filament names Spoolman.** With tracking Off, the only UI text that mentions Spoolman is the Settings → Filament section itself (the Full/External descriptions and the API switch).
+
+### Doc 07 §B session 3 (Bambu Cloud transport, monitoring only) — 2026-11-18
+
+**MQTT username is not in the token.** The brief says `u_<uid>` where uid is the `preferred_username` claim of the access-token JWT. Both real accounts' tokens are opaque (one segment, not a JWT), as OpenBambuAPI `cloud-http.md` also notes ("no longer provided within access tokens"). The uid comes from `GET /v1/user-service/my/profile` (`uid`), fetched once per account connection; a JWT `preferred_username` is still used first when a token is one. Verified: `u_<profile uid>` + token → CONNACK Success on `us.mqtt.bambulab.com:8883` for both accounts.
+
+**Print history is `/v1/user-service/my/tasks`, not `/v1/iot-service/api/user/print`.** `/user/print` returns each bound printer's *current* state (`dev_id`, `dev_name`, `dev_online`, `dev_access_code`, task fields null when idle); it holds no history. History is `GET /v1/user-service/my/tasks?deviceId=<serial>&limit=N` (`hits[]`: `id`, `title`, `status` 2 finished / 3 failed-or-cancelled, `startTime`, `endTime`, `weight`, …). The printer page shows that, read-only. `/user/print` is used once when a device becomes a new printer, for its LAN access code.
+
+**No `pushall` over cloud means state can be unknown.** P1/A1 send deltas; the full state comes from `pushall` on `device/<serial>/request`, which this session must not publish. Observed with no request sent: all three printers pushed a full report (with `gcode_state`) on their own within 91–261 s; until then only temperatures/Wi-Fi arrive. The cloud path withholds status until `gcode_state` is known, or takes it from the printer's last LAN status (seed), so an unknown state can never close a running job. A freshly linked cloud-only printer shows no status for up to a few minutes.
+
+**`print_status` in `/user/bind` is not the printer state.** The A1 reported `ACTIVE` there while idle (MQTT `gcode_state: FAILED`, LAN idle). Not used.
+
+**rumqttc's 5 s connect timeout was too short.** The A1 on Wi-Fi answers ping in ~2 s; TCP + TLS + CONNACK hit the default timeout ("Network timeout") on both LAN and cloud in the debug build. LAN and cloud now allow 20 s (`CONNECT_TIMEOUT`). The LAN driver's own 10 s handshake deadline never applied before, since rumqttc gave up at 5 s.
+
+**Bambu over LAN stays "Not supported (cloud mode)".** Compat now decides by the active path (`compat::Reach`, `control_refusal`): cloud path → new verdict `cloud_only` ("Cloud only: watch, can't send"); Bambu on a LAN path keeps `unsupported` (no signed / Developer-Mode dispatch exists yet). `cloud_only` is in the verdict set of every filament mode. It is transient, so queueing to that printer is still allowed; Print now, Start next and printer commands are refused.
+
+**Migration numbering.** #33 (`0018_job_open_unique`) and #34 (`0018_bambu_account`) both used 0018; on this branch the account table is 0019 and the token-rejected column is 0020. Migrations run every statement idempotently on each start, so a database that already ran #34 is unaffected.

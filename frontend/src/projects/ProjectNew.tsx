@@ -4,6 +4,7 @@
  * grouped into shared colour slots (same material + colour), split or merged by hand.
  * Spools are picked from the sliced material by default ("PLA only, as sliced").
  */
+import { useFilament } from "../filament/policy";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { LibraryEntry } from "../api/library";
@@ -61,6 +62,8 @@ export default function ProjectNew() {
   const [showAll, setShowAll] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState<Record<string, string>>({});
   const [confirmSwaps, setConfirmSwaps] = useState(false);
+  // Without spool tracking each colour is a plain named slot (doc 07 §A).
+  const { spools } = useFilament();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +95,7 @@ export default function ProjectNew() {
   const groups = useMemo(() => groupSlots(files, assign), [files, assign]);
   const needsKey = JSON.stringify(groups.map((g) => [g.key, g.perSet * sets, groupMaterials(g), g.hex]));
   useEffect(() => {
-    if (source !== "files" || groups.length === 0) return;
+    if (!spools || source !== "files" || groups.length === 0) return;
     let live = true;
     const t = setTimeout(() => {
       projectsApi
@@ -107,7 +110,7 @@ export default function ProjectNew() {
       clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, needsKey]);
+  }, [source, needsKey, spools]);
 
   const slots: SlotRow[] = useMemo(() => {
     if (source === "template")
@@ -136,7 +139,7 @@ export default function ProjectNew() {
   // The spool per slot: the user's choice (null = decide later), else the best
   // option of the sliced material (the server ranks them).
   const pickOf = (key: string, options: SpoolOption[]): number | null =>
-    key in pick ? pick[key] : (options.find((o) => o.material_ok) ?? options[0])?.spool.id ?? null;
+    !spools ? null : key in pick ? pick[key] : (options.find((o) => o.material_ok) ?? options[0])?.spool.id ?? null;
 
   const t = templates?.find((x) => x.id === tpl) ?? null;
   const baseName = (n: string) => n.replace(/\.(gcode|bgcode|3mf)$/i, "").replace(/\.gcode$/i, "").replace(/[_-]+/g, " ");
@@ -157,7 +160,7 @@ export default function ProjectNew() {
   const ready = source === "template" ? !!plan : files.length > 0 && slots.length > 0;
 
   const summary = useMemo(() => {
-    if (!slots.length) return null;
+    if (!spools || !slots.length) return null;
     let short = 0;
     let unset = 0;
     let warn = "";
@@ -243,7 +246,11 @@ export default function ProjectNew() {
       </Link>
       <div>
         <h1 className="prj-title">New project</h1>
-        <p className="prj-sub">Pick what to print, then which spool feeds each colour. Grams are reserved when you create the project.</p>
+        <p className="prj-sub">
+          {spools
+            ? "Pick what to print, then which spool feeds each colour. Grams are reserved when you create the project."
+            : "Pick what to print. Each colour becomes a named slot, taken from the slice."}
+        </p>
       </div>
       {error && <p className="prj-note prj-note--bad" role="alert">{error}</p>}
 
@@ -409,6 +416,27 @@ export default function ProjectNew() {
         {prints > 0 && <span className="prj-muted">{prints} prints in total.</span>}
       </section>
 
+      {!spools && (
+        <section aria-label="Colours" className="prj-sec">
+          <h2 className="prj-sec__title">3 · Colours</h2>
+          {slots.length === 0 && <p className="prj-muted">{source === "files" ? "Pick files first." : "Pick a template first."}</p>}
+          {slots.map((s) => (
+            <div key={s.key} className="np-slot">
+              <div className="np-slot__head">
+                <Dot hex={s.hex} big />
+                <b>{s.key}</b>
+                <span>— {[s.materials.join("/"), s.hex ? `#${s.hex.replace(/^#/, "").toUpperCase()}` : null].filter(Boolean).join(" ") || "as sliced"}</span>
+                <span className="prj-muted">
+                  {s.label ? `${s.label} · ` : ""}used on {s.plates}
+                </span>
+                <span style={{ flex: 1 }} />
+                <span className="prj-mono">{Math.round(s.need)} g</span>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      {spools && (
       <section aria-label="Colours" className="prj-sec">
         <h2 className="prj-sec__title">3 · Spool for each colour</h2>
         <p className="prj-muted" style={{ margin: 0 }}>
@@ -505,11 +533,12 @@ export default function ProjectNew() {
           );
         })}
       </section>
+      )}
 
       {confirmSwaps && (
         <div className="prj-note prj-note--warn" role="alert" style={{ display: "flex", flexWrap: "wrap", gap: "var(--fw-space-2)", alignItems: "center" }}>
           <span style={{ flex: "1 1 300px" }}>
-            ⚠ {swapFiles.join(", ")} change{swapFiles.length === 1 ? "s" : ""} filament by hand (M600): someone has to swap spools during each print. Queue
+            ⚠ {swapFiles.join(", ")} change{swapFiles.length === 1 ? "s" : ""} filament by hand (M600): someone has to change filament during each print. Queue
             anyway?
           </span>
           <button type="button" className="prj-btn prj-btn--small" disabled={busy} onClick={() => void create(true, true)}>

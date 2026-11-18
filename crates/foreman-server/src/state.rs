@@ -37,11 +37,14 @@ pub struct AppState {
     pub transfers: Arc<Transfers>,
     /// Printer queues + fleet queue dispatcher.
     pub scheduler: Arc<Scheduler>,
-    /// The built-in Spoolman, once it has started (empty while disabled).
-    pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
+    /// The built-in Spoolman and the filament tracking mode: `spools()` for spool
+    /// behaviour (None while tracking is Off), `store()` for the records.
+    pub tracking: Arc<crate::tracking::Tracking>,
     /// Server data directory; theme fonts and custom.css are served from it.
     pub data_dir: std::path::PathBuf,
     /// `FOREMAN__DRIVERS_ENABLED`: false = never connect to printers (setup scans show
     /// sample printers, added printers stay offline).
     pub drivers_enabled: bool,
+    /// Bambu Cloud sign-ins held per account, and the cloud HTTP client (doc 07 §B).
+    pub bambu: Arc<crate::api::bambu_accounts::BambuSignins>,
 }

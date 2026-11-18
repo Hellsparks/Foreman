@@ -366,8 +366,8 @@ pub async fn macros_apply(
 // ---------------------------------------------------------------------------
 
 fn sm(s: &AppState) -> ApiResult<&crate::spools::Spoolman> {
-    s.spoolman
-        .get()
+    s.tracking
+        .store()
         .ok_or_else(|| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Spoolman is not running"))
 }
 

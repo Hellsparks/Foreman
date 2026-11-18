@@ -60,6 +60,9 @@ pub struct Printer {
     pub auto_start_from_queue: bool,
     /// Who reports filament use to Spoolman (3.6).
     pub usage_reporter: UsageReporter,
+    /// Bambu Cloud account this printer belongs to (doc 07 §B); None = LAN only.
+    #[ts(type = "number | null")]
+    pub bambu_account_id: Option<i64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

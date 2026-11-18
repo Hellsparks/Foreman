@@ -74,6 +74,10 @@ pub trait SchedEnv: Send + Sync + 'static {
     async fn thumb_url(&self, _file_id: i64) -> Option<String> {
         None
     }
+    /// Filament tracking mode (jobs carry no spools while it is Off).
+    fn filament_mode(&self) -> foreman_core::tracking::FilamentMode {
+        foreman_core::tracking::FilamentMode::Full
+    }
 }
 
 /// The real environment: drivers + Library.
@@ -81,8 +85,8 @@ pub struct LiveEnv {
     pub pool: SqlitePool,
     pub drivers: Arc<DriverManager>,
     pub library: Arc<LibraryStore>,
-    /// The built-in Spoolman, once it has started (None while disabled).
-    pub spoolman: Arc<std::sync::OnceLock<spoolman_rs::state::AppState>>,
+    /// The built-in Spoolman and the filament tracking mode.
+    pub tracking: Arc<crate::tracking::Tracking>,
 }
 
 #[async_trait]
@@ -91,7 +95,7 @@ impl SchedEnv for LiveEnv {
         let printers = repo::printer::list(&self.pool).await.unwrap_or_default();
         let mut snaps = Vec::with_capacity(printers.len());
         for p in printers {
-            snaps.push(crate::spools::snapshot(&self.drivers, self.spoolman.get(), p).await);
+            snaps.push(crate::spools::snapshot(&self.drivers, &self.tracking, p).await);
         }
         snaps
     }
@@ -132,14 +136,18 @@ impl SchedEnv for LiveEnv {
 
     async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
         let sm = self
-            .spoolman
-            .get()
-            .ok_or_else(|| AppError::Internal("Spoolman is not running".into()))?;
+            .tracking
+            .spools()
+            .ok_or_else(|| AppError::Internal("filament tracking is off".into()))?;
         spoolman_deduct(sm, spool_id, grams).await
     }
 
     async fn release_active_spool(&self, printer_id: i64) -> Result<(), AppError> {
         crate::spools::set_slot(&self.drivers, printer_id, 0, None).await
+    }
+
+    fn filament_mode(&self) -> foreman_core::tracking::FilamentMode {
+        self.tracking.mode()
     }
 
     async fn thumb_url(&self, file_id: i64) -> Option<String> {
@@ -858,7 +866,7 @@ impl Scheduler {
             .into_iter()
             .find(|s| s.printer.id == printer_id)
             .ok_or_else(|| AppError::NotFound(format!("printer {printer_id}")))?;
-        if let Some(reason) = compat::control_unsupported(&snap.printer) {
+        if let Some(reason) = compat::control_unsupported(&snap.printer, snap.reach) {
             return Err(AppError::InvalidInput(reason.into()));
         }
         if plate_confirm {

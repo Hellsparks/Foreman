@@ -15,6 +15,7 @@ use foreman_core::{
     error::AppError,
     events::{AmsTray, PrinterState, PrinterStatus, ServerEvent},
     repo,
+    tracking::FilamentMode,
 };
 use tokio::sync::{broadcast, Notify};
 
@@ -35,6 +36,7 @@ struct Mock {
     deductions: Vec<(i64, f64)>,
     /// Printers whose Moonraker active spool was released.
     released: Vec<i64>,
+    mode: FilamentMode,
 }
 
 struct MockEnv {
@@ -42,6 +44,9 @@ struct MockEnv {
     m: Mutex<Mock>,
     /// When set, uploads wait here until notified.
     gate: Option<Arc<Notify>>,
+    /// When set, `start` makes the printer report "printing" at once, as a fast
+    /// printer does (the status event races the job opened for the start command).
+    report_on_start: Mutex<Option<Arc<Scheduler>>>,
 }
 
 impl MockEnv {
@@ -68,6 +73,8 @@ impl SchedEnv for MockEnv {
                 caps: m.caps.get(&p.id).cloned(),
                 printer: p,
                 loaded: vec![],
+                mode: m.mode,
+                reach: foreman_core::compat::Reach::Lan,
             })
             .collect()
     }
@@ -91,11 +98,30 @@ impl SchedEnv for MockEnv {
     }
     async fn start(&self, printer_id: i64, name: &str) -> Result<(), AppError> {
         self.lock().starts.push((printer_id, name.to_owned()));
+        let sched = self
+            .report_on_start
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone();
+        if let Some(sched) = sched {
+            let st = PrinterStatus {
+                state: PrinterState::Printing,
+                filename: Some(name.to_owned()),
+                ..Default::default()
+            };
+            self.lock().status.insert(printer_id, st.clone());
+            tokio::spawn(async move {
+                sched.on_status(printer_id, &st).await;
+            });
+        }
         Ok(())
     }
     async fn deduct(&self, spool_id: i64, grams: f64) -> Result<(), AppError> {
         self.lock().deductions.push((spool_id, grams));
         Ok(())
+    }
+    fn filament_mode(&self) -> FilamentMode {
+        self.lock().mode
     }
     async fn release_active_spool(&self, printer_id: i64) -> Result<(), AppError> {
         self.lock().released.push(printer_id);
@@ -164,6 +190,7 @@ async fn rig(gate: Option<Arc<Notify>>) -> Rig {
         pool: db.pool.clone(),
         m: Mutex::new(Mock::default()),
         gate,
+        report_on_start: Mutex::new(None),
     });
     env.set_state(1, PrinterState::Idle);
     env.set_state(2, PrinterState::Idle);
@@ -568,6 +595,14 @@ mod jobs {
             self.env.lock().status.insert(pid, s.clone());
             self.sched.on_status(pid, &s).await
         }
+        /// From now on `start` makes the mock printer report printing immediately.
+        fn printing_on_start(&self) {
+            *self
+                .env
+                .report_on_start
+                .lock()
+                .unwrap_or_else(|p| p.into_inner()) = Some(self.sched.clone());
+        }
         async fn jobs(&self) -> Vec<Job> {
             repo::job::list(
                 &self.pool,
@@ -652,6 +687,143 @@ mod jobs {
             .await
             .expect("rate");
         assert_eq!(rated.outcome, Some(JobOutcome::Good));
+    }
+
+    /// A printer that reports "printing" the instant the start command lands must
+    /// still produce exactly one job (start path and status path race).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn printing_reported_at_once_on_start_opens_one_job() {
+        let r = rig(None).await;
+        r.printing_on_start();
+        r.start_one().await;
+        // Let the spawned status report finish.
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+        let jobs = r.jobs().await;
+        for j in &jobs {
+            eprintln!(
+                "ROW id={} printer={:?} file_id={:?} file={} q={:?} end={:?}",
+                j.id, j.printer_id, j.file_id, j.file_name, j.queue_item_id, j.end
+            );
+        }
+        assert_eq!(jobs.len(), 1, "one print, one job");
+    }
+
+    /// The same race 20 times on fresh databases: 20 jobs in total, never more.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn twenty_start_races_make_twenty_jobs() {
+        let mut total = 0;
+        for _ in 0..20 {
+            let r = rig(None).await;
+            r.printing_on_start();
+            r.start_one().await;
+            for _ in 0..20 {
+                tokio::task::yield_now().await;
+            }
+            let n = r.jobs().await.len();
+            assert_eq!(n, 1, "one print, one job");
+            total += n;
+        }
+        eprintln!("RACE_TOTAL jobs={total} runs=20");
+        assert_eq!(total, 20);
+    }
+
+    /// The status path wins the race (print seen before Foreman's start returns):
+    /// the start path attaches the Library file, plan and queue item to that job.
+    #[tokio::test]
+    async fn start_arriving_second_attaches_to_the_status_opened_job() {
+        let r = rig(None).await;
+        r.file(10, spool_file());
+        r.env.set_state(2, PrinterState::Offline);
+        let item = r.add(10, Some(1)).await;
+        let mut s = st(PrinterState::Printing, None);
+        s.filename = Some("file10.gcode".into());
+        r.push(1, s).await;
+        let before = r.jobs().await;
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].file_id, None);
+        r.sched.job_sent(1, 10, "file10.gcode").await;
+        let after = r.jobs().await;
+        assert_eq!(after.len(), 1, "attached, not a second job");
+        assert_eq!(after[0].id, before[0].id);
+        assert_eq!(after[0].file_id, Some(10));
+        assert_eq!(after[0].grams_planned, Some(12.5));
+        assert_eq!(after[0].tools[0].spool_id, Some(7));
+        let _ = item;
+    }
+
+    /// Two printers printing at once: one job each.
+    #[tokio::test]
+    async fn two_printers_printing_at_once_get_one_job_each() {
+        let r = rig(None).await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(2, st(PrinterState::Printing, None)).await;
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 2);
+        let mut ps: Vec<_> = jobs.iter().filter_map(|j| j.printer_id).collect();
+        ps.sort();
+        assert_eq!(ps, vec![1, 2]);
+        assert!(jobs.iter().all(|j| j.end == JobEnd::Running));
+    }
+
+    /// A print seen on LAN, then (LAN lost) on the Bambu Cloud path, then on LAN again:
+    /// the path switch goes printing → offline → printing, and stays one job.
+    #[tokio::test]
+    async fn print_seen_over_lan_then_cloud_then_lan_is_one_job() {
+        let r = rig(None).await;
+        r.env.set_state(2, PrinterState::Offline);
+        r.push(1, st(PrinterState::Printing, None)).await; // LAN
+        r.push(1, st(PrinterState::Offline, None)).await; // LAN driver lost the printer
+        r.push(1, st(PrinterState::Printing, None)).await; // cloud path took over
+        r.push(1, st(PrinterState::Printing, None)).await; // back on LAN (no offline gap)
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 1, "one job across the path switches");
+        assert_eq!(jobs[0].end, JobEnd::Running);
+    }
+
+    /// A job finishes and a new print starts on the same printer: a second job.
+    #[tokio::test]
+    async fn finished_job_then_new_print_opens_a_new_job() {
+        let r = rig(None).await;
+        r.env.set_state(2, PrinterState::Offline);
+        r.push(1, st(PrinterState::Printing, None)).await;
+        r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+            .await;
+        r.push(1, st(PrinterState::Printing, None)).await;
+        let jobs = r.jobs().await;
+        assert_eq!(jobs.len(), 2);
+        assert_eq!(
+            jobs.iter().filter(|j| j.end == JobEnd::Running).count(),
+            1,
+            "only the new one is open"
+        );
+        assert_eq!(jobs.iter().filter(|j| j.end == JobEnd::Complete).count(), 1);
+    }
+
+    #[tokio::test]
+    async fn tracking_off_records_grams_with_no_spool_and_deducts_nothing() {
+        let r = rig(None).await;
+        r.env.lock().mode = FilamentMode::Off;
+        r.start_one().await;
+        let j = &r.jobs().await[0];
+        assert_eq!(j.usage_reporter, job_engine::NO_REPORTER);
+        assert_eq!(j.tools[0].spool_id, None, "the preset's spool is ignored");
+        assert_eq!(j.grams_planned, Some(12.5));
+        r.push(1, st(PrinterState::Printing, None)).await;
+        assert!(
+            r.push(1, st(PrinterState::Idle, Some(PrintEnd::Complete)))
+                .await
+        );
+        let j = &r.jobs().await[0];
+        assert_eq!(j.end, JobEnd::Complete);
+        assert_eq!(j.grams_used, Some(12.5), "history keeps the file's grams");
+        assert_eq!(j.grams_deducted, 0.0);
+        assert!(r.deductions().is_empty());
+        assert_eq!(
+            repo::job::deduct_state(&r.pool, j.id).await.expect("state"),
+            "skipped"
+        );
     }
 
     #[tokio::test]

@@ -169,6 +169,26 @@ const MIGRATIONS: &[&str] = &[
        api_key_id INTEGER PRIMARY KEY NOT NULL REFERENCES api_key(id) ON DELETE CASCADE, \
        tools_json TEXT, allow_destructive INTEGER NOT NULL DEFAULT 0, \
        rate_per_minute INTEGER NOT NULL DEFAULT 60, updated_at TEXT NOT NULL)",
+    // 0018: one open job per printer (see migrations/0018_job_open_unique.sql). Keep
+    // the oldest running job per printer, close the rest, then enforce it.
+    "UPDATE job SET end_state = 'error', ended_at = COALESCE(ended_at, started_at), \
+     error = 'duplicate job opened by a start race (merged by migration 0018)', \
+     deduct_state = 'skipped' \
+     WHERE end_state = 'running' AND printer_id IS NOT NULL \
+     AND id NOT IN (SELECT MIN(id) FROM job WHERE end_state = 'running' GROUP BY printer_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_job_open_printer \
+     ON job (printer_id) WHERE end_state = 'running'",
+    // 0019: Bambu Cloud accounts (doc 07 §B, see migrations/0019_bambu_account.sql).
+    "CREATE TABLE IF NOT EXISTS bambu_account (\
+       id INTEGER PRIMARY KEY NOT NULL, label TEXT NOT NULL, \
+       region TEXT NOT NULL CHECK (region IN ('global', 'china')), email TEXT NOT NULL, \
+       token TEXT, token_expires_at TEXT, last_ok_at TEXT, last_error TEXT, \
+       created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "ALTER TABLE printer ADD COLUMN bambu_account_id INTEGER \
+     REFERENCES bambu_account(id) ON DELETE SET NULL",
+    // 0020: Bambu Cloud transport (doc 07 §B session 3, see migrations/0020_bambu_token_rejected.sql).
+    // Set when Bambu refuses the stored token; nothing retries until it is replaced.
+    "ALTER TABLE bambu_account ADD COLUMN token_rejected_at TEXT",
 ];
 
 /// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only
@@ -272,6 +292,62 @@ impl ForemanDb {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    /// A database from before 0018 holds two open jobs on one printer: reconnecting
+    /// keeps the oldest, closes the other without deduction, and enforces the index.
+    #[tokio::test]
+    async fn migration_0018_merges_duplicate_open_jobs() {
+        let dir = TempDir::new().expect("tempdir");
+        let path = dir.path().join("foreman.db");
+        let db = ForemanDb::connect(&path).await.expect("connect");
+        sqlx::query("DROP INDEX ux_job_open_printer")
+            .execute(&db.pool)
+            .await
+            .expect("drop index");
+        for id in [1, 2] {
+            sqlx::query(
+                "INSERT INTO printer (id, name, firmware, tags, sort_order, created_at, updated_at) \
+                 VALUES (?, 'P', 'moonraker', '[]', 0, 'x', 'x')",
+            )
+            .bind(id)
+            .execute(&db.pool)
+            .await
+            .expect("printer");
+        }
+        for (id, printer) in [(1, 1), (2, 1), (3, 2)] {
+            sqlx::query(
+                "INSERT INTO job (id, printer_id, printer_name, file_name, started_at) \
+                 VALUES (?, ?, 'P', 'f', '2026-01-01T00:00:00Z')",
+            )
+            .bind(id)
+            .bind(printer)
+            .execute(&db.pool)
+            .await
+            .expect("job");
+        }
+        db.pool.close().await;
+        let db = ForemanDb::connect(&path).await.expect("reconnect");
+        let rows: Vec<(i64, String, String)> =
+            sqlx::query_as("SELECT id, end_state, deduct_state FROM job ORDER BY id")
+                .fetch_all(&db.pool)
+                .await
+                .expect("rows");
+        assert_eq!(
+            rows,
+            vec![
+                (1, "running".into(), "none".into()),
+                (2, "error".into(), "skipped".into()),
+                (3, "running".into(), "none".into()),
+            ]
+        );
+        let dup = sqlx::query(
+            "INSERT INTO job (printer_id, printer_name, file_name, started_at) \
+             VALUES (1, 'P', 'f', 'now')",
+        )
+        .execute(&db.pool)
+        .await;
+        assert!(dup.is_err(), "index enforced after the merge");
+    }
 
     async fn open_fresh() -> (ForemanDb, TempDir) {
         let dir = TempDir::new().expect("tempdir");

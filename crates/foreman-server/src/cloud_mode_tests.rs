@@ -9,7 +9,8 @@ use std::sync::{
 use async_trait::async_trait;
 use axum::{http::StatusCode, Router};
 use foreman_core::{
-    compat::CLOUD_MODE,
+    bambu_cloud::Region,
+    compat::{Reach, CLOUD_MODE, CLOUD_ONLY},
     domain::{FirmwareKind, QueueSource},
     driver::{PrinterCapabilities, PrinterCommand, PrinterDriver, PrinterFile},
     error::AppError,
@@ -273,4 +274,148 @@ async fn pause_resume_cancel_are_refused_before_the_driver() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+}
+
+// ---------------------------------------------------------------------------
+// Bambu Cloud path (doc 07 §B): reachable only over the cloud = watch, can't send
+// ---------------------------------------------------------------------------
+
+/// Link the rig's Bambu to a cloud account. With `lan`, it also has a LAN address
+/// and access code (LAN first, cloud last).
+async fn link_cloud(r: &Rig, lan: bool) {
+    let pool = &r.state.foreman_db.pool;
+    let acct = repo::bambu_account::create(pool, "Thomas", Region::Global, "t@example.com")
+        .await
+        .expect("account");
+    sqlx::query("UPDATE printer SET serial_number = '03919C461200718' WHERE id = ?")
+        .bind(r.bambu)
+        .execute(pool)
+        .await
+        .expect("serial");
+    if lan {
+        sqlx::query(
+            "UPDATE printer SET primary_url = '10.0.0.249', access_code = '12345678' WHERE id = ?",
+        )
+        .bind(r.bambu)
+        .execute(pool)
+        .await
+        .expect("lan");
+    }
+    repo::printer::set_bambu_account(pool, r.bambu, Some(acct.id))
+        .await
+        .expect("link");
+}
+
+#[tokio::test]
+async fn cloud_path_is_last_after_every_lan_path() {
+    let r = rig(PrinterState::Idle).await;
+    link_cloud(&r, true).await;
+    let printer = repo::printer::get(&r.state.foreman_db.pool, r.bambu)
+        .await
+        .expect("printer");
+    let names: Vec<String> = r
+        .state
+        .driver_manager
+        .effective_paths(&printer)
+        .await
+        .expect("paths")
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
+    assert_eq!(names, ["LAN", "Bambu Cloud"]);
+    // On its LAN path the printer keeps the existing Bambu rule.
+    assert_eq!(r.state.driver_manager.reach(r.bambu).await, Reach::Lan);
+
+    // Stored paths stay first, in their order; cloud is still last.
+    for (name, prio) in [("Tailscale", 10), ("Home", 0)] {
+        repo::printer_path::create(
+            &r.state.foreman_db.pool,
+            foreman_core::domain::CreatePrinterPath {
+                printer_id: r.bambu,
+                name: name.into(),
+                url: format!("{name}.invalid"),
+                priority: Some(prio),
+            },
+        )
+        .await
+        .expect("path");
+    }
+    let names: Vec<String> = r
+        .state
+        .driver_manager
+        .effective_paths(&printer)
+        .await
+        .expect("paths")
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
+    assert_eq!(names, ["Home", "Tailscale", "Bambu Cloud"]);
+}
+
+#[tokio::test]
+async fn unlinked_printers_keep_their_paths_unchanged() {
+    let r = rig(PrinterState::Idle).await;
+    let printer = repo::printer::get(&r.state.foreman_db.pool, r.bambu)
+        .await
+        .expect("printer");
+    assert!(r
+        .state
+        .driver_manager
+        .effective_paths(&printer)
+        .await
+        .expect("paths")
+        .is_empty());
+}
+
+#[tokio::test]
+async fn cloud_only_printer_gets_the_cloud_only_verdict_from_compat() {
+    let r = rig(PrinterState::Idle).await;
+    link_cloud(&r, false).await;
+    assert_eq!(r.state.driver_manager.reach(r.bambu).await, Reach::Cloud);
+
+    let (s, v) = call(
+        &r.app,
+        "GET",
+        &format!("/api/send/check/{}", r.file),
+        &r.auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v[0]["verdict"], "cloud_only");
+    assert_eq!(v[0]["reason"], CLOUD_ONLY);
+
+    let (_, v) = call(&r.app, "GET", "/api/printers", &r.auth, None).await;
+    assert_eq!(v[0]["control_unsupported"], CLOUD_ONLY);
+    assert_eq!(v[0]["reach"], "cloud");
+    assert_eq!(v[0]["active_path_name"], "Bambu Cloud");
+
+    // Print now is refused by compat (409 with the verdict), never by the driver.
+    for dry_run in [false, true] {
+        let (s, v) = call(
+            &r.app,
+            "POST",
+            "/api/send",
+            &r.auth,
+            Some(
+                json!({ "file_id": r.file, "printer_id": r.bambu, "mode": "print_now",
+                         "plate_confirm": true, "dry_run": dry_run }),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "{v}");
+        assert_eq!(v["verdict"], "cloud_only");
+        assert_eq!(v["reason"], CLOUD_ONLY);
+    }
+    let (s, v) = call(
+        &r.app,
+        "POST",
+        &format!("/api/printers/{}/commands/pause", r.bambu),
+        &r.auth,
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v.to_string().contains(CLOUD_ONLY), "{v}");
+    assert_eq!(r.driver_calls(), 0);
 }

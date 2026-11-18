@@ -1383,7 +1383,7 @@ export default function Library() {
                           ? "var(--fw-success)"
                           : c.verdict === "plate"
                             ? "var(--fw-warning)"
-                            : c.verdict === "busy" || c.verdict === "offline"
+                            : c.verdict === "busy" || c.verdict === "offline" || c.verdict === "cloud_only"
                               ? "var(--fw-muted)"
                               : "var(--fw-danger)";
                       return (
@@ -1401,7 +1401,7 @@ export default function Library() {
                               Print now
                             </button>
                           )}
-                          {c.verdict === "unsupported" && (
+                          {(c.verdict === "unsupported" || c.verdict === "cloud_only") && (
                             <button type="button" className="fb-button fb-primary fb-small" disabled title={c.reason}>
                               Print now
                             </button>

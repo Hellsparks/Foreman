@@ -31,6 +31,8 @@ pub struct PrinterWithStatus {
     pub active_path_name: Option<String>,
     /// Set when Foreman can't send, start, pause, resume or cancel prints here.
     pub control_unsupported: Option<&'static str>,
+    /// Kind of the active connection path ("lan" | "cloud").
+    pub reach: foreman_core::compat::Reach,
 }
 
 /// `GET /api/printers`
@@ -45,13 +47,15 @@ pub async fn list_printers(State(state): State<AppState>) -> impl IntoResponse {
                 let active = state.driver_manager.get_active_path(p.id).await;
                 let active_path_index = active.as_ref().map(|(i, _)| *i as i64);
                 let active_path_name = active.map(|(_, path)| path.name);
-                let control_unsupported = foreman_core::compat::control_unsupported(&p);
+                let reach = state.driver_manager.reach(p.id).await;
+                let control_unsupported = foreman_core::compat::control_unsupported(&p, reach);
                 result.push(PrinterWithStatus {
                     printer: p,
                     status,
                     active_path_index,
                     active_path_name,
                     control_unsupported,
+                    reach,
                 });
             }
             (

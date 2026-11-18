@@ -22,8 +22,8 @@ use crate::{
 };
 
 fn sm(s: &AppState) -> ApiResult<&Spoolman> {
-    s.spoolman
-        .get()
+    s.tracking
+        .store()
         .ok_or_else(|| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Spoolman is not running"))
 }
 
@@ -47,7 +47,15 @@ pub async fn list(State(s): State<AppState>) -> ApiResult<Json<Vec<ExportRow>>> 
 }
 
 pub async fn orca(State(s): State<AppState>, Json(b): Json<ExportRequest>) -> ApiResult<Response> {
-    let (zip, infos) = svc::orca_zip(sm(&s)?, b.filament_ids.as_deref()).await?;
+    // Filament records while spools are tracked; the Library's own file facts
+    // when tracking is Off.
+    let (zip, infos) = match s.tracking.spools() {
+        Some(sm) => svc::orca_zip(sm, b.filament_ids.as_deref()).await?,
+        None if !s.tracking.mode().tracks_spools() => {
+            svc::orca_zip_from_files(&s.foreman_db.pool).await?
+        }
+        None => svc::orca_zip(sm(&s)?, b.filament_ids.as_deref()).await?,
+    };
     let file = match infos.as_slice() {
         [one] => format!("orca-{}.zip", svc::file_slug(&one.name)),
         _ => "foreman-orca-filaments.zip".to_owned(),

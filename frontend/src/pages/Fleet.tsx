@@ -6,7 +6,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, viaPath } from "../api/client";
 import { useEventStream } from "../hooks/useEventStream";
 import type { PrinterWithStatus } from "../api/client";
 import type { PrinterStatus } from "../api/types/PrinterStatus";
@@ -14,6 +14,7 @@ import type { FirmwareKind } from "../api/types/FirmwareKind";
 import type { ShellContext } from "../shell/Shell";
 import { SPOOL_TOPICS, spools, type LoadedSlot } from "../api/spools";
 import LoadSpoolPanel from "../filament/LoadSpoolPanel";
+import { useFilament } from "../filament/policy";
 import { StatusChip, ProgressBar, Swatch, Menu, type MenuItem } from "../ui";
 import { usePhone } from "../hooks/useMediaQuery";
 import type { Tone } from "../ui";
@@ -176,13 +177,17 @@ export default function Fleet() {
     }
   }, []);
 
+  // Loaded spools only exist while spools are tracked; without them the cards
+  // show the printer's own AMS trays and no load action.
+  const { spools: tracksSpools } = useFilament();
   const loadSlots = useCallback(async () => {
+    if (!tracksSpools) return setSlots([]);
     try {
       setSlots(await spools.loaded());
     } catch (e) {
       console.error("Failed to load spools:", e);
     }
-  }, []);
+  }, [tracksSpools]);
 
   useEffect(() => {
     loadPrinters();
@@ -477,13 +482,17 @@ export function PrinterCard({
           {printer.name}
         </button>
         <span className="fleet-card__fw">{fwLabel(printer.firmware)}</span>
-        {printer.active_path_index != null && printer.active_path_index > 0 && printer.active_path_name && (
+        {viaPath(printer) && (
           <span
             className="fleet-card__path-label"
-            title={`Connected via backup path: ${printer.active_path_name}`}
+            title={
+              printer.reach === "cloud"
+                ? "Watched over Bambu Cloud: status only, can't send"
+                : `Connected via backup path: ${printer.active_path_name}`
+            }
             style={{ fontSize: 11, color: "var(--fw-warning)", fontFamily: "var(--fw-mono)" }}
           >
-            via {printer.active_path_name}
+            via {viaPath(printer)}
           </span>
         )}
         <div style={{ flex: 1 }} />

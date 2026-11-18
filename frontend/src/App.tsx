@@ -6,6 +6,7 @@ import Jobs from "./pages/Jobs";
 import Library from "./pages/Library";
 import Projects from "./pages/Projects";
 import Filament from "./pages/Filament";
+import { RequireSpools } from "./filament/policy";
 import Service from "./pages/Service";
 import Tools from "./pages/Tools";
 import Settings from "./pages/Settings";
@@ -29,7 +30,7 @@ export default function App() {
           <Route path="jobs/*" element={<Jobs />} />
           <Route path="library/*" element={<Library />} />
           <Route path="projects/*" element={<Projects />} />
-          <Route path="filament/*" element={<Filament />} />
+          <Route path="filament/*" element={<RequireSpools><Filament /></RequireSpools>} />
           <Route path="service/*" element={<Service />} />
           <Route path="tools/*" element={<Tools />} />
           <Route path="settings/*" element={<Settings />} />

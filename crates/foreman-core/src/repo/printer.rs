@@ -34,6 +34,7 @@ struct PrinterRow {
     plate_clear: i64,
     auto_start_from_queue: i64,
     usage_reporter: String,
+    bambu_account_id: Option<i64>,
     created_at: String,
     updated_at: String,
 }
@@ -95,6 +96,7 @@ impl PrinterRow {
             plate_clear: self.plate_clear != 0,
             auto_start_from_queue: self.auto_start_from_queue != 0,
             usage_reporter: UsageReporter::parse(&self.usage_reporter),
+            bambu_account_id: self.bambu_account_id,
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         })
@@ -109,14 +111,14 @@ const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     usage_reporter, created_at, updated_at \
+     usage_reporter, bambu_account_id, created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     usage_reporter, created_at, updated_at \
+     usage_reporter, bambu_account_id, created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.
@@ -266,6 +268,25 @@ pub async fn clear_tls_fingerprint(pool: &SqlitePool, id: i64) -> Result<(), App
         .execute(pool)
         .await
         .map_err(|e| AppError::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Link the printer to a Bambu Cloud account (its cloud path), or unlink with `None`.
+pub async fn set_bambu_account(
+    pool: &SqlitePool,
+    id: i64,
+    account_id: Option<i64>,
+) -> Result<(), AppError> {
+    let done = sqlx::query("UPDATE printer SET bambu_account_id=?, updated_at=? WHERE id=?")
+        .bind(account_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(e.to_string()))?;
+    if done.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("printer {id}")));
+    }
     Ok(())
 }
 

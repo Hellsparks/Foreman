@@ -1,6 +1,7 @@
 pub mod attention;
 pub mod auth;
 pub mod backup;
+pub mod bambu_accounts;
 pub mod calibration;
 pub mod exports;
 pub mod filaments;
@@ -21,4 +22,5 @@ pub mod spools;
 pub mod ssh;
 pub mod storage;
 pub mod terminal_ws;
+pub mod tracking;
 pub mod ws;

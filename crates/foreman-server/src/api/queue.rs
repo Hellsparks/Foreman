@@ -252,7 +252,8 @@ pub async fn board(State(state): State<AppState>) -> Result<Json<QueueBoard>, Ap
             name: s.printer.name.clone(),
             plate_clear: s.printer.plate_clear,
             auto_start: s.printer.auto_start_from_queue,
-            control_unsupported: compat::control_unsupported(&s.printer).map(str::to_owned),
+            control_unsupported: compat::control_unsupported(&s.printer, s.reach)
+                .map(str::to_owned),
             status: s.status.clone(),
             items: Vec::new(),
         });
@@ -331,6 +332,8 @@ fn lane_tag(r: &CompatResult, is_head: bool, auto_start: bool) -> (&'static str,
         Verdict::TooBig | Verdict::Nozzle | Verdict::Unsupported => {
             ("bad", format!("✖ {}", r.reason))
         }
+        // Transient: the printer is reachable only over Bambu Cloud right now.
+        Verdict::CloudOnly => ("warn", format!("☁ {}", r.reason)),
     }
 }
 

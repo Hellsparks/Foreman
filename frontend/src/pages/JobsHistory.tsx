@@ -1,4 +1,5 @@
 /** Jobs → History and Stats tabs (docs/ui-ref/Jobs.dc.html lines 105–209, task 3.6). */
+import { useFilament } from "../filament/policy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type PrinterWithStatus } from "../api/client";
@@ -120,6 +121,7 @@ export function JobsHistory({
   const scoped = fixedPrinterId != null;
   const [material, setMaterial] = useState("");
   const [spool, setSpool] = useState("");
+  const { spools } = useFilament();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [list, setList] = useState<Job[]>([]);
@@ -174,7 +176,7 @@ export function JobsHistory({
   };
 
   const remove = async (j: Job) => {
-    if (!window.confirm(`Delete the history record for ${j.file_name}? Spool weights are not changed.`)) return;
+    if (!window.confirm(`Delete the history record for ${j.file_name}? ${spools ? "Spool weights are not changed." : ""}`.trim())) return;
     try {
       await jobs.remove(j.id);
       setSel(null);
@@ -246,10 +248,12 @@ export function JobsHistory({
               ))}
             </datalist>
           </label>
-          <label className="jh-field">
-            <span className="jh-field__k">Spool</span>
-            <input value={spool} placeholder="#id" onChange={(e) => setSpool(e.target.value)} size={5} />
-          </label>
+          {spools && (
+            <label className="jh-field">
+              <span className="jh-field__k">Spool</span>
+              <input value={spool} placeholder="#id" onChange={(e) => setSpool(e.target.value)} size={5} />
+            </label>
+          )}
           <label className="jh-field">
             <span className="jh-field__k">From</span>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -303,7 +307,7 @@ export function JobsHistory({
               )}
               {list.map((j) => {
                 const c = outcomeChip(j);
-                const sp = spoolText(j);
+                const sp = spools ? spoolText(j) : "";
                 return (
                   <tr key={j.id} className={sel === j.id ? "jh-row--sel" : undefined}>
                     <td>
@@ -356,6 +360,7 @@ function JobInspector({
   onRate: (o: JobOutcome, reason?: string | null) => void;
   onDelete: () => void;
 }) {
+  const { spools } = useFilament();
   const facts: [string, string][] = [
     ["Printer", j.printer_name],
     ["Started", fmtWhen(j.started_at)],
@@ -368,10 +373,10 @@ function JobInspector({
     const used = fmtGrams(t.grams_used ?? t.grams_planned);
     facts.push([
       label,
-      [t.material, used, t.spool_id != null ? `spool #${t.spool_id}` : "no spool"].filter(Boolean).join(" · "),
+      [t.material, used, spools ? (t.spool_id != null ? `spool #${t.spool_id}` : "no spool") : null].filter(Boolean).join(" · "),
     ]);
   }
-  facts.push([
+  if (spools) facts.push([
     "Spool deduction",
     j.usage_reporter === "moonraker"
       ? "reported by Moonraker"
@@ -498,13 +503,16 @@ export function JobsStats() {
         .map((m) => `${m.key} ${Math.round((m.grams / s.grams) * 100)}%`)
         .join(" · ")
     : "no filament recorded";
+  const { spools } = useFilament();
   const spoolsUsed = s ? s.by_spool.filter((x) => x.spool_id != null) : [];
   const kpis = s
     ? [
         { label: `Printed · ${days} d`, value: `${s.hours < 10 ? s.hours.toFixed(1) : Math.round(s.hours)} h`, sub: `${s.jobs} ${s.jobs === 1 ? "job" : "jobs"}` },
         { label: "Success rate", value: pct(s.success_rate), sub: `${s.failed} failed · ${s.cancelled} cancelled · ${s.unrated} not rated` },
         { label: "Filament used", value: fmtGrams(s.grams), sub: matSub },
-        { label: "Spools used", value: String(spoolsUsed.length), sub: spoolsUsed[0] ? `most: #${spoolsUsed[0].spool_id} ${fmtGrams(spoolsUsed[0].grams)}` : "none linked" },
+        ...(spools
+          ? [{ label: "Spools used", value: String(spoolsUsed.length), sub: spoolsUsed[0] ? `most: #${spoolsUsed[0].spool_id} ${fmtGrams(spoolsUsed[0].grams)}` : "none linked" }]
+          : []),
       ]
     : [];
 
@@ -590,6 +598,7 @@ export function JobsStats() {
             </div>
           ))}
         </section>
+        {spools && (
         <section className="jh-panel" aria-labelledby="jh-spool">
           <h2 id="jh-spool" className="jh-cap">
             Filament by spool
@@ -604,6 +613,7 @@ export function JobsStats() {
             </div>
           ))}
         </section>
+        )}
       </div>
     </main>
   );

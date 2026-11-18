@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { exportsApi, type ExportRow } from "../api/exports";
 import Calibration from "../calibration/Calibration";
-import Exports from "../exports/Exports";
+import Exports, { FileOrcaExport } from "../exports/Exports";
+import { useFilament } from "../filament/policy";
 import Swatches from "../exports/Swatches";
 import { EdgePanel, PhoneTitle } from "../ui";
 import "./Tools.css";
@@ -14,12 +15,16 @@ const TABS: [Tab, string][] = [
   ["import", "Import"],
   ["export", "Export"],
 ];
+/** Tabs that need filament records (TD values, swatches); gone while tracking is Off. */
+const RECORD_TABS: Tab[] = ["swatch"];
 
 export default function Tools() {
   const [tab, setTab] = useState<Tab>("cal");
   const [rows, setRows] = useState<ExportRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const needRows = tab === "swatch" || tab === "export";
+  const { filamentRecords } = useFilament();
+  const tabs = TABS.filter(([id]) => filamentRecords || !RECORD_TABS.includes(id));
+  const needRows = filamentRecords && (tab === "swatch" || tab === "export");
   useEffect(() => {
     if (!needRows) return;
     exportsApi.rows().then(
@@ -41,7 +46,7 @@ export default function Tools() {
         </PhoneTitle>
         <EdgePanel side="left" label="Tools sections" storageKey="tools.sections">
         <div role="tablist" aria-label="Tools" className="tl-tabs">
-          {TABS.map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id} className="tl-tab" onClick={() => setTab(id)}>
               {label}
             </button>
@@ -58,6 +63,8 @@ export default function Tools() {
         <Calibration />
       ) : tab === "import" ? (
         <p className="tl-muted">Coming in a later session.</p>
+      ) : !filamentRecords ? (
+        tab === "export" ? <FileOrcaExport onError={onError} /> : null
       ) : rows === null ? (
         <p className="tl-muted">Loading filaments…</p>
       ) : tab === "swatch" ? (

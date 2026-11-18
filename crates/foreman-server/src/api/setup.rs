@@ -95,8 +95,8 @@ async fn overview(s: &AppState) -> ApiResult<SetupOverview> {
         needs_wizard: ws.step != SetupStep::Done,
         checklist,
         current: setup::current_counts(s).await,
-        spoolman_running: s.spoolman.get().is_some(),
-        spoolman_port: s.spoolman.get().map(|sm| sm.config.port),
+        spoolman_running: s.tracking.store().is_some(),
+        spoolman_port: s.tracking.store().map(|sm| sm.config.port),
         drivers_enabled: s.drivers_enabled,
         backup_default_dir: crate::api::backup::load_settings(s).await?.dir,
         state: ws,
@@ -208,7 +208,7 @@ pub async fn data_fresh(State(s): State<AppState>) -> ApiResult<Json<SetupOvervi
 }
 
 fn need_spoolman(s: &AppState) -> ApiResult<&crate::spools::Spoolman> {
-    s.spoolman.get().ok_or_else(|| {
+    s.tracking.store().ok_or_else(|| {
         coded(
             StatusCode::CONFLICT,
             "spoolman_off",

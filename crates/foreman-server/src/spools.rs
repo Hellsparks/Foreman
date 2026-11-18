@@ -252,17 +252,20 @@ pub async fn all_slots(
 /// Compat snapshot for one printer, with its loaded spools.
 pub async fn snapshot(
     drivers: &DriverManager,
-    sm: Option<&Spoolman>,
+    tracking: &crate::tracking::Tracking,
     printer: Printer,
 ) -> PrinterSnapshot {
     let caps = drivers.get_capabilities(printer.id).await;
     let status = drivers.get_status(printer.id).await;
-    let loaded = slots_for(drivers, sm, &printer).await;
+    let loaded = slots_for(drivers, tracking.spools(), &printer).await;
+    let reach = drivers.reach(printer.id).await;
     PrinterSnapshot {
         printer,
         caps,
         status,
         loaded,
+        mode: tracking.mode(),
+        reach,
     }
 }
 

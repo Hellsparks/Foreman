@@ -5,6 +5,8 @@ mod auth_api_tests;
 mod backup;
 #[cfg(test)]
 mod backup_tests;
+#[cfg(test)]
+mod bambu_accounts_tests;
 mod calibration;
 #[cfg(test)]
 mod calibration_tests;
@@ -47,6 +49,7 @@ mod state;
 mod theme_files;
 #[cfg(test)]
 mod theme_files_tests;
+pub mod tracking;
 #[cfg(test)]
 mod transfer_tests;
 mod transfers;
@@ -59,7 +62,6 @@ use axum::{
 };
 use foreman_core::{db::ForemanDb, events::ServerEvent, repo};
 use spoolman_rs::{
-    api as spoolman_api,
     config::SpoolmanConfig,
     db::{extra_field, Db as SpoolmanDb},
     state::AppState as SpoolmanState,
@@ -269,9 +271,25 @@ pub async fn serve_with(
         });
     }
 
+    // Secrets master key lives next to the DB, outside it.
+    let secrets = Arc::new(foreman_core::secrets::SecretBox::load_or_create(
+        &cfg.data_dir.join("secret.key"),
+    )?);
+
     // Driver manager: load printers from DB and spawn drivers.
     let driver_manager = DriverManager::new(Arc::clone(&tx), foreman_db.pool.clone());
     if cfg.drivers_enabled {
+        // Bambu Cloud: one MQTT connection per account with linked printers (doc 07 §B).
+        let hub = foreman_core::drivers::bambu_cloud::CloudHub::new(
+            foreman_db.pool.clone(),
+            Arc::clone(&secrets),
+            foreman_core::bambu_cloud::BambuCloud::new()?,
+            Arc::clone(&tx),
+        );
+        if let Err(e) = hub.sync().await {
+            warn!("bambu cloud: initial sync failed: {e}");
+        }
+        driver_manager.set_cloud(hub).await;
         driver_manager.start_all(&foreman_db.pool).await;
     } else {
         warn!("printer drivers disabled (FOREMAN__DRIVERS_ENABLED=false): every printer stays offline");
@@ -281,11 +299,6 @@ pub async fn serve_with(
         .timeout(Duration::from_secs(10))
         .build()
         .unwrap_or_default();
-
-    // Secrets master key lives next to the DB, outside it.
-    let secrets = Arc::new(foreman_core::secrets::SecretBox::load_or_create(
-        &cfg.data_dir.join("secret.key"),
-    )?);
     // SSH identity: generated once, stored encrypted in `setting`.
     let (ssh_key, ssh_pub) =
         foreman_core::ssh_client::ensure_identity(&foreman_db.pool, &secrets).await?;
@@ -316,6 +329,10 @@ pub async fn serve_with(
     );
 
     let spoolman = Arc::new(std::sync::OnceLock::new());
+    let tracking = Arc::new(tracking::Tracking::new(
+        tracking::load_mode(&foreman_db.pool).await?,
+        Arc::clone(&spoolman),
+    ));
     let scheduler = scheduler::Scheduler::new(
         foreman_db.pool.clone(),
         Arc::clone(&tx),
@@ -323,7 +340,7 @@ pub async fn serve_with(
             pool: foreman_db.pool.clone(),
             drivers: driver_manager.clone(),
             library: Arc::clone(&library),
-            spoolman: Arc::clone(&spoolman),
+            tracking: Arc::clone(&tracking),
         }),
     );
     scheduler.spawn();
@@ -355,9 +372,10 @@ pub async fn serve_with(
         library,
         transfers,
         scheduler,
-        spoolman: Arc::clone(&spoolman),
+        tracking: Arc::clone(&tracking),
         data_dir: cfg.data_dir.clone(),
         drivers_enabled: cfg.drivers_enabled,
+        bambu: Arc::new(api::bambu_accounts::BambuSignins::new()?),
     };
 
     // Library: catch up with files added/removed on disk, then purge old trash daily.
@@ -391,7 +409,23 @@ pub async fn serve_with(
     let app = build_router(app_state.clone(), frontend_dist);
 
     let stop = tokio_util::sync::CancellationToken::new();
-    spawn_spoolman(&cfg, &spoolman, stop.clone()).await;
+    tracking.set_shutdown(stop.clone());
+    spawn_spoolman(&cfg, &spoolman).await;
+    match tracking::serve_api(&app_state.foreman_db.pool, tracking.mode()).await {
+        Ok(true) if spoolman.get().is_some() => {
+            info!(
+                "Spoolman-compatible API is unauthenticated by design (Moonraker and slicers expect that)"
+            );
+            if let Err(e) = tracking.serve_api(true).await {
+                warn!("spoolman-rs API: {e}");
+            }
+        }
+        Ok(_) => info!(
+            mode = tracking.mode().as_str(),
+            "Spoolman API not served (Settings → Filament)"
+        ),
+        Err(e) => warn!("filament.serve_api: {e}"),
+    }
 
     if let Some(outcome) = restore_outcome {
         api::backup::report_restore(&app_state, outcome).await;
@@ -477,6 +511,7 @@ pub async fn serve_with(
     // checkpoints its WAL before the process goes away.
     stop.cancel();
     app_state.foreman_db.pool.close().await;
+    let _ = tracking.serve_api(false).await;
     if let Some(sm) = spoolman.get() {
         sm.db.pool.close().await;
     }
@@ -708,59 +743,24 @@ pub async fn restore_cli(cfg: config::ServerConfig, file: PathBuf) -> anyhow::Re
     }
 }
 
-/// The Spoolman-compatible API on its own port (default 7912).
-async fn spawn_spoolman(
-    cfg: &config::ServerConfig,
-    shared: &std::sync::OnceLock<SpoolmanState>,
-    stop: tokio_util::sync::CancellationToken,
-) {
+/// Connect the built-in Spoolman database (its API is started separately, see
+/// [`tracking::Tracking::serve_api`]).
+async fn spawn_spoolman(cfg: &config::ServerConfig, shared: &std::sync::OnceLock<SpoolmanState>) {
     if !cfg.spoolman_enabled {
         return;
     }
-    info!(
-        "Spoolman-compatible API is unauthenticated by design (Moonraker and slicers expect that)"
-    );
     match SpoolmanConfig::from_env() {
-        Ok(spoolman_cfg) => {
-            let spoolman_addr: SocketAddr = format!("{}:{}", spoolman_cfg.host, spoolman_cfg.port)
-                .parse()
-                .unwrap_or_else(|_| SocketAddr::from(([0, 0, 0, 0], 7912)));
-            match SpoolmanDb::connect(&spoolman_cfg).await {
-                Ok(db) => {
-                    if let Err(e) = extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await
-                    {
-                        warn!("could not create Foreman default extra fields: {e}");
-                    }
-                    let state = SpoolmanState::new(db, spoolman_cfg.clone());
-                    // The job engine deducts filament through the same DB + events.
-                    let _ = shared.set(state.clone());
-                    let spoolman_router =
-                        spoolman_api::router(&spoolman_cfg.base_path).with_state(state);
-                    match tokio::net::TcpListener::bind(spoolman_addr).await {
-                        Ok(spoolman_listener) => {
-                            info!(%spoolman_addr, "spoolman-rs API listening");
-                            tokio::spawn(async move {
-                                if let Err(e) = axum::serve(spoolman_listener, spoolman_router)
-                                    .with_graceful_shutdown(stop.cancelled_owned())
-                                    .await
-                                {
-                                    tracing::error!("spoolman-rs server error: {e}");
-                                }
-                            });
-                        }
-                        Err(e) => {
-                            warn!("could not bind spoolman-rs to {spoolman_addr}: {e}");
-                        }
-                    }
+        Ok(spoolman_cfg) => match SpoolmanDb::connect(&spoolman_cfg).await {
+            Ok(db) => {
+                if let Err(e) = extra_field::ensure_foreman_defaults(&db.pool, &db.engine).await {
+                    warn!("could not create Foreman default extra fields: {e}");
                 }
-                Err(e) => {
-                    warn!("spoolman-rs database connect failed: {e}");
-                }
+                // The job engine deducts filament through the same DB + events.
+                let _ = shared.set(SpoolmanState::new(db, spoolman_cfg));
             }
-        }
-        Err(e) => {
-            warn!("spoolman-rs config error (spoolman-rs disabled): {e}");
-        }
+            Err(e) => warn!("spoolman-rs database connect failed: {e}"),
+        },
+        Err(e) => warn!("spoolman-rs config error (spoolman-rs disabled): {e}"),
     }
 }
 
@@ -1029,6 +1029,39 @@ fn api_routes() -> Router<AppState> {
             "/api/exports/spoolman.json",
             get(api::exports::spoolman_json),
         )
+        // Bambu Cloud accounts + sign-in (doc 07 §B)
+        .route(
+            "/api/bambu/accounts",
+            get(api::bambu_accounts::list).post(api::bambu_accounts::create),
+        )
+        .route(
+            "/api/bambu/accounts/{id}",
+            delete(api::bambu_accounts::remove),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/signin",
+            post(api::bambu_accounts::signin),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/code",
+            post(api::bambu_accounts::code),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/devices/{serial}/link",
+            post(api::bambu_accounts::link).delete(api::bambu_accounts::unlink),
+        )
+        .route(
+            "/api/printers/{id}/cloud-history",
+            get(api::bambu_accounts::printer_history),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/token",
+            post(api::bambu_accounts::paste_token),
+        )
+        .route(
+            "/api/bambu/accounts/{id}/devices",
+            get(api::bambu_accounts::devices),
+        )
         // Backup + restore (6.2, W14)
         .route("/api/backup", get(api::backup::overview))
         .route("/api/backup/settings", put(api::backup::put_settings))
@@ -1039,6 +1072,14 @@ fn api_routes() -> Router<AppState> {
         .route("/api/swatch/fit", post(api::exports::swatch_fit))
         .route("/api/swatch/stl", post(api::exports::swatch_stl))
         .route("/api/swatch/batch", post(api::exports::swatch_batch))
+        .route(
+            "/api/settings/filament",
+            get(api::tracking::get_settings).put(api::tracking::put_settings),
+        )
+        .route(
+            "/api/settings/filament/preview",
+            get(api::tracking::get_preview),
+        )
         .route("/api/maintenance", get(api::maintenance::overview))
         .route(
             "/api/maintenance/settings",

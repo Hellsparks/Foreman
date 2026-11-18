@@ -74,7 +74,7 @@ struct World {
 async fn world() -> World {
     let (d, app, state, auth) = setup().await;
     let (pawns, frame) = files(&state).await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let teal = add_spool(sm, "PLA", "1F8A8A", 1000.0).await;
     let white = add_spool(sm, "PLA", "F4F4EF", 500.0).await;
     let (s, v) = call(
@@ -626,7 +626,7 @@ async fn m600_file(state: &AppState) -> i64 {
 async fn loose_files_share_a_slot_and_queue_per_print() {
     let (_d, app, state, auth) = setup().await;
     let [housing, benchy, clip] = loose_files(&state).await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     let teal = add_spool(sm, "PLA", "1F8A8A", 1000.0).await;
     let black = add_spool(sm, "PETG", "000000", 800.0).await;
 
@@ -856,4 +856,105 @@ async fn manual_swap_files_need_confirmation_to_queue() {
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["added"], 1);
+}
+
+#[tokio::test]
+async fn tracking_off_releases_reservations_and_clears_project_spools() {
+    let w = world().await;
+    let id = w.create(1).await["id"].as_i64().expect("id");
+    assert!(reserved_on(&w.inventory().await, w.teal) > 0.0);
+
+    // A mode change needs the confirm.
+    let off = json!({ "mode": "off" });
+    let (s, _) = call(&w.app, "PUT", "/api/settings/filament", &w.auth, Some(off)).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+
+    let (s, p) = call(
+        &w.app,
+        "GET",
+        "/api/settings/filament/preview?mode=off",
+        &w.auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    assert!(p["reservations"].as_u64().expect("n") >= 2, "{p}");
+    assert_eq!(
+        (p["project_slots"].as_i64(), p["projects"].as_i64()),
+        (Some(2), Some(1))
+    );
+    let text = p["confirm"].to_string();
+    assert!(
+        text.contains("2 slots in 1 project will lose their spool assignment"),
+        "{text}"
+    );
+    assert!(text.contains("open reservations"), "{text}");
+
+    let body = json!({ "mode": "off", "confirm": true });
+    let (s, r) = call(&w.app, "PUT", "/api/settings/filament", &w.auth, Some(body)).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(r["cleared_project_slots"], 2);
+    assert_eq!(r["settings"]["policy"]["spools"], false);
+    assert_eq!(
+        r["settings"]["policy"]["verdicts"],
+        json!([
+            "ready",
+            "busy",
+            "plate",
+            "too_big",
+            "nozzle",
+            "offline",
+            "unsupported",
+            "cloud_only"
+        ])
+    );
+    let v = w.get(id).await;
+    for s in v["slots"].as_array().expect("slots") {
+        assert!(s["spool"].is_null(), "{s}");
+    }
+    // Spool routes are off; the template plan still works, with nothing to pick.
+    let (s, _) = call(&w.app, "GET", "/api/spools", &w.auth, None).await;
+    assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
+    let (s, plan) = call(
+        &w.app,
+        "GET",
+        &format!("/api/templates/{}/plan?sets=1", w.tpl),
+        &w.auth,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{plan}");
+    assert_eq!(plan["slots"][0]["options"], json!([]));
+    // A spool id sent while Off is not stored, and can't be set later.
+    let second = w.create(1).await;
+    assert!(second["slots"][0]["spool"].is_null(), "{second}");
+    let sid = second["id"].as_i64().expect("id");
+    let (s, _) = call(
+        &w.app,
+        "PUT",
+        &format!("/api/projects/{sid}/slots/PRIMARY"),
+        &w.auth,
+        Some(json!({ "spool_id": w.teal })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Back on: records return, assignments don't.
+    let (_, p) = call(
+        &w.app,
+        "GET",
+        "/api/settings/filament/preview?mode=full",
+        &w.auth,
+        None,
+    )
+    .await;
+    assert!(p["confirm"].to_string().contains("not restored"), "{p}");
+    let body = json!({ "mode": "full", "confirm": true });
+    let (s, _) = call(&w.app, "PUT", "/api/settings/filament", &w.auth, Some(body)).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, spools) = call(&w.app, "GET", "/api/spools", &w.auth, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(spools.as_array().map(Vec::len), Some(2), "spools kept");
+    assert!(w.get(id).await["slots"][0]["spool"].is_null());
+    assert_eq!(reserved_on(&w.inventory().await, w.teal), 0.0);
 }

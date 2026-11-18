@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAppearance, THEMES, MODES, type Theme, type Mode } from "../hooks/useAppearance";
-import { api } from "../api/client";
+import { api, viaPath } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
 import SecuritySettings from "../auth/SecuritySettings";
 import BackupSettings from "../backup/BackupSettings";
+import FilamentSettings from "../filament/FilamentSettings";
+import { useFilament } from "../filament/policy";
 import ThemeSettings from "../theme/ThemeSettings";
 import RerunSetup from "../setup/RerunSetup";
+import BambuCloudSettings from "../integrations/BambuCloudSettings";
 import { EdgePanel } from "../ui";
 import { AboutSettings, AppSettings } from "../desktop/AboutSettings";
 import { IS_TAURI } from "../shell/TopBar";
@@ -48,6 +51,8 @@ export default function Settings() {
           {[
             ["appearance-heading", "Appearance"],
             ["printers-heading", "Printers"],
+            ["filament-heading", "Filament"],
+            ["integrations-heading", "Integrations"],
             ["security-heading", "Security"],
             ["backup-heading", "Backup"],
             ["setup-heading", "Setup"],
@@ -190,7 +195,7 @@ export default function Settings() {
                   >
                     {p.firmware}
                   </span>
-                  {p.active_path_index != null && p.active_path_index > 0 && p.active_path_name && (
+                  {viaPath(p) && (
                     <span style={{ fontSize: 11, color: "var(--fw-warning)", fontFamily: "var(--fw-mono)" }}>
                       via {p.active_path_name}
                     </span>
@@ -228,6 +233,19 @@ export default function Settings() {
             ))}
           </div>
         )}
+      </section>
+
+      <FilamentSettings />
+
+      {/* Integrations ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="integrations-heading">
+        <h2
+          id="integrations-heading"
+          style={{ font: "500 18px/1.3 var(--fw-sans)", margin: "0 0 var(--fw-space-4)", letterSpacing: "-0.02em" }}
+        >
+          Integrations
+        </h2>
+        <BambuCloudSettings />
       </section>
 
       <SecuritySettings />
@@ -364,6 +382,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
   const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
   const [returnAfter, setReturnAfter] = useState(printer.return_after_secs ?? 60);
   const [reporter, setReporter] = useState(printer.usage_reporter ?? "auto");
+  const { spools } = useFilament();
   const [authValue, setAuthValue] = useState(
     printer.firmware === "bambu" ? (printer.access_code ?? "") : (printer.api_key ?? "")
   );
@@ -665,6 +684,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             ))}
           </select>
         </label>
+        {spools && (
         <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
           <span style={{ fontSize: 12, fontWeight: "bold" }}>Filament use reported by</span>
           <select
@@ -683,6 +703,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             <option value="foreman">Foreman (from the file)</option>
           </select>
         </label>
+        )}
       </div>
 
       {/* Auth */}

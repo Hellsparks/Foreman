@@ -645,7 +645,7 @@ async fn failed_backup_raises_attention_and_a_good_one_clears_it() {
 #[tokio::test]
 async fn spool_csv_and_spoolman_json_exports() {
     let (_d, app, state, auth) = setup().await;
-    let sm = state.spoolman.get().expect("sm");
+    let sm = state.tracking.store().expect("sm");
     add_spool(sm, "PLA", "1d1d22", 800.0).await;
     add_spool(sm, "PETG", "ff0000", 250.5).await;
     let (csv, n) = crate::exports::spools_csv(sm).await.expect("csv");
