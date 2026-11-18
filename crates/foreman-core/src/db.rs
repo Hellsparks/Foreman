@@ -169,6 +169,14 @@ const MIGRATIONS: &[&str] = &[
        api_key_id INTEGER PRIMARY KEY NOT NULL REFERENCES api_key(id) ON DELETE CASCADE, \
        tools_json TEXT, allow_destructive INTEGER NOT NULL DEFAULT 0, \
        rate_per_minute INTEGER NOT NULL DEFAULT 60, updated_at TEXT NOT NULL)",
+    // 0018: Bambu Cloud accounts (doc 07 §B, see migrations/0018_bambu_account.sql).
+    "CREATE TABLE IF NOT EXISTS bambu_account (\
+       id INTEGER PRIMARY KEY NOT NULL, label TEXT NOT NULL, \
+       region TEXT NOT NULL CHECK (region IN ('global', 'china')), email TEXT NOT NULL, \
+       token TEXT, token_expires_at TEXT, last_ok_at TEXT, last_error TEXT, \
+       created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "ALTER TABLE printer ADD COLUMN bambu_account_id INTEGER \
+     REFERENCES bambu_account(id) ON DELETE SET NULL",
 ];
 
 /// Schema level of this build: one step per [`MIGRATIONS`] statement (they are only
