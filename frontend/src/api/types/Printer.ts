@@ -49,4 +49,8 @@ auto_start_from_queue: boolean,
 /**
  * Who reports filament use to Spoolman (3.6).
  */
-usage_reporter: UsageReporter, created_at: string, updated_at: string, };
+usage_reporter: UsageReporter, 
+/**
+ * Bambu Cloud account this printer belongs to (doc 07 §B); None = LAN only.
+ */
+bambu_account_id: number | null, created_at: string, updated_at: string, };
