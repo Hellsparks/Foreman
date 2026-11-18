@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { FilamentProvider } from "../filament/policy";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { setupApi } from "../api/setup";
 import Rail from "./Rail";
@@ -91,6 +92,7 @@ export default function Shell() {
   };
 
   return (
+    <FilamentProvider>
     <div className="shell">
       <Rail
         collapsed={railCollapsed}
@@ -118,5 +120,6 @@ export default function Shell() {
         <PhoneNav />
       </div>
     </div>
+    </FilamentProvider>
   );
 }

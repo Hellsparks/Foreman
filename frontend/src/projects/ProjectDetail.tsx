@@ -3,6 +3,7 @@
  * renderVals. Plates with slots and copies, live plate status, progress, time and
  * grams, materials with swap, activity, "print all remaining" → fleet queue.
  */
+import { useFilament } from "../filament/policy";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -67,6 +68,7 @@ export default function ProjectDetail() {
     projectsApi.plan(p.template_id, p.sets).then(setPlan, () => setPlan(null));
   }, [swap, p?.template_id, p?.sets]);
 
+  const { spools } = useFilament();
   const run = async (f: () => Promise<ProjectView | void>, msg?: string) => {
     setBusy(true);
     setError(null);
@@ -336,15 +338,23 @@ export default function ProjectDetail() {
                       {s.key}
                     </span>
                     <Dot hex={s.spool?.color_hex ?? s.spool?.multi_color_hexes[0] ?? s.hex} big />
-                    <span>{s.spool ? `#${s.spool.id} ${[s.spool.vendor, s.spool.material, s.spool.name].filter(Boolean).join(" ")}` : "No spool yet"}</span>
-                    {!ro && (
+                    <span>
+                      {!spools
+                        ? [s.label, s.hex ? `#${s.hex.replace(/^#/, "").toUpperCase()}` : null].filter(Boolean).join(" · ") || "As sliced"
+                        : s.spool
+                          ? `#${s.spool.id} ${[s.spool.vendor, s.spool.material, s.spool.name].filter(Boolean).join(" ")}`
+                          : "No spool yet"}
+                    </span>
+                    {!ro && spools && (
                       <button type="button" className="prj-btn prj-btn--small" aria-expanded={swap === s.key} onClick={() => setSwap(swap === s.key ? null : s.key)}>
                         Swap
                       </button>
                     )}
                   </div>
-                  <div className={short || !s.spool ? "prj-tone--warn" : "prj-tone--ok"} style={{ fontSize: 13 }}>
-                    {!s.spool
+                  <div className={!spools ? "prj-muted" : short || !s.spool ? "prj-tone--warn" : "prj-tone--ok"} style={{ fontSize: 13 }}>
+                    {!spools
+                      ? `Needs ${Math.round(s.need)} g`
+                      : !s.spool
                       ? `⚠ Needs ${Math.round(s.need)} g · nothing reserved`
                       : short
                         ? `⚠ Needs ${Math.round(s.need)} g · only ${Math.round(free)} g free · short ${Math.round(s.need - free)} g`

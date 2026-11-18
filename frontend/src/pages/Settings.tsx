@@ -4,6 +4,8 @@ import { api } from "../api/client";
 import type { PrinterWithStatus, PrinterPath, PathTestResult } from "../api/client";
 import SecuritySettings from "../auth/SecuritySettings";
 import BackupSettings from "../backup/BackupSettings";
+import FilamentSettings from "../filament/FilamentSettings";
+import { useFilament } from "../filament/policy";
 import ThemeSettings from "../theme/ThemeSettings";
 import RerunSetup from "../setup/RerunSetup";
 import { EdgePanel } from "../ui";
@@ -48,6 +50,7 @@ export default function Settings() {
           {[
             ["appearance-heading", "Appearance"],
             ["printers-heading", "Printers"],
+            ["filament-heading", "Filament"],
             ["security-heading", "Security"],
             ["backup-heading", "Backup"],
             ["setup-heading", "Setup"],
@@ -230,6 +233,8 @@ export default function Settings() {
         )}
       </section>
 
+      <FilamentSettings />
+
       <SecuritySettings />
 
       <BackupSettings />
@@ -364,6 +369,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
   const [failAfter, setFailAfter] = useState(printer.fail_after_checks ?? 3);
   const [returnAfter, setReturnAfter] = useState(printer.return_after_secs ?? 60);
   const [reporter, setReporter] = useState(printer.usage_reporter ?? "auto");
+  const { spools } = useFilament();
   const [authValue, setAuthValue] = useState(
     printer.firmware === "bambu" ? (printer.access_code ?? "") : (printer.api_key ?? "")
   );
@@ -665,6 +671,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             ))}
           </select>
         </label>
+        {spools && (
         <label style={{ display: "flex", flexDirection: "column", gap: "var(--fw-space-1)" }}>
           <span style={{ fontSize: 12, fontWeight: "bold" }}>Filament use reported by</span>
           <select
@@ -683,6 +690,7 @@ function SettingsPrinterConfigForm({ printer }: { printer: PrinterWithStatus }) 
             <option value="foreman">Foreman (from the file)</option>
           </select>
         </label>
+        )}
       </div>
 
       {/* Auth */}

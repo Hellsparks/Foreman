@@ -1,3 +1,4 @@
+import { useFilament } from "../filament/policy";
 import { NavLink } from "react-router-dom";
 
 // SVG path data for each nav item, from the UI reference (Main.dc.html).
@@ -34,6 +35,8 @@ function NavIcon({ name }: { name: string }) {
 interface NavItem {
   to: string;
   label: string;
+  /** Shown only while spools are tracked (doc 07 §A). */
+  spools?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -41,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/jobs",     label: "Jobs" },
   { to: "/library",  label: "Library" },
   { to: "/projects", label: "Projects" },
-  { to: "/filament", label: "Filament" },
+  { to: "/filament", label: "Filament", spools: true },
   { to: "/service",  label: "Service" },
   { to: "/tools",    label: "Tools" },
   { to: "/settings", label: "Settings" },
@@ -54,6 +57,8 @@ interface RailProps {
 
 export default function Rail({ collapsed, onToggle }: RailProps) {
   const navId = "rail-nav";
+  const { spools } = useFilament();
+  const items = NAV_ITEMS.filter((i) => !i.spools || spools);
 
   return (
     <nav
@@ -81,7 +86,7 @@ export default function Rail({ collapsed, onToggle }: RailProps) {
 
       {/* Nav items */}
       <ul className="rail__nav" id={navId} role="list">
-        {NAV_ITEMS.map(({ to, label }) => (
+        {items.map(({ to, label }) => (
           <li key={to} className="rail__item">
             <NavLink
               to={to}

@@ -1,3 +1,4 @@
+import { useFilament } from "../filament/policy";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -83,6 +84,8 @@ export default function TopBar({ connectionState: _connectionState }: TopBarProp
   const phone = usePhone();
   // Phone only: the search field is a button until tapped (see Shell.css).
   const [searchOpen, setSearchOpen] = useState(false);
+  const { spools } = useFilament();
+  const searchScope = spools ? "printers, files, spools" : "printers, files";
   const searchRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -120,7 +123,7 @@ export default function TopBar({ connectionState: _connectionState }: TopBarProp
         <input
           type="search"
           className="topbar__search-input"
-          placeholder={phone ? "Search printers, files, spools…" : "Search printers, files, spools… or type a command"}
+          placeholder={`Search ${searchScope}…${phone ? "" : " or type a command"}`}
           aria-keyshortcuts="Control+k"
           ref={searchRef}
           onBlur={() => setSearchOpen(false)}

@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { TOPBAR_SLOT_ID } from "../shell/TopBar";
 import { FilesTab, SshSettings, TerminalTab } from "./PrinterFiles";
 import PrinterSpoolsTab from "../filament/PrinterSpoolsTab";
+import { useFilament } from "../filament/policy";
 import { QueueBoard, useQueueBoard } from "./QueueBoard";
 import { PrinterServiceTab } from "./Service";
 import { JobsHistory } from "./JobsHistory";
@@ -60,6 +61,8 @@ const BABY_STEPS = [-0.05, -0.01, 0.01, 0.05];
 const EXT_LENGTHS = [10, 25, 50, 100];
 const EXT_SPEEDS = [2, 5, 10];
 const TABS = ["Live", "Queue", "Spools", "Service", "History", "Files", "Terminal", "Config"] as const;
+/** Tabs that exist only while spools are tracked (doc 07 §A). */
+const SPOOL_TABS: readonly string[] = ["Spools"];
 const DEFAULT_PRESETS = [
   { label: "PLA",  nozzle: 215, bed: 60 },
   { label: "PETG", nozzle: 245, bed: 85 },
@@ -133,6 +136,7 @@ export default function Printer() {
 
   // Tab
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("Live");
+  const filament = useFilament();
   const [visited, setVisited] = useState<Set<string>>(() => new Set(["Live"]));
   useEffect(() => {
     setVisited((v) => (v.has(activeTab) ? v : new Set(v).add(activeTab)));
@@ -329,7 +333,9 @@ export default function Printer() {
       <header className="printer-header">
         <EdgePanel side="left" label="Printer sections" storageKey="printer.sections">
         <div className="printer-tabs" role="tablist" aria-label="Printer sections" ref={tabsRef}>
-          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu").map((t) => (
+          {TABS.filter((t) => t !== "Terminal" || printer.firmware !== "bambu")
+            .filter((t) => filament.spools || !SPOOL_TABS.includes(t))
+            .map((t) => (
             <button
               key={t}
               role="tab"

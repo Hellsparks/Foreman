@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
+import { trackingApi } from "../api/tracking";
+import { useFilament } from "../filament/policy";
 import { setupApi, type DataSourceKind, type PendingImport, type SetupOverview } from "../api/setup";
 import { Button } from "../ui";
 import Checklist from "./Checklist";
@@ -151,8 +153,9 @@ type Act = (fn: () => Promise<SetupOverview | void>) => Promise<void>;
 // ---------------------------------------------------------------------------
 
 function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Act }) {
-  const [choice, setChoice] = useState<DataSourceKind | null>(
-    ov.state.pending?.kind ?? ov.state.data_source?.kind ?? null,
+  const filament = useFilament();
+  const [choice, setChoice] = useState<DataSourceKind | "off" | null>(
+    filament.policy && !filament.spools ? "off" : ov.state.pending?.kind ?? ov.state.data_source?.kind ?? null,
   );
   const [pending, setPending] = useState<PendingImport | null>(ov.state.pending);
   const [path, setPath] = useState("");
@@ -181,7 +184,7 @@ function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Ac
   const kindPending = pending && pending.kind === choice ? pending : null;
   const port = ov.spoolman_port ?? 7912;
 
-  const options: { kind: DataSourceKind; title: string; means: string; more: string }[] = [
+  const options: { kind: DataSourceKind | "off"; title: string; means: string; more: string }[] = [
     {
       kind: "fresh",
       title: "Fresh start",
@@ -206,6 +209,12 @@ function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Ac
         : "Reads that Spoolman once and copies its data in, with the same ids. That Spoolman is not changed.",
       more: `Afterwards point Moonraker's [spoolman] server at Foreman (port ${port}) so filament use lands here, then retire the old Spoolman.`,
     },
+    {
+      kind: "off",
+      title: "No filament tracking",
+      means: "Just the fleet: Send, queue, projects and job history, without a filament inventory.",
+      more: "Turn it on later under Settings → Filament.",
+    },
   ];
 
   return (
@@ -218,7 +227,7 @@ function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Ac
       )}
       <div className="su-choices" role="radiogroup" aria-label="Filament data source">
         {options.map((o) => {
-          const disabled = smOff && o.kind !== "fresh";
+          const disabled = smOff && o.kind !== "fresh" && o.kind !== "off";
           return (
             <label key={o.kind} className={`su-choice${choice === o.kind ? " su-choice--on" : ""}`}>
               <input
@@ -345,6 +354,21 @@ function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Ac
             Continue with a fresh start
           </Button>
         )}
+        {choice === "off" && (
+          <Button
+            variant="primary"
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                if (filament.spools || !filament.policy) await trackingApi.setupOff();
+                await filament.reload();
+                return setupApi.fresh();
+              })
+            }
+          >
+            Continue without filament tracking
+          </Button>
+        )}
         {kindPending && kindPending.accepted && (
           <Button
             variant="primary"
@@ -370,7 +394,7 @@ function DataStep({ ov, busy, act }: { ov: SetupOverview; busy: boolean; act: Ac
             Discard
           </Button>
         )}
-        {ov.state.data_source && !kindPending && choice !== "fresh" && (
+        {ov.state.data_source && !kindPending && choice !== "fresh" && choice !== "off" && (
           <Button variant="secondary" disabled={busy} onClick={() => void act(() => setupApi.step("printers"))}>
             Keep current data ({ov.state.data_source.label})
           </Button>
