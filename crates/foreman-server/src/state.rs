@@ -44,4 +44,6 @@ pub struct AppState {
     /// `FOREMAN__DRIVERS_ENABLED`: false = never connect to printers (setup scans show
     /// sample printers, added printers stay offline).
     pub drivers_enabled: bool,
+    /// Bambu Cloud sign-ins held per account, and the cloud HTTP client (doc 07 §B).
+    pub bambu: Arc<crate::api::bambu_accounts::BambuSignins>,
 }

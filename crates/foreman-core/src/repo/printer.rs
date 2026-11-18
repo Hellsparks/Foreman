@@ -34,6 +34,7 @@ struct PrinterRow {
     plate_clear: i64,
     auto_start_from_queue: i64,
     usage_reporter: String,
+    bambu_account_id: Option<i64>,
     created_at: String,
     updated_at: String,
 }
@@ -95,6 +96,7 @@ impl PrinterRow {
             plate_clear: self.plate_clear != 0,
             auto_start_from_queue: self.auto_start_from_queue != 0,
             usage_reporter: UsageReporter::parse(&self.usage_reporter),
+            bambu_account_id: self.bambu_account_id,
             created_at: parse_dt(&self.created_at),
             updated_at: parse_dt(&self.updated_at),
         })
@@ -109,14 +111,14 @@ const SQL_LIST: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     usage_reporter, created_at, updated_at \
+     usage_reporter, bambu_account_id, created_at, updated_at \
      FROM printer ORDER BY sort_order ASC, id ASC";
 
 const SQL_GET: &str =
     "SELECT id, name, firmware, primary_url, api_key, serial_number, access_code, \
      tls_fingerprint, tags, hardened_nozzle, slicer_profiles, sort_order, \
      fail_after_checks, return_after_secs, plate_clear, auto_start_from_queue, \
-     usage_reporter, created_at, updated_at \
+     usage_reporter, bambu_account_id, created_at, updated_at \
      FROM printer WHERE id=?";
 
 /// Return all printers ordered by `sort_order`, then `id`.

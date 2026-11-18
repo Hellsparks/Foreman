@@ -1,0 +1,79 @@
+/* Settings → Integrations → Bambu Cloud. Tokens only (DESIGN.md). */
+.bc__cap { margin: 0 0 var(--fw-space-2); font-weight: normal; }
+.bc__intro { margin: 0 0 var(--fw-space-4); max-width: 68ch; }
+.bc__err { color: var(--fw-danger); overflow-wrap: anywhere; }
+
+.bc__list { display: flex; flex-direction: column; gap: var(--fw-space-3); }
+
+.bc__card {
+  border: var(--fw-border-width) solid var(--fw-border);
+  background: var(--fw-raised);
+  border-radius: var(--fw-radius);
+  padding: var(--fw-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+}
+.bc__form { margin-top: var(--fw-space-3); }
+.bc__card-title { font-weight: bold; }
+
+.bc__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--fw-space-2) var(--fw-space-4);
+}
+.bc__who { min-width: 0; overflow-wrap: anywhere; }
+.bc__state { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; max-width: 100%; }
+.bc__detail { text-align: right; }
+.bc__region {
+  font-family: var(--fw-mono);
+  text-transform: uppercase;
+  font-size: var(--fw-type-label);
+}
+
+.bc__inner {
+  border-top: var(--fw-border-width) solid var(--fw-border);
+  padding-top: var(--fw-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fw-space-3);
+}
+.bc__form.bc__inner { margin-top: 0; }
+
+.bc__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--fw-space-3);
+}
+.bc__wide { grid-column: 1 / -1; }
+
+.bc__method { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--fw-space-4); }
+.bc__actions { display: flex; flex-wrap: wrap; gap: var(--fw-space-2); }
+
+.bc__devices { display: flex; flex-direction: column; gap: var(--fw-space-2); }
+.bc__devices-head { display: flex; justify-content: space-between; align-items: center; }
+
+.bc__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bc__table th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--fw-muted);
+  font-size: var(--fw-type-label);
+  padding: 0 var(--fw-space-2) var(--fw-space-1) 0;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+}
+.bc__table td {
+  padding: var(--fw-space-2) var(--fw-space-2) var(--fw-space-2) 0;
+  border-bottom: var(--fw-border-width) solid var(--fw-border);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .bc__state { align-items: flex-start; }
+  .bc__detail { text-align: left; }
+  .bc__table thead { display: none; }
+  .bc__table tr { display: grid; grid-template-columns: 1fr auto; padding: var(--fw-space-2) 0; border-bottom: var(--fw-border-width) solid var(--fw-border); }
+  .bc__table td { border: 0; padding: 2px 0; }
+}
