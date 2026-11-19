@@ -6,10 +6,15 @@
 //! per-printer [`CachedStatus`], the same parser the LAN driver uses.
 //!
 //! [`BambuCloudDriver`] is the printer's cloud *path*: it reads that merged state and
-//! publishes it like any driver. It never publishes to `device/<serial>/request`; there is
-//! no dispatch, upload, camera or `pushall` here. Everything that would touch the printer
-//! is refused by the compatibility engine before it gets here ([`crate::compat::Reach`]);
-//! the driver's own refusals are only a backstop.
+//! publishes it like any driver. The one thing this module may publish is `pushall`, a
+//! request for the printer's full status, through [`pushall::send`], the only function in
+//! the file that can publish (a test counts the publish calls). No dispatch, upload or
+//! camera message can reach `device/<serial>/request`. Everything that would touch the
+//! printer is refused by the compatibility engine before it gets here
+//! ([`crate::compat::Reach`]); the driver's own refusals are only a backstop.
+//!
+//! `pushall` is sent once when a printer's cloud path comes up and at most once per
+//! [`PUSHALL_FLOOR`] per printer after that, however often the path flaps.
 //!
 //! Credentials differ from LAN in every field:
 //! - broker `us.mqtt.bambulab.com:8883` (China: `cn.mqtt.bambulab.com`), TLS with the
@@ -24,9 +29,9 @@
 //! (no retry, no login call), and raises one Attention item naming the account. Only that
 //! account is touched. Network failures back off (2 s → 60 s) and retry.
 //!
-//! Without `pushall`, P1/A1 printers send deltas: a report may not say whether the printer
-//! is printing. The merged state stays "unknown" until a report carries `gcode_state` or
-//! another path seeds it ([`CloudHub::seed`]); the driver publishes nothing until then,
+//! P1/A1 printers send deltas: until the `pushall` answer arrives, a report may not say
+//! whether the printer is printing. The merged state stays "unknown" until a report carries
+//! `gcode_state` or another path seeds it ([`CloudHub::seed`]); the driver publishes nothing until then,
 //! so an unknown state can never close a running job.
 
 use std::collections::{HashMap, HashSet};
@@ -117,6 +122,72 @@ pub fn jwt_mqtt_username(token: &Token) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------
+// pushall: the only message this transport may publish
+// ---------------------------------------------------------------------------
+
+/// Least time between two `pushall` requests for one printer.
+pub const PUSHALL_FLOOR: Duration = Duration::from_secs(300);
+
+/// The only code in the cloud transport that can publish to the broker. It builds one
+/// message (`pushall`) and one topic from a serial; it takes no payload and no topic, so
+/// a later command cannot reach `device/<serial>/request` through it.
+mod pushall {
+    use rumqttc::{AsyncClient, ClientError, QoS};
+
+    /// Same body the LAN driver sends on connect.
+    pub(super) const PAYLOAD: &str =
+        r#"{"pushing":{"sequence_id":"0","command":"pushall","version":1,"push_target":1}}"#;
+
+    pub(super) fn topic(serial: &str) -> String {
+        format!("device/{serial}/request")
+    }
+
+    pub(super) async fn send(client: &AsyncClient, serial: &str) -> Result<(), ClientError> {
+        client
+            .publish(topic(serial), QoS::AtMostOnce, false, PAYLOAD)
+            .await
+    }
+}
+
+/// Per-printer floor on `pushall`. Kept by the hub, not the driver or session, so path
+/// flaps, driver restarts and re-authentication cannot reset it.
+struct PushAllFloor {
+    last: HashMap<(i64, String), Instant>,
+}
+
+impl PushAllFloor {
+    fn new() -> Self {
+        Self {
+            last: HashMap::new(),
+        }
+    }
+
+    /// Ok if a request may go now; Err(wait) if the floor has not elapsed.
+    fn check(&self, key: &(i64, String), now: Instant) -> Result<(), Duration> {
+        match self.last.get(key) {
+            Some(t) if now.duration_since(*t) < PUSHALL_FLOOR => {
+                Err(PUSHALL_FLOOR - now.duration_since(*t))
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn record(&mut self, key: (i64, String), now: Instant) {
+        self.last.insert(key, now);
+    }
+}
+
+/// What came of a `pushall` request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushAllOutcome {
+    Sent,
+    /// Asked for less than [`PUSHALL_FLOOR`] ago; retry after this long.
+    Throttled(Duration),
+    /// The account's connection is not up.
+    NotConnected,
+}
+
+// ---------------------------------------------------------------------------
 // Session state
 // ---------------------------------------------------------------------------
 
@@ -202,6 +273,7 @@ pub struct CloudHub {
     http: BambuCloud,
     bus_tx: Arc<broadcast::Sender<ServerEvent>>,
     sessions: Mutex<HashMap<i64, Arc<Session>>>,
+    pushall_floor: std::sync::Mutex<PushAllFloor>,
 }
 
 impl CloudHub {
@@ -217,6 +289,7 @@ impl CloudHub {
             http,
             bus_tx,
             sessions: Mutex::new(HashMap::new()),
+            pushall_floor: std::sync::Mutex::new(PushAllFloor::new()),
         })
     }
 
@@ -320,6 +393,41 @@ impl CloudHub {
             .get(serial)
             .and_then(|f| f.last_report)
             .is_some_and(|t| t.elapsed() < REPORT_STALE_AFTER)
+    }
+
+    /// Ask the printer for its full status (`pushall`), unless it was asked less than
+    /// [`PUSHALL_FLOOR`] ago. The only publish the cloud transport makes.
+    pub async fn request_pushall(&self, account_id: i64, serial: &str) -> PushAllOutcome {
+        let Some(s) = self.session(account_id).await else {
+            return PushAllOutcome::NotConnected;
+        };
+        if *s.state.borrow() != SessionState::Connected {
+            return PushAllOutcome::NotConnected;
+        }
+        let key = (account_id, serial.to_owned());
+        {
+            let floor = self.pushall_floor.lock().unwrap_or_else(|e| e.into_inner());
+            if let Err(wait) = floor.check(&key, Instant::now()) {
+                return PushAllOutcome::Throttled(wait);
+            }
+        }
+        let Some(client) = s.client.lock().await.clone() else {
+            return PushAllOutcome::NotConnected;
+        };
+        match pushall::send(&client, serial).await {
+            Ok(()) => {
+                self.pushall_floor
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .record(key, Instant::now());
+                info!(account_id, serial, "bambu cloud: pushall requested");
+                PushAllOutcome::Sent
+            }
+            Err(e) => {
+                warn!(account_id, serial, "bambu cloud: pushall: {e}");
+                PushAllOutcome::NotConnected
+            }
+        }
     }
 
     /// What the account's connection has heard from this printer.
@@ -776,6 +884,9 @@ impl BambuCloudDriver {
             let mut last_reports = u64::MAX;
             let min_interval = Duration::from_millis(500);
             let mut last_publish = Instant::now() - min_interval;
+            // Set when the path comes up; cleared once pushall has gone out. A request
+            // held back by the floor stays set and goes out when the floor lapses.
+            let mut want_pushall = false;
             loop {
                 // Follow the account's current connection (a re-authentication
                 // replaces it; the printer keeps its path).
@@ -793,6 +904,7 @@ impl BambuCloudDriver {
                 let up = st == SessionState::Connected;
                 if online != Some(up) {
                     online = Some(up);
+                    want_pushall = up;
                     let reason = match &st {
                         SessionState::Connected => Some(CLOUD_PATH_NAME.to_owned()),
                         SessionState::AuthExpired { .. } => {
@@ -824,6 +936,14 @@ impl BambuCloudDriver {
                             status: off,
                         });
                     }
+                }
+
+                // Ask for the full status once the path is up (floor: PUSHALL_FLOOR).
+                if up
+                    && want_pushall
+                    && hub.request_pushall(account_id, &serial).await == PushAllOutcome::Sent
+                {
+                    want_pushall = false;
                 }
 
                 // This printer's merged reports → status (only once the state is known).
@@ -1059,6 +1179,36 @@ mod tests {
             "a 403 is not an expired token"
         );
         assert!(acct.last_error.as_deref().is_some_and(|e| e.contains(body)));
+    }
+
+    #[test]
+    fn pushall_floor_holds_under_flaps() {
+        let mut f = PushAllFloor::new();
+        let key = (1, "SER".to_owned());
+        let t0 = Instant::now();
+        assert!(f.check(&key, t0).is_ok());
+        f.record(key.clone(), t0);
+        // Ten flaps in the next 4 minutes: every one refused.
+        for i in 1..=10u64 {
+            let t = t0 + Duration::from_secs(i * 24);
+            assert!(f.check(&key, t).is_err(), "flap {i} must be throttled");
+        }
+        // Another printer on the same account is independent.
+        assert!(f.check(&(1, "OTHER".into()), t0).is_ok());
+        // After the floor, one more goes out.
+        assert!(f.check(&key, t0 + PUSHALL_FLOOR).is_ok());
+    }
+
+    #[test]
+    fn pushall_is_the_only_publish_and_only_targets_request() {
+        let src = include_str!("bambu_cloud.rs");
+        let prod = &src[..src.find("#[cfg(test)]").unwrap_or(src.len())];
+        let needle = concat!(".pub", "lish(");
+        assert_eq!(prod.matches(needle).count(), 1, "exactly one publish call");
+        assert!(prod.contains("pushall::send(&client, serial)"));
+        assert_eq!(pushall::topic("01P00A"), "device/01P00A/request");
+        let v: Value = serde_json::from_str(pushall::PAYLOAD).unwrap();
+        assert_eq!(v["pushing"]["command"], "pushall");
     }
 
     #[test]
