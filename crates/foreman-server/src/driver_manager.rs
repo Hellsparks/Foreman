@@ -745,7 +745,7 @@ impl DriverManager {
     }
 
     /// A status from the printer's LAN path tells the cloud feed the print state it
-    /// can't ask for (no `pushall` over cloud).
+    /// can't ask for.
     async fn seed_cloud(&self, printer_id: i64, status: &PrinterStatus) {
         let Some((account_id, serial)) = self.cloud_links.read().await.get(&printer_id).cloned()
         else {
